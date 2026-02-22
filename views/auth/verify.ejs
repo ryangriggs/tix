@@ -1,0 +1,65 @@
+<%- include('../partials/head', { title: 'Check your email' }) %>
+<main class="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo">🎫 Ticketing</div>
+    <h1 class="auth-title">Check your email</h1>
+
+    <% if (sent) { %>
+      <p class="auth-subtitle">We sent a login link and 6-digit code to your email. Enter the code below or click the link in the email.</p>
+    <% } %>
+
+    <% if (error) { %>
+      <div class="alert alert-error"><%= error %></div>
+    <% } %>
+
+    <% if (tokenId && rawToken) { %>
+      <%-- Magic link flow: user clicked the link in email. We confirm via POST so
+           email security scanners (which pre-fetch URLs) cannot consume the token. --%>
+      <form method="POST" action="/auth/verify" class="auth-form">
+        <input type="hidden" name="tokenId" value="<%= tokenId %>">
+        <input type="hidden" name="rawToken" value="<%= rawToken %>">
+        <input type="hidden" name="next" value="<%= next %>">
+        <button type="submit" class="btn btn-primary btn-full">Log in</button>
+      </form>
+    <% } else if (tokenId) { %>
+      <form method="POST" action="/auth/verify" class="auth-form" id="otp-form">
+        <input type="hidden" name="tokenId" value="<%= tokenId %>">
+        <input type="hidden" name="next" value="<%= next %>">
+        <div class="form-group">
+          <label for="otp">6-digit code</label>
+          <input
+            type="text"
+            id="otp"
+            name="otp"
+            inputmode="numeric"
+            pattern="[0-9]{6}"
+            maxlength="6"
+            placeholder="123456"
+            autocomplete="one-time-code"
+            autofocus
+            required
+            class="form-input otp-input"
+          >
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Verify code</button>
+      </form>
+    <% } %>
+
+    <div style="margin-top:1.5rem;text-align:center">
+      <a href="/auth/login" class="link-muted">← Request a new link</a>
+    </div>
+  </div>
+</main>
+<script>
+  // Auto-submit when 6 digits are pasted or typed
+  const otpInput = document.getElementById('otp');
+  if (otpInput) {
+    otpInput.addEventListener('input', () => {
+      if (otpInput.value.replace(/\D/g, '').length === 6) {
+        otpInput.value = otpInput.value.replace(/\D/g, '');
+        document.getElementById('otp-form').submit();
+      }
+    });
+  }
+</script>
+<%- include('../partials/foot') %>

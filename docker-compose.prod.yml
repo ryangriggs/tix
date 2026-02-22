@@ -1,0 +1,20 @@
+version: '3.8'
+
+# Production overrides: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Or use this file standalone after building the image.
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+      - "25:25"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    command: node src/app.js
+    # No mailhog dependency in production

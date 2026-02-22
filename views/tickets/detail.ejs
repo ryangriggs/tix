@@ -1,0 +1,230 @@
+<%- include('../partials/head', { title: `#${ticket.id} — ${ticket.subject}` }) %>
+<%- include('../partials/nav') %>
+
+<!-- Quill (only needed for the comment editor) -->
+<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+
+<main class="container">
+
+  <!-- Back link -->
+  <div style="margin-bottom:1rem">
+    <a href="/tickets" class="btn btn-ghost btn-sm">← All Tickets</a>
+  </div>
+
+  <!-- Ticket header -->
+  <div class="ticket-header">
+    <div class="ticket-header-top">
+      <span class="ticket-num">#<%= ticket.id %></span>
+      <span class="badge badge-priority-<%= ticket.priority %>" id="badge-priority"><%= ticket.priority %></span>
+      <span class="badge badge-status-<%= ticket.status %>" id="badge-status"><%= ticket.status.replace('_',' ') %></span>
+    </div>
+    <h1 class="ticket-title"><%= ticket.subject %></h1>
+    <div class="ticket-meta-row">
+      <span class="meta-item">Created <%= formatDateFull(ticket.created_at) %></span>
+      <span class="meta-item">Updated <%= formatDate(ticket.updated_at) %></span>
+      <% if (ticket.due_date) { %>
+        <span class="meta-item <%= ticket.due_date < (Date.now()/1000) ? 'overdue' : '' %>">
+          Due <%= formatDateFull(ticket.due_date) %>
+        </span>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="ticket-layout">
+
+    <!-- Left column: body + comments -->
+    <div class="ticket-main">
+
+      <!-- Ticket body -->
+      <div class="ticket-body rich-content"><%- ticket.body %></div>
+
+      <!-- Ticket-level attachments -->
+      <% if (ticketAttachments.length) { %>
+        <div class="attachments-section">
+          <strong>Attachments</strong>
+          <ul class="attachment-list">
+            <% for (const a of ticketAttachments) { %>
+              <li><a href="/tickets/attachments/<%= a.stored_name %>" class="attachment-link">📎 <%= a.original_name %></a> <span class="meta-item">(<%= (a.size/1024).toFixed(1) %> KB)</span></li>
+            <% } %>
+          </ul>
+        </div>
+      <% } %>
+
+      <!-- Add comment (above activity) -->
+      <div class="comment-form-section">
+        <h3 class="section-title">Reply</h3>
+        <form method="POST" action="/tickets/<%= ticket.id %>/comments" enctype="multipart/form-data" id="comment-form">
+          <div class="form-group">
+            <div id="comment-editor" class="quill-editor quill-compact"></div>
+            <input type="hidden" name="body" id="comment-body">
+          </div>
+          <div class="form-group">
+            <input type="file" name="attachments" multiple class="form-file">
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Post comment</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Comments -->
+      <div class="comments-section" id="comments">
+        <h2 class="section-title">Activity</h2>
+
+        <% for (const c of comments) { %>
+          <div class="comment" id="comment-<%= c.id %>">
+            <div class="comment-header">
+              <span class="comment-author">
+                <% if (c.user_name) { %>
+                  <%= c.user_name %><span class="comment-author-sub"><%= c.user_email %></span>
+                <% } else { %>
+                  <%= c.user_email || 'System' %>
+                <% } %>
+              </span>
+              <% if (c.is_email) { %><span class="badge badge-email">via email</span><% } %>
+              <span class="comment-time"><%= formatDateFull(c.created_at) %></span>
+            </div>
+            <div class="comment-body rich-content"><%- c.body %></div>
+            <% const cattachments = commentAttachmentsMap[c.id]; %>
+            <% if (cattachments && cattachments.length) { %>
+              <ul class="attachment-list">
+                <% for (const a of cattachments) { %>
+                  <li><a href="/tickets/attachments/<%= a.stored_name %>" class="attachment-link">📎 <%= a.original_name %></a></li>
+                <% } %>
+              </ul>
+            <% } %>
+          </div>
+        <% } %>
+      </div>
+
+    </div><!-- /.ticket-main -->
+
+    <!-- Right column: sidebar -->
+    <aside class="ticket-sidebar">
+
+      <!-- Status -->
+      <% if (canManage) { %>
+        <div class="sidebar-section">
+          <div class="sidebar-label">Status</div>
+          <form method="POST" action="/tickets/<%= ticket.id %>/status">
+            <select name="status" class="form-select" onchange="this.form.submit()">
+              <% for (const s of ['open','pending','on_hold','completed','cancelled']) { %>
+                <option value="<%= s %>" <%= ticket.status === s ? 'selected' : '' %>><%= s.replace('_',' ') %></option>
+              <% } %>
+            </select>
+          </form>
+        </div>
+
+        <!-- Priority -->
+        <div class="sidebar-section">
+          <div class="sidebar-label">Priority</div>
+          <form method="POST" action="/tickets/<%= ticket.id %>/priority">
+            <select name="priority" class="form-select" onchange="this.form.submit()">
+              <% for (const p of ['low','medium','high','urgent']) { %>
+                <option value="<%= p %>" <%= ticket.priority === p ? 'selected' : '' %>><%= p %></option>
+              <% } %>
+            </select>
+          </form>
+        </div>
+
+        <!-- Due date -->
+        <div class="sidebar-section">
+          <div class="sidebar-label">Due date</div>
+          <form method="POST" action="/tickets/<%= ticket.id %>/due-date" class="inline-form">
+            <input type="date" name="due_date" value="<%= formatDateInput(ticket.due_date) %>" class="form-input form-input-sm">
+            <button type="submit" class="btn btn-sm btn-secondary">Set</button>
+          </form>
+        </div>
+      <% } else { %>
+        <div class="sidebar-section">
+          <div class="sidebar-label">Status</div>
+          <span class="badge badge-status-<%= ticket.status %>"><%= ticket.status.replace('_',' ') %></span>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-label">Priority</div>
+          <span class="badge badge-priority-<%= ticket.priority %>"><%= ticket.priority %></span>
+        </div>
+        <% if (ticket.due_date) { %>
+          <div class="sidebar-section">
+            <div class="sidebar-label">Due date</div>
+            <span class="<%= ticket.due_date < (Date.now()/1000) ? 'overdue' : '' %>"><%= formatDateFull(ticket.due_date) %></span>
+          </div>
+        <% } %>
+      <% } %>
+
+      <!-- Parties -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">People</div>
+        <ul class="party-list">
+          <% for (const p of parties) { %>
+            <li class="party-item">
+              <div class="party-info">
+                <% if (p.name) { %>
+                  <span class="party-name"><%= p.name %></span>
+                  <a href="mailto:<%= p.email %>" class="party-email-link"><%= p.email %></a>
+                <% } else { %>
+                  <span class="party-name"><%= p.email %></span>
+                <% } %>
+              </div>
+              <span class="badge badge-role"><%= p.role %></span>
+              <% if (canManage && p.user_id !== user.id) { %>
+                <form method="POST" action="/tickets/<%= ticket.id %>/parties/remove" style="display:inline">
+                  <input type="hidden" name="userId" value="<%= p.user_id %>">
+                  <button type="submit" class="btn-icon" title="Remove">×</button>
+                </form>
+              <% } %>
+            </li>
+          <% } %>
+        </ul>
+
+        <% if (canManage) { %>
+          <details class="add-party-details">
+            <summary class="link-btn">+ Add person</summary>
+            <form method="POST" action="/tickets/<%= ticket.id %>/parties" class="add-party-form">
+              <input type="email" name="email" placeholder="email@example.com" class="form-input form-input-sm" required>
+              <select name="role" class="form-select form-select-sm">
+                <option value="collaborator">Collaborator</option>
+                <option value="owner">Owner</option>
+              </select>
+              <button type="submit" class="btn btn-sm btn-secondary">Add</button>
+            </form>
+          </details>
+        <% } %>
+      </div>
+
+      <% if (user && user.role === 'admin') { %>
+        <div class="sidebar-section">
+          <form method="POST" action="/tickets/<%= ticket.id %>/delete"
+            onsubmit="return confirm('Permanently delete this ticket and all its data?')">
+            <button type="submit" class="btn btn-danger btn-full btn-sm">Delete Ticket</button>
+          </form>
+        </div>
+      <% } %>
+
+    </aside><!-- /.ticket-sidebar -->
+  </div><!-- /.ticket-layout -->
+</main>
+
+<script>
+  // Comment editor
+  const quill = new Quill('#comment-editor', {
+    theme: 'snow',
+    placeholder: 'Write a comment…',
+    modules: {
+      toolbar: [
+        ['bold', 'italic', 'underline', 'strike'],
+        ['blockquote', 'code-block'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['link'],
+        ['clean'],
+      ]
+    }
+  });
+
+  document.getElementById('comment-form').addEventListener('submit', () => {
+    document.getElementById('comment-body').value = quill.root.innerHTML;
+  });
+</script>
+
+<%- include('../partials/foot') %>
