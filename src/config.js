@@ -16,6 +16,8 @@ const config = {
   defaultAssigneeEmail: process.env.DEFAULT_ASSIGNEE_EMAIL || null,
   adminEmail: process.env.ADMIN_EMAIL || null,
 
+  appUrl: (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, ''),
+
   dataDir: process.env.DATA_DIR || '/app/data',
   uploadsDir: process.env.UPLOADS_DIR || '/app/data/uploads',
 

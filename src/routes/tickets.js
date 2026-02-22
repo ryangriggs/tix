@@ -370,12 +370,11 @@ router.post('/:id/parties', async (req, res) => {
 
   // Notify the newly added party
   try {
-    const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
     await sendTicketNotification({
       to: email,
       ticketSubject: ticket.subject,
       body: `<p>You have been added to ticket <strong>#${ticket.id}: ${ticket.subject}</strong> as a ${role}.</p>
-             <p><a href="${appUrl}/tickets/${ticket.id}">View ticket</a></p>`,
+             <p><a href="${config.appUrl}/tickets/${ticket.id}">View ticket</a></p>`,
       ticketId: ticket.id,
     });
   } catch (err) { console.error('[Tickets] Notification error:', err); }

@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 
+const config = require('../config');
 const db = require('../db');
 const { sendMagicLink } = require('../services/mail');
 const { issueSessionCookie } = require('../middleware/auth');
@@ -30,8 +31,7 @@ router.post('/login', async (req, res) => {
   const otp = String(Math.floor(100000 + Math.random() * 900000));
   const { tokenId, rawToken } = db.createAuthToken(user.id, otp);
 
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const magicLink = `${baseUrl}/auth/verify?t=${tokenId}&k=${rawToken}&next=${encodeURIComponent(next)}`;
+  const magicLink = `${config.appUrl}/auth/verify?t=${tokenId}&k=${rawToken}&next=${encodeURIComponent(next)}`;
 
   try {
     await sendMagicLink(email, magicLink, otp);

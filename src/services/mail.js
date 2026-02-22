@@ -91,12 +91,11 @@ async function sendMagicLink(toEmail, magicLinkUrl, otp) {
 }
 
 async function sendTicketNotification({ to, ticketSubject, body, ticketId, messageId, inReplyTo, references }) {
-  const appUrl = process.env.APP_URL || `http://localhost:${config.port}`;
   const footer = `
     <hr style="border:none;border-top:1px solid #e0e0e0;margin:24px 0">
     <p style="color:#666;font-size:.85em;margin:0">
       You can reply to this email to add a comment, or
-      <a href="${appUrl}/tickets/${ticketId}">view ticket #${ticketId} online</a>.
+      <a href="${config.appUrl}/tickets/${ticketId}">view ticket #${ticketId} online</a>.
     </p>
   `;
   const fullHtml = body + footer;

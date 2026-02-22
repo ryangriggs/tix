@@ -359,11 +359,6 @@ function resolveCidReferences(html, cidMap) {
   });
 }
 
-function getAppUrl() {
-  // Best-effort — override with APP_URL env var for proper links in emails
-  return process.env.APP_URL || `http://localhost:${config.port}`;
-}
-
 // ============================================================
 // Mailgun webhook entry point
 // Mailgun forward() sends individual parsed fields, not raw MIME.
