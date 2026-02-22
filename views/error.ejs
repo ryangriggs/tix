@@ -1,0 +1,8 @@
+<%- include('partials/head', { title: title || 'Error' }) %>
+<%- include('partials/nav') %>
+<main class="container" style="padding-top:4rem;text-align:center">
+  <h1 style="font-size:3rem;color:var(--text-muted)"><%= title || 'Error' %></h1>
+  <p style="color:var(--text-muted);margin:1rem 0"><%= message %></p>
+  <a href="/" class="btn btn-primary">Go home</a>
+</main>
+<%- include('partials/foot') %>

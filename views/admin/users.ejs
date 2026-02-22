@@ -1,0 +1,61 @@
+<%- include('../partials/head', { title: 'User Management' }) %>
+<%- include('../partials/nav') %>
+
+<main class="container">
+  <h1 class="page-title">User Management</h1>
+
+  <% if (message) { %>
+    <div class="alert alert-info"><%= message %></div>
+  <% } %>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Email</th>
+        <th>Name</th>
+        <th>Role</th>
+        <th>Created</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% for (const u of users) { %>
+        <tr class="<%= u.blocked_at ? 'row-blocked' : '' %>">
+          <td><%= u.email %></td>
+          <td>
+            <form method="POST" action="/admin/users/<%= u.id %>/name" class="inline-form">
+              <input type="text" name="name" value="<%= u.name || '' %>" placeholder="—"
+                class="form-input form-input-sm" style="width:160px">
+              <button type="submit" class="btn btn-sm btn-secondary">Save</button>
+            </form>
+          </td>
+          <td>
+            <form method="POST" action="/admin/users/<%= u.id %>/role" style="display:inline">
+              <select name="role" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="user"  <%= u.role === 'user'  ? 'selected' : '' %>>User</option>
+                <option value="admin" <%= u.role === 'admin' ? 'selected' : '' %>>Admin</option>
+              </select>
+            </form>
+          </td>
+          <td><%= formatDate(u.created_at) %></td>
+          <td><%= u.blocked_at ? '🚫 Blocked' : '✓ Active' %></td>
+          <td class="actions-cell">
+            <% if (!u.blocked_at) { %>
+              <form method="POST" action="/admin/users/<%= u.id %>/block">
+                <button type="submit" class="btn btn-sm btn-danger"
+                  onclick="return confirm('Block <%= u.email %>?')">Block</button>
+              </form>
+            <% } else { %>
+              <form method="POST" action="/admin/users/<%= u.id %>/unblock">
+                <button type="submit" class="btn btn-sm btn-secondary">Unblock</button>
+              </form>
+            <% } %>
+          </td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+</main>
+
+<%- include('../partials/foot') %>

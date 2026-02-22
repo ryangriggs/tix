@@ -1,0 +1,182 @@
+<%- include('../partials/head', { title: 'Tickets' }) %>
+<%- include('../partials/nav') %>
+
+<main class="container">
+  <div class="page-toolbar">
+    <h1 class="page-title">Tickets</h1>
+    <a href="/tickets/new" class="btn btn-primary">+ New Ticket</a>
+  </div>
+
+  <!-- Filters & Search -->
+  <form method="GET" action="/tickets" class="filter-bar" id="filter-form">
+    <div class="filter-tabs">
+      <% const statuses = ['', 'open', 'pending', 'on_hold', 'completed', 'cancelled']; %>
+      <% const statusLabels = { '': 'All', open: 'Open', pending: 'Pending', on_hold: 'On Hold', completed: 'Completed', cancelled: 'Cancelled' }; %>
+      <% for (const s of statuses) { %>
+        <button type="button" class="filter-tab <%= filters.status === s ? 'active' : '' %>"
+          onclick="setFilter('status','<%= s %>')">
+          <%= statusLabels[s] %>
+        </button>
+      <% } %>
+    </div>
+
+    <div class="filter-controls">
+      <select name="priority" class="form-select" onchange="this.form.submit()">
+        <option value="" <%= !filters.priority ? 'selected' : '' %>>Any priority</option>
+        <option value="urgent"  <%= filters.priority==='urgent'  ? 'selected' : '' %>>Urgent</option>
+        <option value="high"    <%= filters.priority==='high'    ? 'selected' : '' %>>High</option>
+        <option value="medium"  <%= filters.priority==='medium'  ? 'selected' : '' %>>Medium</option>
+        <option value="low"     <%= filters.priority==='low'     ? 'selected' : '' %>>Low</option>
+      </select>
+
+      <input type="hidden" name="sort"  value="<%= filters.sort %>">
+      <input type="hidden" name="order" value="<%= filters.order %>">
+
+      <select name="since" class="form-select" onchange="this.form.submit()">
+        <option value="1d"  <%= filters.since==='1d'  ? 'selected' : '' %>>Last 24 h</option>
+        <option value="7d"  <%= filters.since==='7d'  ? 'selected' : '' %>>Last 7 days</option>
+        <option value="30d" <%= filters.since==='30d' ? 'selected' : '' %>>Last 30 days</option>
+        <option value=""    <%= filters.since===''    ? 'selected' : '' %>>All time</option>
+      </select>
+
+      <div class="search-wrap">
+        <input type="search" name="q" value="<%= filters.q %>" placeholder="Search…" class="form-input form-input-sm">
+      </div>
+
+      <input type="hidden" name="status" value="<%= filters.status %>">
+    </div>
+  </form>
+
+  <!-- Column headers -->
+  <div class="ticket-list-header">
+    <div class="tlh-inner">
+      <button type="button" class="tc-num    tlh-sort-btn <%= filters.sort==='id'            ? 'tlh-active' : '' %>" onclick="setSort('id')"            title="Sort by ticket #">#<%= filters.sort==='id'            ? (filters.order==='desc' ? ' ↓' : ' ↑') : '' %></button>
+      <button type="button" class="tc-creator tlh-sort-btn <%= filters.sort==='submitter'     ? 'tlh-active' : '' %>" onclick="setSort('submitter')"                         >From<%= filters.sort==='submitter'     ? (filters.order==='desc' ? ' ↓' : ' ↑') : '' %></button>
+      <button type="button" class="tc-subject tlh-sort-btn <%= filters.sort==='subject'       ? 'tlh-active' : '' %>" onclick="setSort('subject')"                           >Subject<%= filters.sort==='subject'       ? (filters.order==='desc' ? ' ↓' : ' ↑') : '' %></button>
+      <button type="button" class="tc-created tlh-sort-btn <%= filters.sort==='created_at'   ? 'tlh-active' : '' %>" onclick="setSort('created_at')"                        >Created<%= filters.sort==='created_at'   ? (filters.order==='desc' ? ' ↓' : ' ↑') : '' %></button>
+      <button type="button" class="tc-updated tlh-sort-btn <%= filters.sort==='updated_at'   ? 'tlh-active' : '' %>" onclick="setSort('updated_at')"                        >Updated<%= filters.sort==='updated_at'   ? (filters.order==='desc' ? ' ↓' : ' ↑') : '' %></button>
+      <button type="button" class="tc-replies tlh-sort-btn <%= filters.sort==='comment_count' ? 'tlh-active' : '' %>" onclick="setSort('comment_count')" title="Sort by replies">💬<%= filters.sort==='comment_count' ? (filters.order==='desc' ? ' ↓' : ' ↑') : '' %></button>
+    </div>
+    <% if (user && user.role === 'admin') { %><span class="tlh-checkbox-spacer"></span><% } %>
+  </div>
+
+  <!-- Ticket list wrapped in bulk form -->
+  <form method="POST" action="/tickets/bulk" id="bulk-form">
+    <input type="hidden" name="action" id="bulk-action" value="">
+
+    <div class="ticket-list" id="ticket-list">
+      <% if (tickets.length === 0) { %>
+        <div class="empty-state">
+          <p>No tickets found.</p>
+          <% if (filters.since) { %>
+            <a href="/tickets?status=<%= filters.status %>&priority=<%= filters.priority %>&sort=<%= filters.sort %>&order=<%= filters.order %>&since=" class="btn btn-secondary btn-sm">Show all time</a>
+          <% } %>
+          <a href="/tickets/new" class="btn btn-primary">Create one</a>
+        </div>
+      <% } %>
+
+      <% for (const t of tickets) { %>
+        <div class="ticket-card priority-<%= t.priority %> status-<%= t.status %>" data-ticket-id="<%= t.id %>">
+          <a href="/tickets/<%= t.id %>" class="ticket-card-link">
+            <span class="tc-num"><span class="priority-dot priority-dot-<%= t.priority %>" title="<%= t.priority %>"></span>#<%= t.id %></span>
+            <% if (t.submitter_name) { %>
+              <span class="tc-creator name-tip" data-email="<%= t.submitter_email %>"><%= t.submitter_name %></span>
+            <% } else { %>
+              <span class="tc-creator"><%= t.submitter_email || '—' %></span>
+            <% } %>
+            <span class="tc-subject"><%= t.subject %></span>
+            <span class="tc-created"><%= formatDate(t.created_at) %></span>
+            <span class="tc-updated"<% if (t.last_actor) { %> data-by="<%= t.last_actor %>"<% } %>><%= formatDate(t.updated_at) %></span>
+            <span class="tc-replies"><% if (t.comment_count > 0) { %>💬 <%= t.comment_count %><% } %></span>
+          </a>
+          <% if (user && user.role === 'admin') { %>
+            <label class="ticket-card-checkbox" title="Select ticket">
+              <input type="checkbox" name="ticketIds[]" value="<%= t.id %>" class="ticket-checkbox" onchange="updateBulkBar()">
+            </label>
+          <% } %>
+        </div>
+      <% } %>
+    </div>
+
+    <!-- Floating bulk action bar — only visible when tickets are selected -->
+    <div class="bulk-bar" id="bulk-bar">
+      <span class="bulk-count" id="bulk-count">0 selected</span>
+      <div class="bulk-actions">
+        <select id="bulk-status" name="bulkStatus" class="form-select form-select-sm" onchange="bulkSubmit('status')">
+          <option value="">Status…</option>
+          <option value="open">Open</option>
+          <option value="pending">Pending</option>
+          <option value="on_hold">On Hold</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <select id="bulk-priority" name="bulkPriority" class="form-select form-select-sm" onchange="bulkSubmit('priority')">
+          <option value="">Priority…</option>
+          <option value="urgent">Urgent</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+        <button type="button" class="btn btn-sm btn-danger" onclick="bulkDelete()">Delete</button>
+      </div>
+    </div>
+  </form>
+</main>
+
+<!-- Scroll-to-top button -->
+<button class="scroll-top-btn" id="scroll-top-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top" aria-label="Back to top">↑</button>
+
+<script>
+function setFilter(key, value) {
+  const form = document.getElementById('filter-form');
+  form.querySelector(`[name="${key}"]`).value = value;
+  form.submit();
+}
+
+function setSort(col) {
+  const form = document.getElementById('filter-form');
+  const sortInput = form.querySelector('[name="sort"]');
+  const orderInput = form.querySelector('[name="order"]');
+  const isCurrent = sortInput.value === col;
+  orderInput.value = isCurrent && orderInput.value === 'desc' ? 'asc' : 'desc';
+  sortInput.value = col;
+  form.submit();
+}
+
+function updateBulkBar() {
+  const checked = document.querySelectorAll('.ticket-checkbox:checked');
+  const bar = document.getElementById('bulk-bar');
+  document.getElementById('bulk-count').textContent = `${checked.length} selected`;
+  bar.classList.toggle('bulk-bar-visible', checked.length > 0);
+}
+
+function bulkSubmit(type) {
+  const checked = document.querySelectorAll('.ticket-checkbox:checked');
+  if (!checked.length) return;
+  const select = document.getElementById(type === 'status' ? 'bulk-status' : 'bulk-priority');
+  const value = select.value;
+  if (!value) return;
+  const label = type === 'status' ? value.replace('_', ' ') : value;
+  if (confirm(`Change ${type} of ${checked.length} ticket${checked.length !== 1 ? 's' : ''} to "${label}"?`)) {
+    document.getElementById('bulk-action').value = type;
+    document.getElementById('bulk-form').submit();
+  } else {
+    select.value = '';
+  }
+}
+
+function bulkDelete() {
+  const checked = document.querySelectorAll('.ticket-checkbox:checked');
+  if (!checked.length) return;
+  if (confirm(`Permanently delete ${checked.length} ticket${checked.length !== 1 ? 's' : ''}?`)) {
+    document.getElementById('bulk-action').value = 'delete';
+    document.getElementById('bulk-form').submit();
+  }
+}
+
+window.addEventListener('scroll', () => {
+  document.getElementById('scroll-top-btn').classList.toggle('visible', window.scrollY > 300);
+}, { passive: true });
+</script>
+
+<%- include('../partials/foot') %>
