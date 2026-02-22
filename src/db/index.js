@@ -151,6 +151,70 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_email_msg_id          ON email_messages(message_id);
   CREATE INDEX IF NOT EXISTS idx_tickets_status        ON tickets(status);
   CREATE INDEX IF NOT EXISTS idx_tickets_updated       ON tickets(updated_at DESC);
+
+  CREATE VIRTUAL TABLE IF NOT EXISTS ticket_fts USING fts5(
+    text,
+    tokenize = 'unicode61'
+  );
+
+  CREATE VIRTUAL TABLE IF NOT EXISTS comment_fts USING fts5(
+    text,
+    tokenize = 'unicode61'
+  );
+
+  CREATE TRIGGER IF NOT EXISTS fts_ticket_ai
+  AFTER INSERT ON tickets BEGIN
+    INSERT INTO ticket_fts(rowid, text)
+    VALUES (NEW.id, CAST(NEW.id AS TEXT) || ' ' || NEW.subject || ' ' || COALESCE(NEW.body, ''));
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS fts_ticket_au
+  AFTER UPDATE OF subject, body ON tickets BEGIN
+    DELETE FROM ticket_fts WHERE rowid = OLD.id;
+    INSERT INTO ticket_fts(rowid, text)
+    SELECT NEW.id,
+      CAST(NEW.id AS TEXT) || ' ' || NEW.subject || ' ' || COALESCE(NEW.body, '') || ' ' ||
+      COALESCE(u.name, '') || ' ' || COALESCE(u.email, '')
+    FROM tickets t
+    LEFT JOIN ticket_parties tp ON tp.ticket_id = NEW.id AND tp.role = 'submitter'
+    LEFT JOIN users u ON u.id = tp.user_id
+    WHERE t.id = NEW.id;
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS fts_ticket_ad
+  BEFORE DELETE ON tickets BEGIN
+    DELETE FROM comment_fts WHERE rowid IN (SELECT id FROM comments WHERE ticket_id = OLD.id);
+    DELETE FROM ticket_fts WHERE rowid = OLD.id;
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS fts_party_submitter_ai
+  AFTER INSERT ON ticket_parties
+  WHEN NEW.role = 'submitter' BEGIN
+    DELETE FROM ticket_fts WHERE rowid = NEW.ticket_id;
+    INSERT INTO ticket_fts(rowid, text)
+    SELECT NEW.ticket_id,
+      CAST(t.id AS TEXT) || ' ' || t.subject || ' ' || COALESCE(t.body, '') || ' ' ||
+      COALESCE(u.name, '') || ' ' || COALESCE(u.email, '')
+    FROM tickets t
+    JOIN users u ON u.id = NEW.user_id
+    WHERE t.id = NEW.ticket_id;
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS fts_comment_ai
+  AFTER INSERT ON comments BEGIN
+    INSERT INTO comment_fts(rowid, text) VALUES (NEW.id, NEW.body);
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS fts_comment_au
+  AFTER UPDATE OF body ON comments BEGIN
+    DELETE FROM comment_fts WHERE rowid = OLD.id;
+    INSERT INTO comment_fts(rowid, text) VALUES (NEW.id, NEW.body);
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS fts_comment_ad
+  AFTER DELETE ON comments BEGIN
+    DELETE FROM comment_fts WHERE rowid = OLD.id;
+  END;
 `;
 
 // ============================================================
@@ -171,6 +235,27 @@ async function initDb() {
 
   // Migrations — safe to run repeatedly (fail silently if column already exists)
   try { _db.exec('ALTER TABLE users ADD COLUMN name TEXT'); } catch (_) {}
+
+  // One-time FTS population for existing data (new installs have nothing to populate)
+  const ftsMigrated = prepare('SELECT value FROM settings WHERE key = ?').get('fts_migrated');
+  if (!ftsMigrated) {
+    _db.exec(`
+      INSERT INTO ticket_fts(rowid, text)
+      SELECT t.id,
+        CAST(t.id AS TEXT) || ' ' || t.subject || ' ' || COALESCE(t.body, '') || ' ' ||
+        COALESCE(u.name, '') || ' ' || COALESCE(u.email, '')
+      FROM tickets t
+      LEFT JOIN ticket_parties tp ON tp.ticket_id = t.id AND tp.role = 'submitter'
+      LEFT JOIN users u ON u.id = tp.user_id;
+
+      INSERT INTO comment_fts(rowid, text)
+      SELECT id, body FROM comments;
+
+      INSERT OR REPLACE INTO settings (key, value) VALUES ('fts_migrated', '1');
+    `);
+    save();
+    console.log('[DB] FTS index populated');
+  }
 
   save();
   console.log('[DB] SQLite ready:', DB_PATH);
@@ -349,8 +434,17 @@ function getTickets({ userId, userRole, status, priority, sort = 'updated_at', o
   if (priority) { conditions.push('t.priority = ?'); params.push(priority); }
   if (dateFrom) { conditions.push('t.updated_at >= ?'); params.push(dateFrom); }
   if (search) {
-    conditions.push('(t.subject LIKE ? OR t.body LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`);
+    // Build an FTS5 MATCH query: each whitespace-delimited token becomes a prefix phrase search.
+    // e.g. "john smith" → `"john"* "smith"*`  (both tokens must appear, prefix-matched)
+    const ftsQuery = search.trim().split(/\s+/).filter(Boolean)
+      .map(t => `"${t.replace(/"/g, '""')}"*`).join(' ');
+    conditions.push(`t.id IN (
+      SELECT rowid FROM ticket_fts WHERE ticket_fts MATCH ?
+      UNION
+      SELECT c.ticket_id FROM comments c
+      WHERE c.id IN (SELECT rowid FROM comment_fts WHERE comment_fts MATCH ?)
+    )`);
+    params.push(ftsQuery, ftsQuery);
   }
 
   if (conditions.length > 0) query += ' WHERE ' + conditions.join(' AND ');
