@@ -15,6 +15,11 @@ const config = {
   otpMaxTries: parseInt(process.env.OTP_MAX_TRIES || '5', 10),
   otpLockoutSeconds: parseInt(process.env.OTP_LOCKOUT_SECONDS || '300', 10),
 
+  // Inbound email rate limiting — max messages per minute per sender.
+  // 0 disables the limit entirely.
+  emailRateLimitPerTicket:  parseInt(process.env.EMAIL_RATE_LIMIT_PER_TICKET  || '10', 10),
+  emailRateLimitNewTickets: parseInt(process.env.EMAIL_RATE_LIMIT_NEW_TICKETS || '3',  10),
+
   // Comma-separated extension lists (without leading dot, case-insensitive).
   // Whitelist: only these extensions are accepted. Empty = allow all.
   // Blacklist: always rejected, even if in the whitelist.
@@ -34,6 +39,17 @@ const config = {
   mailgun: {
     apiKey: process.env.MAILGUN_API_KEY || '',
     domain: process.env.MAILGUN_DOMAIN || '',
+  },
+
+  // Outbound mail transport: 'mailgun' (default) or 'smtp'
+  mailTransport: process.env.MAIL_TRANSPORT || 'mailgun',
+
+  // SMTP relay — used when MAIL_TRANSPORT=smtp
+  smtpRelay: {
+    host: process.env.SMTP_RELAY_HOST || 'smtp-relay.gmail.com',
+    port: parseInt(process.env.SMTP_RELAY_PORT || '587', 10),
+    user: process.env.SMTP_RELAY_USER || '',
+    pass: process.env.SMTP_RELAY_PASS || '',
   },
 
   mailhog: {

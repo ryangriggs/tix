@@ -105,6 +105,60 @@ function getMailDomain() {
 }
 
 // ============================================================
+// In-memory sliding-window rate limiter
+// ============================================================
+
+const _rateLimits = new Map();
+
+function isRateLimited(key, maxPerMinute) {
+  if (!maxPerMinute) return false;
+  const now = Date.now();
+  const recent = (_rateLimits.get(key) || []).filter(t => now - t < 60_000);
+  if (recent.length >= maxPerMinute) {
+    _rateLimits.set(key, recent);
+    return true;
+  }
+  recent.push(now);
+  _rateLimits.set(key, recent);
+  return false;
+}
+
+// Prune stale entries every 5 minutes so the Map doesn't grow unbounded
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamps] of _rateLimits) {
+    const recent = timestamps.filter(t => now - t < 60_000);
+    if (recent.length === 0) _rateLimits.delete(key);
+    else _rateLimits.set(key, recent);
+  }
+}, 5 * 60_000).unref();
+
+// ============================================================
+// Reply-token extraction
+// Looks for tickets+{token}@domain in a list of address objects
+// (the shape mailparser returns for To/CC headers).
+// ============================================================
+
+function extractReplyToken(addressValues) {
+  const domain    = getMailDomain();
+  const localPart = config.ticketEmail.split('@')[0].toLowerCase();
+  const prefix    = localPart + '+';
+
+  for (const addr of addressValues || []) {
+    const email      = (addr.address || '').toLowerCase();
+    const atIdx      = email.lastIndexOf('@');
+    if (atIdx === -1) continue;
+    const addrLocal  = email.slice(0, atIdx);
+    const addrDomain = email.slice(atIdx + 1);
+    if (addrDomain === domain && addrLocal.startsWith(prefix)) {
+      const token = addrLocal.slice(prefix.length);
+      if (token) return token;
+    }
+  }
+  return null;
+}
+
+// ============================================================
 // Main entry point called by the SMTP server
 // ============================================================
 
@@ -125,12 +179,22 @@ async function processInboundEmail(rawEmail) {
   }
 
   // --- Reply detection ---
-  // Prefer In-Reply-To, then walk References, then fall back to subject tag.
-  // Track whether we matched via subject tag — that path requires authorization.
+  // 1. Reply-To token in To/CC (survives forwarding — primary mechanism)
+  // 2. In-Reply-To / References Message-ID lookup (legacy fallback)
+  // 3. Subject tag [Ticket #N] — only trusted for existing parties
   let existingTicketId = null;
-  let subjectFallback   = false;
+  let subjectFallback  = false;
 
-  if (parsed.inReplyTo) {
+  const toAddrs = [
+    ...(parsed.to?.value  || []),
+    ...(parsed.cc?.value  || []),
+  ];
+  const replyToken = extractReplyToken(toAddrs);
+  if (replyToken) {
+    existingTicketId = db.findTicketByReplyToken(replyToken);
+  }
+
+  if (!existingTicketId && parsed.inReplyTo) {
     existingTicketId = db.findTicketByMessageId(parsed.inReplyTo);
   }
 
@@ -174,10 +238,15 @@ async function handleReply(ticketId, fromEmail, parsed, subjectFallback = false)
     return;
   }
 
+  if (isRateLimited(`reply:${fromEmail}:${ticketId}`, config.emailRateLimitPerTicket)) {
+    console.log(`[Inbound] Rate limit exceeded for ${fromEmail} replying to ticket #${ticketId}`);
+    return;
+  }
+
   // Subject-tag matches ([Ticket #N]) are only trusted if the sender is already
   // a party — otherwise anyone who knows a ticket number could post to it.
-  // Message-ID matches (In-Reply-To / References) are always trusted because
-  // the IDs are random, unguessable tokens.
+  // Reply-token and Message-ID matches are always trusted because the tokens are
+  // unguessable; the token also survives email forwarding.
   if (subjectFallback && !db.getUserTicketRole(ticketId, user.id)) {
     console.log(`[Inbound] Subject-tag reply from non-party ${fromEmail} to #${ticketId} — treating as new ticket`);
     await handleNewTicket(fromEmail, parsed);
@@ -210,6 +279,7 @@ async function handleReply(ticketId, fromEmail, parsed, subjectFallback = false)
       ticketId,
       messageId: msgId,
       inReplyTo: `<ticket-${ticketId}@${domain}>`,
+      replyToken: ticket.reply_token,
     });
   }
 
@@ -229,6 +299,11 @@ async function handleNewTicket(fromEmail, parsed) {
 
   if (senderUser.blocked_at) {
     console.log(`[Inbound] Ignoring email from blocked user ${fromEmail}`);
+    return;
+  }
+
+  if (isRateLimited(`new:${fromEmail}`, config.emailRateLimitNewTickets)) {
+    console.log(`[Inbound] Rate limit exceeded for new tickets from ${fromEmail}`);
     return;
   }
 
@@ -282,6 +357,7 @@ async function handleNewTicket(fromEmail, parsed) {
       <p>Your ticket has been received and assigned ID <strong>#${ticket.id}</strong>.</p>`,
     ticketId: ticket.id,
     messageId: outMsgId,
+    replyToken: ticket.reply_token,
   });
 
   // Notify original sender if this was a forwarded email
@@ -293,6 +369,7 @@ async function handleNewTicket(fromEmail, parsed) {
         <p>A ticket has been created on your behalf with ID <strong>#${ticket.id}</strong>.</p>`,
       ticketId: ticket.id,
       messageId: `<ticket-${ticket.id}-orig-${Date.now()}@${domain}>`,
+      replyToken: ticket.reply_token,
     });
   }
 
@@ -304,6 +381,7 @@ async function handleNewTicket(fromEmail, parsed) {
       body: `<p>New ticket <strong>#${ticket.id}</strong> from ${fromEmail}:</p>${body}`,
       ticketId: ticket.id,
       messageId: `<ticket-${ticket.id}-notify-${Date.now()}@${domain}>`,
+      replyToken: ticket.reply_token,
     });
   }
 
@@ -417,11 +495,18 @@ async function processMailgunWebhook(fields, files) {
     return;
   }
 
-  // Reply detection — same logic as processInboundEmail
+  // Reply detection — same order as processInboundEmail
   let existingTicketId = null;
-  let subjectFallback   = false;
+  let subjectFallback  = false;
 
-  if (inReplyTo) {
+  // 1. Reply-token: Mailgun provides the envelope RCPT TO as `recipient`
+  const recipientAddr = (fields.recipient || fields.to || '').trim();
+  const replyToken = extractReplyToken([{ address: recipientAddr }]);
+  if (replyToken) {
+    existingTicketId = db.findTicketByReplyToken(replyToken);
+  }
+
+  if (!existingTicketId && inReplyTo) {
     existingTicketId = db.findTicketByMessageId(inReplyTo);
   }
   if (!existingTicketId) {

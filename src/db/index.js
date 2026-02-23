@@ -237,6 +237,10 @@ async function initDb() {
   try { _db.exec('ALTER TABLE users ADD COLUMN name TEXT'); } catch (_) {}
   try { _db.exec('ALTER TABLE auth_tokens ADD COLUMN otp_tries INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   try { _db.exec('ALTER TABLE auth_tokens ADD COLUMN locked_until INTEGER'); } catch (_) {}
+  try { _db.exec('ALTER TABLE tickets ADD COLUMN reply_token TEXT'); } catch (_) {}
+  // Back-fill reply tokens for any existing tickets that pre-date this migration
+  _db.exec(`UPDATE tickets SET reply_token = lower(hex(randomblob(16))) WHERE reply_token IS NULL`);
+  _db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_reply_token ON tickets(reply_token)');
 
   // One-time FTS population for existing data (new installs have nothing to populate)
   const ftsMigrated = prepare('SELECT value FROM settings WHERE key = ?').get('fts_migrated');
@@ -388,10 +392,11 @@ function verifyOTPByTokenId(tokenId, otp) {
 // ============================================================
 
 function createTicket({ subject, body, priority = 'medium', dueDate = null }) {
+  const replyToken = uuidv4().replace(/-/g, '');
   const result = prepare(`
-    INSERT INTO tickets (subject, body, priority, due_date)
-    VALUES (?, ?, ?, ?)
-  `).run(subject, body, priority, dueDate);
+    INSERT INTO tickets (subject, body, priority, due_date, reply_token)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(subject, body, priority, dueDate, replyToken);
   return prepare('SELECT * FROM tickets WHERE id = ?').get(result.lastInsertRowid);
 }
 
@@ -595,6 +600,12 @@ function findTicketByMessageId(messageId) {
   return row ? row.ticket_id : null;
 }
 
+function findTicketByReplyToken(token) {
+  if (!token) return null;
+  const row = prepare('SELECT id FROM tickets WHERE reply_token = ?').get(token);
+  return row ? row.id : null;
+}
+
 // ============================================================
 // Settings
 // ============================================================
@@ -653,7 +664,7 @@ module.exports = {
   // Attachments
   addAttachment, getAttachments, getAttachmentsByComment, getAttachmentByStoredName,
   // Email threading
-  recordEmailMessage, findTicketByMessageId,
+  recordEmailMessage, findTicketByMessageId, findTicketByReplyToken,
   // Settings
   getSetting, setSetting, getUserPrefs, setUserPrefs,
   // Reminders

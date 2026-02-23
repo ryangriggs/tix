@@ -10,36 +10,48 @@ function getTransport() {
   if (_transport) return _transport;
 
   if (config.isDev) {
-    // MailHog - catches all outbound emails in a local web UI
+    // MailHog — catches all outbound mail in a local web UI
     _transport = nodemailer.createTransport({
       host: config.mailhog.host,
       port: config.mailhog.port,
       secure: false,
       ignoreTLS: true,
     });
+  } else if (config.mailTransport === 'smtp') {
+    // SMTP relay (e.g. Google Workspace smtp-relay.gmail.com)
+    // port 587 → STARTTLS, port 465 → implicit TLS
+    _transport = nodemailer.createTransport({
+      host:       config.smtpRelay.host,
+      port:       config.smtpRelay.port,
+      secure:     config.smtpRelay.port === 465,
+      requireTLS: true,
+      auth: {
+        user: config.smtpRelay.user,
+        pass: config.smtpRelay.pass,
+      },
+    });
   } else {
-    // Mailgun via their SMTP relay
-    // Uses nodemailer so the send() interface stays identical
-    const Mailgun = require('mailgun.js');
+    // Mailgun REST API (default for production)
+    const Mailgun  = require('mailgun.js');
     const FormData = require('form-data');
     const mg = new Mailgun(FormData).client({ username: 'api', key: config.mailgun.apiKey });
 
-    // Wrap Mailgun REST API in the same interface as nodemailer
+    // Wrap in the same sendMail interface as nodemailer
     _transport = {
       async sendMail(opts) {
         const msg = {
-          from: opts.from,
-          to: Array.isArray(opts.to) ? opts.to : [opts.to],
+          from:    opts.from,
+          to:      Array.isArray(opts.to) ? opts.to : [opts.to],
           subject: opts.subject,
-          html: opts.html,
-          text: opts.text,
+          html:    opts.html,
+          text:    opts.text,
         };
         if (opts.messageId)  msg['h:Message-Id']  = opts.messageId;
         if (opts.inReplyTo)  msg['h:In-Reply-To'] = opts.inReplyTo;
         if (opts.references) msg['h:References']  = opts.references;
-        // Prevent auto-replies and bounce loops
-        msg['h:Auto-Submitted']          = 'auto-generated';
-        msg['h:Precedence']              = 'bulk';
+        if (opts.replyTo)    msg['h:Reply-To']    = opts.replyTo;
+        msg['h:Auto-Submitted']           = 'auto-generated';
+        msg['h:Precedence']               = 'bulk';
         msg['h:X-Auto-Response-Suppress'] = 'All';
         return mg.messages.create(config.mailgun.domain, msg);
       }
@@ -50,15 +62,19 @@ function getTransport() {
 }
 
 // Low-level send — all helpers funnel through here
-async function send({ to, subject, html, text, messageId, inReplyTo, references }) {
+async function send({ to, subject, html, text, messageId, inReplyTo, references, replyTo }) {
   const from = `Ticketing <${config.ticketEmail}>`;
   const transport = getTransport();
 
-  if (config.isDev) {
-    // nodemailer format
+  if (!config.isDev && config.mailTransport === 'mailgun') {
+    // Mailgun REST wrapper expects flat options; headers are passed as h:* keys
+    await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references, replyTo });
+  } else {
+    // nodemailer (MailHog in dev, SMTP relay in prod)
     await transport.sendMail({
       from, to, subject, html, text,
       messageId,
+      replyTo,
       headers: {
         'Auto-Submitted':           'auto-generated',
         'Precedence':               'bulk',
@@ -67,8 +83,6 @@ async function send({ to, subject, html, text, messageId, inReplyTo, references 
         ...(references && { References: references }),
       },
     });
-  } else {
-    await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references });
   }
 }
 
@@ -90,7 +104,14 @@ async function sendMagicLink(toEmail, magicLinkUrl, otp) {
   });
 }
 
-async function sendTicketNotification({ to, ticketSubject, body, ticketId, messageId, inReplyTo, references }) {
+async function sendTicketNotification({ to, ticketSubject, body, ticketId, messageId, inReplyTo, references, replyToken }) {
+  let replyTo;
+  if (replyToken) {
+    const mailDomain = config.ticketEmail.includes('@') ? config.ticketEmail.split('@')[1] : 'ticketing.local';
+    const localPart  = config.ticketEmail.split('@')[0];
+    replyTo = `Ticketing <${localPart}+${replyToken}@${mailDomain}>`;
+  }
+
   const footer = `
     <hr style="border:none;border-top:1px solid #e0e0e0;margin:24px 0">
     <p style="color:#666;font-size:.85em;margin:0">
@@ -110,17 +131,25 @@ async function sendTicketNotification({ to, ticketSubject, body, ticketId, messa
       messageId,
       inReplyTo,
       references,
+      replyTo,
     });
   }
 }
 
 async function sendDueReminder(email, ticket) {
   const dueDate = new Date(ticket.due_date * 1000).toLocaleDateString();
+  let replyTo;
+  if (ticket.reply_token) {
+    const mailDomain = config.ticketEmail.includes('@') ? config.ticketEmail.split('@')[1] : 'ticketing.local';
+    const localPart  = config.ticketEmail.split('@')[0];
+    replyTo = `Ticketing <${localPart}+${ticket.reply_token}@${mailDomain}>`;
+  }
   await send({
     to: email,
     subject: `[Ticket #${ticket.id}] Due date reminder`,
     html: `<p>Ticket <strong>#${ticket.id}: ${ticket.subject}</strong> is due on <strong>${dueDate}</strong>.</p>`,
     text: `Ticket #${ticket.id}: ${ticket.subject} is due on ${dueDate}.`,
+    replyTo,
   });
 }
 
