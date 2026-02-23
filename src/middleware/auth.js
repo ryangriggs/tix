@@ -1,8 +1,41 @@
 'use strict';
 
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 const { getUserById } = require('../db');
+
+// ============================================================
+// CSRF — HMAC token tied to the session cookie value.
+// No server-side state needed; changes automatically on logout.
+// ============================================================
+
+function makeCsrfToken(sessionCookie) {
+  return crypto
+    .createHmac('sha256', config.jwtSecret)
+    .update(sessionCookie || '')
+    .digest('base64url');
+}
+
+function verifyCsrf(req, res, next) {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  // Body for url-encoded forms; query for multipart (enctype="multipart/form-data") forms;
+  // header for AJAX callers.
+  const submitted = req.body?._csrf || req.query._csrf || req.headers['x-csrf-token'] || '';
+  const expected  = makeCsrfToken(req.cookies.session || '');
+  let ok = false;
+  try {
+    ok = submitted.length === expected.length &&
+         crypto.timingSafeEqual(Buffer.from(submitted), Buffer.from(expected));
+  } catch (_) {}
+  if (!ok) {
+    return res.status(403).render('error', {
+      title: 'Forbidden',
+      message: 'Invalid or missing CSRF token. Please go back and try again.',
+    });
+  }
+  next();
+}
 
 function requireAuth(req, res, next) {
   const token = req.cookies.session;
@@ -17,6 +50,8 @@ function requireAuth(req, res, next) {
     }
     req.user = user;
     res.locals.user = user;
+    // Expose CSRF token to every authenticated view
+    res.locals.csrfToken = makeCsrfToken(token);
     next();
   } catch (_) {
     res.clearCookie('session');
@@ -60,4 +95,4 @@ function issueSessionCookie(res, user) {
   });
 }
 
-module.exports = { requireAuth, requireAdmin, optionalAuth, issueSessionCookie };
+module.exports = { requireAuth, requireAdmin, optionalAuth, issueSessionCookie, verifyCsrf };

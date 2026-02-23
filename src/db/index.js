@@ -235,6 +235,8 @@ async function initDb() {
 
   // Migrations — safe to run repeatedly (fail silently if column already exists)
   try { _db.exec('ALTER TABLE users ADD COLUMN name TEXT'); } catch (_) {}
+  try { _db.exec('ALTER TABLE auth_tokens ADD COLUMN otp_tries INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
+  try { _db.exec('ALTER TABLE auth_tokens ADD COLUMN locked_until INTEGER'); } catch (_) {}
 
   // One-time FTS population for existing data (new installs have nothing to populate)
   const ftsMigrated = prepare('SELECT value FROM settings WHERE key = ?').get('fts_migrated');
@@ -348,15 +350,35 @@ function verifyAuthToken(tokenId, rawToken) {
   return record;
 }
 
+// Returns: a token record on success; { locked, lockedUntil } on lockout; null on wrong OTP.
 function verifyOTPByTokenId(tokenId, otp) {
   const now = Math.floor(Date.now() / 1000);
 
+  // Fetch the record first without checking the OTP, so we can track attempts
   const record = prepare(`
     SELECT * FROM auth_tokens
-    WHERE id = ? AND otp = ? AND expires_at > ? AND used_at IS NULL
-  `).get(tokenId, otp.trim(), now);
+    WHERE id = ? AND expires_at > ? AND used_at IS NULL
+  `).get(tokenId, now);
 
   if (!record) return null;
+
+  // Enforce lockout before checking the OTP
+  if (record.locked_until && record.locked_until > now) {
+    return { locked: true, lockedUntil: record.locked_until };
+  }
+
+  if (record.otp !== otp.trim()) {
+    const tries = (record.otp_tries || 0) + 1;
+    if (tries >= config.otpMaxTries) {
+      const lockedUntil = now + config.otpLockoutSeconds;
+      prepare('UPDATE auth_tokens SET otp_tries = ?, locked_until = ? WHERE id = ?')
+        .run(tries, lockedUntil, tokenId);
+      return { locked: true, lockedUntil };
+    }
+    prepare('UPDATE auth_tokens SET otp_tries = ? WHERE id = ?').run(tries, tokenId);
+    return null;
+  }
+
   prepare('UPDATE auth_tokens SET used_at = unixepoch() WHERE id = ?').run(tokenId);
   return record;
 }

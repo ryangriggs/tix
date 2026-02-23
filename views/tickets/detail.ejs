@@ -54,7 +54,7 @@
       <!-- Add comment (above activity) -->
       <div class="comment-form-section">
         <h3 class="section-title">Reply</h3>
-        <form method="POST" action="/tickets/<%= ticket.id %>/comments" enctype="multipart/form-data" id="comment-form">
+        <form method="POST" action="/tickets/<%= ticket.id %>/comments?_csrf=<%= csrfToken %>" enctype="multipart/form-data" id="comment-form">
           <div class="form-group">
             <div id="comment-editor" class="quill-editor quill-compact"></div>
             <input type="hidden" name="body" id="comment-body">
@@ -108,6 +108,7 @@
         <div class="sidebar-section">
           <div class="sidebar-label">Status</div>
           <form method="POST" action="/tickets/<%= ticket.id %>/status">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <select name="status" class="form-select" onchange="this.form.submit()">
               <% for (const s of ['open','pending','on_hold','completed','cancelled']) { %>
                 <option value="<%= s %>" <%= ticket.status === s ? 'selected' : '' %>><%= s.replace('_',' ') %></option>
@@ -120,6 +121,7 @@
         <div class="sidebar-section">
           <div class="sidebar-label">Priority</div>
           <form method="POST" action="/tickets/<%= ticket.id %>/priority">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <select name="priority" class="form-select" onchange="this.form.submit()">
               <% for (const p of ['low','medium','high','urgent']) { %>
                 <option value="<%= p %>" <%= ticket.priority === p ? 'selected' : '' %>><%= p %></option>
@@ -132,6 +134,7 @@
         <div class="sidebar-section">
           <div class="sidebar-label">Due date</div>
           <form method="POST" action="/tickets/<%= ticket.id %>/due-date" class="inline-form">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <input type="date" name="due_date" value="<%= formatDateInput(ticket.due_date) %>" class="form-input form-input-sm">
             <button type="submit" class="btn btn-sm btn-secondary">Set</button>
           </form>
@@ -170,6 +173,7 @@
               <span class="badge badge-role"><%= p.role %></span>
               <% if (canManage && p.user_id !== user.id) { %>
                 <form method="POST" action="/tickets/<%= ticket.id %>/parties/remove" style="display:inline">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                   <input type="hidden" name="userId" value="<%= p.user_id %>">
                   <button type="submit" class="btn-icon" title="Remove">×</button>
                 </form>
@@ -182,6 +186,7 @@
           <details class="add-party-details">
             <summary class="link-btn">+ Add person</summary>
             <form method="POST" action="/tickets/<%= ticket.id %>/parties" class="add-party-form">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <input type="email" name="email" placeholder="email@example.com" class="form-input form-input-sm" required>
               <select name="role" class="form-select form-select-sm">
                 <option value="collaborator">Collaborator</option>
@@ -197,6 +202,7 @@
         <div class="sidebar-section">
           <form method="POST" action="/tickets/<%= ticket.id %>/delete"
             onsubmit="return confirm('Permanently delete this ticket and all its data?')">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button type="submit" class="btn btn-danger btn-full btn-sm">Delete Ticket</button>
           </form>
         </div>

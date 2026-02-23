@@ -10,6 +10,7 @@
 
   <div class="card">
     <form method="POST" action="/admin/settings" class="ticket-form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 
       <div class="form-group">
         <label for="default_assignee_email">Default assignee email</label>
