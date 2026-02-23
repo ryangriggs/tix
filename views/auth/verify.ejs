@@ -13,8 +13,8 @@
     <% } %>
 
     <% if (tokenId && rawToken) { %>
-      <%-- Magic link flow: user clicked the link in email. We confirm via POST so
-           email security scanners (which pre-fetch URLs) cannot consume the token. --%>
+      <%# Magic link flow: user clicked the link in email. We confirm via POST so
+           email security scanners (which pre-fetch URLs) cannot consume the token. %>
       <form method="POST" action="/auth/verify" class="auth-form">
         <input type="hidden" name="tokenId" value="<%= tokenId %>">
         <input type="hidden" name="rawToken" value="<%= rawToken %>">
