@@ -41,6 +41,17 @@ const config = {
     domain: process.env.MAILGUN_DOMAIN || '',
   },
 
+  // Outbound mail transport: 'mailgun' (default) or 'smtp'
+  mailTransport: process.env.MAIL_TRANSPORT || 'mailgun',
+
+  // SMTP relay — used when MAIL_TRANSPORT=smtp
+  smtpRelay: {
+    host: process.env.SMTP_RELAY_HOST || 'smtp-relay.gmail.com',
+    port: parseInt(process.env.SMTP_RELAY_PORT || '587', 10),
+    user: process.env.SMTP_RELAY_USER || '',
+    pass: process.env.SMTP_RELAY_PASS || '',
+  },
+
   mailhog: {
     host: process.env.MAILHOG_HOST || 'mailhog',
     port: parseInt(process.env.MAILHOG_PORT || '1025', 10),

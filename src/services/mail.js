@@ -10,37 +10,48 @@ function getTransport() {
   if (_transport) return _transport;
 
   if (config.isDev) {
-    // MailHog - catches all outbound emails in a local web UI
+    // MailHog — catches all outbound mail in a local web UI
     _transport = nodemailer.createTransport({
       host: config.mailhog.host,
       port: config.mailhog.port,
       secure: false,
       ignoreTLS: true,
     });
+  } else if (config.mailTransport === 'smtp') {
+    // SMTP relay (e.g. Google Workspace smtp-relay.gmail.com)
+    // port 587 → STARTTLS, port 465 → implicit TLS
+    _transport = nodemailer.createTransport({
+      host:       config.smtpRelay.host,
+      port:       config.smtpRelay.port,
+      secure:     config.smtpRelay.port === 465,
+      requireTLS: true,
+      auth: {
+        user: config.smtpRelay.user,
+        pass: config.smtpRelay.pass,
+      },
+    });
   } else {
-    // Mailgun via their SMTP relay
-    // Uses nodemailer so the send() interface stays identical
-    const Mailgun = require('mailgun.js');
+    // Mailgun REST API (default for production)
+    const Mailgun  = require('mailgun.js');
     const FormData = require('form-data');
     const mg = new Mailgun(FormData).client({ username: 'api', key: config.mailgun.apiKey });
 
-    // Wrap Mailgun REST API in the same interface as nodemailer
+    // Wrap in the same sendMail interface as nodemailer
     _transport = {
       async sendMail(opts) {
         const msg = {
-          from: opts.from,
-          to: Array.isArray(opts.to) ? opts.to : [opts.to],
+          from:    opts.from,
+          to:      Array.isArray(opts.to) ? opts.to : [opts.to],
           subject: opts.subject,
-          html: opts.html,
-          text: opts.text,
+          html:    opts.html,
+          text:    opts.text,
         };
         if (opts.messageId)  msg['h:Message-Id']  = opts.messageId;
         if (opts.inReplyTo)  msg['h:In-Reply-To'] = opts.inReplyTo;
         if (opts.references) msg['h:References']  = opts.references;
         if (opts.replyTo)    msg['h:Reply-To']    = opts.replyTo;
-        // Prevent auto-replies and bounce loops
-        msg['h:Auto-Submitted']          = 'auto-generated';
-        msg['h:Precedence']              = 'bulk';
+        msg['h:Auto-Submitted']           = 'auto-generated';
+        msg['h:Precedence']               = 'bulk';
         msg['h:X-Auto-Response-Suppress'] = 'All';
         return mg.messages.create(config.mailgun.domain, msg);
       }
@@ -55,8 +66,11 @@ async function send({ to, subject, html, text, messageId, inReplyTo, references,
   const from = `Ticketing <${config.ticketEmail}>`;
   const transport = getTransport();
 
-  if (config.isDev) {
-    // nodemailer format
+  if (!config.isDev && config.mailTransport === 'mailgun') {
+    // Mailgun REST wrapper expects flat options; headers are passed as h:* keys
+    await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references, replyTo });
+  } else {
+    // nodemailer (MailHog in dev, SMTP relay in prod)
     await transport.sendMail({
       from, to, subject, html, text,
       messageId,
@@ -69,8 +83,6 @@ async function send({ to, subject, html, text, messageId, inReplyTo, references,
         ...(references && { References: references }),
       },
     });
-  } else {
-    await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references, replyTo });
   }
 }
 
