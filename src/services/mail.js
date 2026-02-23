@@ -37,6 +37,7 @@ function getTransport() {
         if (opts.messageId)  msg['h:Message-Id']  = opts.messageId;
         if (opts.inReplyTo)  msg['h:In-Reply-To'] = opts.inReplyTo;
         if (opts.references) msg['h:References']  = opts.references;
+        if (opts.replyTo)    msg['h:Reply-To']    = opts.replyTo;
         // Prevent auto-replies and bounce loops
         msg['h:Auto-Submitted']          = 'auto-generated';
         msg['h:Precedence']              = 'bulk';
@@ -50,7 +51,7 @@ function getTransport() {
 }
 
 // Low-level send — all helpers funnel through here
-async function send({ to, subject, html, text, messageId, inReplyTo, references }) {
+async function send({ to, subject, html, text, messageId, inReplyTo, references, replyTo }) {
   const from = `Ticketing <${config.ticketEmail}>`;
   const transport = getTransport();
 
@@ -59,6 +60,7 @@ async function send({ to, subject, html, text, messageId, inReplyTo, references 
     await transport.sendMail({
       from, to, subject, html, text,
       messageId,
+      replyTo,
       headers: {
         'Auto-Submitted':           'auto-generated',
         'Precedence':               'bulk',
@@ -68,7 +70,7 @@ async function send({ to, subject, html, text, messageId, inReplyTo, references 
       },
     });
   } else {
-    await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references });
+    await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references, replyTo });
   }
 }
 
@@ -90,7 +92,14 @@ async function sendMagicLink(toEmail, magicLinkUrl, otp) {
   });
 }
 
-async function sendTicketNotification({ to, ticketSubject, body, ticketId, messageId, inReplyTo, references }) {
+async function sendTicketNotification({ to, ticketSubject, body, ticketId, messageId, inReplyTo, references, replyToken }) {
+  let replyTo;
+  if (replyToken) {
+    const mailDomain = config.ticketEmail.includes('@') ? config.ticketEmail.split('@')[1] : 'ticketing.local';
+    const localPart  = config.ticketEmail.split('@')[0];
+    replyTo = `Ticketing <${localPart}+${replyToken}@${mailDomain}>`;
+  }
+
   const footer = `
     <hr style="border:none;border-top:1px solid #e0e0e0;margin:24px 0">
     <p style="color:#666;font-size:.85em;margin:0">
@@ -110,17 +119,25 @@ async function sendTicketNotification({ to, ticketSubject, body, ticketId, messa
       messageId,
       inReplyTo,
       references,
+      replyTo,
     });
   }
 }
 
 async function sendDueReminder(email, ticket) {
   const dueDate = new Date(ticket.due_date * 1000).toLocaleDateString();
+  let replyTo;
+  if (ticket.reply_token) {
+    const mailDomain = config.ticketEmail.includes('@') ? config.ticketEmail.split('@')[1] : 'ticketing.local';
+    const localPart  = config.ticketEmail.split('@')[0];
+    replyTo = `Ticketing <${localPart}+${ticket.reply_token}@${mailDomain}>`;
+  }
   await send({
     to: email,
     subject: `[Ticket #${ticket.id}] Due date reminder`,
     html: `<p>Ticket <strong>#${ticket.id}: ${ticket.subject}</strong> is due on <strong>${dueDate}</strong>.</p>`,
     text: `Ticket #${ticket.id}: ${ticket.subject} is due on ${dueDate}.`,
+    replyTo,
   });
 }
 
