@@ -5,7 +5,7 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 
 const config = require('./config');
-const { requireAuth, requireAdmin, optionalAuth } = require('./middleware/auth');
+const { requireAuth, requireAdmin, optionalAuth, verifyCsrf } = require('./middleware/auth');
 const { startSMTPServer } = require('./smtp');
 const sse = require('./services/sse');
 const { initDb, getTicketsDueSoon } = require('./db');
@@ -63,8 +63,8 @@ app.use((req, res, next) => {
 // Routes
 // ============================================================
 app.use('/auth', optionalAuth, require('./routes/auth'));
-app.use('/tickets', requireAuth, require('./routes/tickets'));
-app.use('/admin', requireAuth, requireAdmin, require('./routes/admin'));
+app.use('/tickets', requireAuth, verifyCsrf, require('./routes/tickets'));
+app.use('/admin', requireAuth, requireAdmin, verifyCsrf, require('./routes/admin'));
 app.use('/inbound', require('./routes/inbound'));
 
 // Root
@@ -104,6 +104,12 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, _next) => {
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).render('error', { title: 'File too large', message: 'One or more files exceed the 25 MB size limit.' });
+  }
+  if (err.message?.startsWith('File type')) {
+    return res.status(400).render('error', { title: 'File type not allowed', message: err.message });
+  }
   console.error('[App] Unhandled error:', err);
   res.status(500).render('error', { title: 'Error', message: 'An unexpected error occurred.' });
 });

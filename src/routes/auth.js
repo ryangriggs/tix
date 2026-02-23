@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
 
@@ -8,16 +9,23 @@ const db = require('../db');
 const { sendMagicLink } = require('../services/mail');
 const { issueSessionCookie } = require('../middleware/auth');
 
+// Only allow relative same-origin redirects (starts with / but not //)
+function safeRedirectUrl(url) {
+  if (typeof url === 'string' && url.startsWith('/') && !url.startsWith('//')) return url;
+  return '/tickets';
+}
+
 // GET /auth/login
 router.get('/login', (req, res) => {
   if (req.cookies.session) return res.redirect('/');
-  res.render('auth/login', { title: 'Log in', error: null, email: '', next: req.query.next || '/' });
+  const next = safeRedirectUrl(req.query.next);
+  res.render('auth/login', { title: 'Log in', error: null, email: '', next });
 });
 
 // POST /auth/login — send magic link + OTP
 router.post('/login', async (req, res) => {
   const email = (req.body.email || '').trim().toLowerCase();
-  const next = req.body.next || '/';
+  const next  = safeRedirectUrl(req.body.next);
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.render('auth/login', { title: 'Log in', error: 'Please enter a valid email address.', email, next });
@@ -28,7 +36,8 @@ router.post('/login', async (req, res) => {
     return res.render('auth/login', { title: 'Log in', error: 'This account has been blocked.', email, next });
   }
 
-  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  // Cryptographically secure 6-digit OTP
+  const otp = String(crypto.randomInt(100000, 1000000));
   const { tokenId, rawToken } = db.createAuthToken(user.id, otp);
 
   const magicLink = `${config.appUrl}/auth/verify?t=${tokenId}&k=${rawToken}&next=${encodeURIComponent(next)}`;
@@ -48,8 +57,8 @@ router.post('/login', async (req, res) => {
 // consumed here — email security scanners pre-fetch URLs, which would mark
 // the token used before the real user arrives. Verification happens on POST.
 router.get('/verify', (req, res) => {
-  const { t: tokenId, k: rawToken, sent, next } = req.query;
-  const redirectTo = next || '/';
+  const { t: tokenId, k: rawToken, sent } = req.query;
+  const next = safeRedirectUrl(req.query.next);
 
   res.render('auth/verify', {
     title: 'Check your email',
@@ -57,14 +66,14 @@ router.get('/verify', (req, res) => {
     tokenId: tokenId || null,
     rawToken: rawToken || null,
     sent: sent === '1',
-    next: redirectTo,
+    next,
   });
 });
 
 // POST /auth/verify — OTP submission or magic link confirmation
 router.post('/verify', (req, res) => {
-  const { tokenId, otp, rawToken, next } = req.body;
-  const redirectTo = next || '/';
+  const { tokenId, otp, rawToken } = req.body;
+  const redirectTo = safeRedirectUrl(req.body.next);
 
   if (!tokenId) {
     return res.render('auth/verify', { title: 'Verify', error: 'Missing token.', tokenId: null, rawToken: null, sent: false, next: redirectTo });
@@ -87,8 +96,9 @@ router.post('/verify', (req, res) => {
     }
   } else if (otp) {
     // 6-digit OTP entry
-    record = db.verifyOTPByTokenId(tokenId, otp.trim());
-    if (!record) {
+    const result = db.verifyOTPByTokenId(tokenId, otp.trim());
+
+    if (!result) {
       return res.render('auth/verify', {
         title: 'Check your email',
         error: 'Invalid or expired code. Please try again or request a new link.',
@@ -98,6 +108,24 @@ router.post('/verify', (req, res) => {
         next: redirectTo,
       });
     }
+
+    if (result.locked) {
+      const waitSecs = result.lockedUntil - Math.floor(Date.now() / 1000);
+      const waitMins = Math.ceil(waitSecs / 60);
+      const msg = waitMins > 1
+        ? `Too many incorrect attempts. Please wait ${waitMins} minutes or request a new link.`
+        : 'Too many incorrect attempts. Please wait a moment or request a new link.';
+      return res.render('auth/verify', {
+        title: 'Check your email',
+        error: msg,
+        tokenId,
+        rawToken: null,
+        sent: false,
+        next: redirectTo,
+      });
+    }
+
+    record = result;
   } else {
     return res.render('auth/verify', { title: 'Verify', error: 'Missing token or code.', tokenId, rawToken: null, sent: false, next: redirectTo });
   }

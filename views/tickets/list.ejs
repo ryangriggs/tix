@@ -62,6 +62,7 @@
 
   <!-- Ticket list wrapped in bulk form -->
   <form method="POST" action="/tickets/bulk" id="bulk-form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <input type="hidden" name="action" id="bulk-action" value="">
 
     <div class="ticket-list" id="ticket-list">

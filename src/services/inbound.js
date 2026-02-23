@@ -1,7 +1,6 @@
 'use strict';
 
 const { simpleParser } = require('mailparser');
-const sanitizeHtml = require('sanitize-html');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
@@ -59,48 +58,44 @@ function extractForwardedSender(text) {
   return match ? match[1].toLowerCase() : null;
 }
 
-// Remove empty block elements and collapse consecutive <br> tags.
-// Runs iteratively so nested empty divs (e.g. <div><div><br></div></div>) are caught.
-function cleanEmailHtml(html) {
-  if (!html) return html;
-  let result = html;
-  let prev;
-  do {
-    prev = result;
-    // Remove <div>/<p> that contain only whitespace and an optional single <br>
-    result = result.replace(/<(div|p)(\s[^>]*)?>[ \t\r\n]*(<br\s*\/?>)?[ \t\r\n]*<\/(div|p)>/gi, '');
-    // Collapse two or more consecutive <br> into one
-    result = result.replace(/(<br\s*\/?>\s*){2,}/gi, '<br>');
-  } while (result !== prev);
-  return result.trim();
+// Strip HTML tags and decode basic entities to produce a plain-text string.
+// Used when an email has no text/plain part.
+function htmlToPlaintext(html) {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/h[1-6]>/gi, '\n\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
-// Sanitize HTML from untrusted sources (email bodies)
-function sanitizeBody(html, text) {
-  if (html) {
-    const sanitized = sanitizeHtml(html, {
-      allowedTags: [
-        ...sanitizeHtml.defaults.allowedTags,
-        'h1', 'h2', 'h3', 'img', 'pre', 'del',
-      ],
-      allowedAttributes: {
-        ...sanitizeHtml.defaults.allowedAttributes,
-        img: ['src', 'alt', 'width', 'height'],
-        '*': ['style'],
-      },
-      allowedSchemes: ['http', 'https', 'mailto', 'cid'],
-    });
-    return cleanEmailHtml(sanitized);
-  }
-  if (text) {
-    const cleaned = text.replace(/\n{3,}/g, '\n\n');
-    const escaped = cleaned
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-    return `<pre style="white-space:pre-wrap;font-family:inherit">${escaped}</pre>`;
-  }
-  return '';
+// Convert an email body to safe display HTML by treating everything as plain text.
+// This eliminates tracking pixels, external CSS, scripts, and all other HTML attack vectors.
+function formatEmailAsPlaintext(parsed) {
+  const raw = parsed.text || (parsed.html ? htmlToPlaintext(parsed.html) : '');
+  if (!raw.trim()) return '';
+
+  const cleaned = raw.replace(/\n{3,}/g, '\n\n').trim();
+  const escaped = cleaned
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  return '<p>' + escaped
+    .split('\n\n')
+    .map(p => p.trim().replace(/\n/g, '<br>'))
+    .filter(Boolean)
+    .join('</p><p>') + '</p>';
 }
 
 function getMailDomain() {
@@ -194,8 +189,8 @@ async function handleReply(ticketId, fromEmail, parsed, subjectFallback = false)
     db.addParty(ticketId, user.id, 'collaborator');
   }
 
-  const { prepared, cidMap } = prepareAttachments(parsed.attachments);
-  const body = resolveCidReferences(sanitizeBody(parsed.html, parsed.text), cidMap);
+  const { prepared } = prepareAttachments(parsed.attachments);
+  const body = formatEmailAsPlaintext(parsed);
   const comment = db.addComment(ticketId, user.id, body, true);
   commitAttachments(prepared, ticketId, comment.id);
 
@@ -240,8 +235,8 @@ async function handleNewTicket(fromEmail, parsed) {
   // Strip Re:/Fwd: prefixes from subject
   let subject = (parsed.subject || '(No Subject)').replace(/^(Re|Fwd?|Rv):\s*/gi, '').trim();
 
-  const { prepared, cidMap } = prepareAttachments(parsed.attachments);
-  const body = resolveCidReferences(sanitizeBody(parsed.html, parsed.text), cidMap);
+  const { prepared } = prepareAttachments(parsed.attachments);
+  const body = formatEmailAsPlaintext(parsed);
   const ticket = db.createTicket({ subject, body });
 
   // Sender is submitter (and an owner)
@@ -358,15 +353,6 @@ function commitAttachments(prepared, ticketId, commentId) {
       size: att.size,
     });
   }
-}
-
-// Replace cid: src references in HTML with served attachment URLs.
-function resolveCidReferences(html, cidMap) {
-  if (!cidMap.size || !html) return html;
-  return html.replace(/src="cid:([^"]+)"/gi, (match, cid) => {
-    const storedName = cidMap.get(cid);
-    return storedName ? `src="/tickets/attachments/${storedName}"` : match;
-  });
 }
 
 // ============================================================

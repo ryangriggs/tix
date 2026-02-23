@@ -12,6 +12,16 @@ const config = {
   jwtExpiry: '30d',
   secureSession: process.env.SECURE_SESSION === 'true',
 
+  otpMaxTries: parseInt(process.env.OTP_MAX_TRIES || '5', 10),
+  otpLockoutSeconds: parseInt(process.env.OTP_LOCKOUT_SECONDS || '300', 10),
+
+  // Comma-separated extension lists (without leading dot, case-insensitive).
+  // Whitelist: only these extensions are accepted. Empty = allow all.
+  // Blacklist: always rejected, even if in the whitelist.
+  uploadAllowedExtensions: process.env.UPLOAD_ALLOWED_EXTENSIONS
+    || 'jpg,jpeg,png,gif,webp,bmp,pdf,txt,md,csv,zip,doc,docx,xls,xlsx,ppt,pptx',
+  uploadBlockedExtensions: process.env.UPLOAD_BLOCKED_EXTENSIONS || '',
+
   ticketEmail: process.env.TICKET_EMAIL || 'tickets@example.com',
   defaultAssigneeEmail: process.env.DEFAULT_ASSIGNEE_EMAIL || null,
   adminEmail: process.env.ADMIN_EMAIL || null,

@@ -15,7 +15,7 @@
     <div class="alert alert-error"><%= error %></div>
   <% } %>
 
-  <form method="POST" action="/tickets" enctype="multipart/form-data" id="ticket-form" class="ticket-form">
+  <form method="POST" action="/tickets?_csrf=<%= csrfToken %>" enctype="multipart/form-data" id="ticket-form" class="ticket-form">
 
     <div class="form-group">
       <label for="subject">Subject <span class="required">*</span></label>
@@ -47,7 +47,7 @@
     <div class="form-group">
       <label for="attachments">Attachments <span class="optional">(optional)</span></label>
       <input type="file" id="attachments" name="attachments" multiple class="form-file">
-      <p class="form-hint">Max 25 MB per file. Any file type accepted.</p>
+      <p class="form-hint">Max 25 MB per file. Accepted: images, PDF, text, CSV, ZIP, Office documents.</p>
     </div>
 
     <div class="form-actions">

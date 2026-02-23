@@ -25,9 +25,28 @@ const storage = multer.diskStorage({
   },
 });
 
+function buildFileFilter() {
+  const allowed = config.uploadAllowedExtensions
+    .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  const blocked = config.uploadBlockedExtensions
+    .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+
+  return (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase().replace('.', '');
+    if (blocked.length && blocked.includes(ext)) {
+      return cb(new Error(`File type .${ext} is not allowed.`));
+    }
+    if (allowed.length && !allowed.includes(ext)) {
+      return cb(new Error(`File type .${ext} is not allowed. Permitted types: ${allowed.join(', ')}`));
+    }
+    cb(null, true);
+  };
+}
+
 const upload = multer({
   storage,
   limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB per file
+  fileFilter: buildFileFilter(),
 });
 
 // ============================================================
@@ -185,7 +204,8 @@ router.post('/', upload.array('attachments'), async (req, res) => {
 });
 
 // GET /tickets/attachments/:storedName — must be before /:id to avoid param collision
-const INLINE_MIME = /^(image\/|application\/pdf$|text\/plain$|video\/|audio\/)/;
+// SVG is excluded from inline display to prevent script execution.
+const INLINE_MIME = /^(image\/(?!svg)|application\/pdf$|text\/plain$|video\/|audio\/)/;
 
 router.get('/attachments/:storedName', (req, res) => {
   const att = db.getAttachmentByStoredName(req.params.storedName);
