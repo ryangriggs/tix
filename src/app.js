@@ -27,9 +27,12 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
 
+const { version } = require('../package.json');
+
 // Template helpers available in all views
 app.use((req, res, next) => {
   res.locals.user = null;
+  res.locals.appVersion = version;
 
   res.locals.formatDate = function (ts) {
     if (!ts) return '—';
