@@ -9,15 +9,7 @@ let _transport = null;
 function getTransport() {
   if (_transport) return _transport;
 
-  if (config.isDev) {
-    // MailHog — catches all outbound mail in a local web UI
-    _transport = nodemailer.createTransport({
-      host: config.mailhog.host,
-      port: config.mailhog.port,
-      secure: false,
-      ignoreTLS: true,
-    });
-  } else if (config.mailTransport === 'smtp') {
+  if (config.mailTransport === 'smtp') {
     // SMTP relay (e.g. Google Workspace smtp-relay.gmail.com)
     // port 587 → STARTTLS, port 465 → implicit TLS
     _transport = nodemailer.createTransport({
@@ -30,6 +22,51 @@ function getTransport() {
         pass: config.smtpRelay.pass,
       },
     });
+  } else if (config.mailTransport === 'gmail') {
+    // Gmail API via OAuth2 — no SMTP port required, ~2,000 emails/day (Workspace)
+    const { google } = require('googleapis');
+    const oauth2Client = new google.auth.OAuth2(
+      config.gmail.clientId,
+      config.gmail.clientSecret,
+    );
+    oauth2Client.setCredentials({ refresh_token: config.gmail.refreshToken });
+    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+    _transport = {
+      async sendMail(opts) {
+        const boundary = `tix_${Date.now()}`;
+        const lines = [
+          `From: ${opts.from}`,
+          `To: ${Array.isArray(opts.to) ? opts.to.join(', ') : opts.to}`,
+          `Subject: ${opts.subject}`,
+          ...(opts.replyTo    ? [`Reply-To: ${opts.replyTo}`]         : []),
+          ...(opts.messageId  ? [`Message-ID: ${opts.messageId}`]     : []),
+          ...(opts.inReplyTo  ? [`In-Reply-To: ${opts.inReplyTo}`]    : []),
+          ...(opts.references ? [`References: ${opts.references}`]    : []),
+          'Auto-Submitted: auto-generated',
+          'Precedence: bulk',
+          'X-Auto-Response-Suppress: All',
+          'MIME-Version: 1.0',
+          `Content-Type: multipart/alternative; boundary="${boundary}"`,
+          '',
+          `--${boundary}`,
+          'Content-Type: text/plain; charset=UTF-8',
+          '',
+          opts.text || '',
+          `--${boundary}`,
+          'Content-Type: text/html; charset=UTF-8',
+          '',
+          opts.html || '',
+          `--${boundary}--`,
+        ];
+        const raw = Buffer.from(lines.join('\r\n'))
+          .toString('base64')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+        return gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
+      }
+    };
   } else {
     // Mailgun REST API (default for production)
     const Mailgun  = require('mailgun.js');
@@ -66,11 +103,14 @@ async function send({ to, subject, html, text, messageId, inReplyTo, references,
   const from = `Ticketing <${config.ticketEmail}>`;
   const transport = getTransport();
 
-  if (!config.isDev && config.mailTransport === 'mailgun') {
+  if (config.mailTransport === 'mailgun') {
     // Mailgun REST wrapper expects flat options; headers are passed as h:* keys
     await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references, replyTo });
+  } else if (config.mailTransport === 'gmail') {
+    // Gmail transport handles all headers internally via raw RFC 2822 message
+    await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references, replyTo });
   } else {
-    // nodemailer (MailHog in dev, SMTP relay in prod)
+    // nodemailer SMTP relay
     await transport.sendMail({
       from, to, subject, html, text,
       messageId,

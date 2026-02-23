@@ -5,9 +5,6 @@ require('dotenv').config();
 const config = {
   port: parseInt(process.env.PORT || '3000', 10),
   smtpPort: parseInt(process.env.SMTP_PORT || '25', 10),
-  nodeEnv: process.env.NODE_ENV || 'development',
-  isDev: process.env.NODE_ENV !== 'production',
-
   jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-in-production',
   jwtExpiry: '30d',
   secureSession: process.env.SECURE_SESSION === 'true',
@@ -41,21 +38,26 @@ const config = {
     domain: process.env.MAILGUN_DOMAIN || '',
   },
 
-  // Outbound mail transport: 'mailgun' (default) or 'smtp'
+  // Outbound mail transport: 'mailgun' (default), 'smtp', or 'gmail'
   mailTransport: process.env.MAIL_TRANSPORT || 'mailgun',
 
   // SMTP relay — used when MAIL_TRANSPORT=smtp
   smtpRelay: {
-    host: process.env.SMTP_RELAY_HOST || 'smtp-relay.gmail.com',
+    host: process.env.SMTP_RELAY_HOST || '',
     port: parseInt(process.env.SMTP_RELAY_PORT || '587', 10),
     user: process.env.SMTP_RELAY_USER || '',
     pass: process.env.SMTP_RELAY_PASS || '',
   },
 
-  mailhog: {
-    host: process.env.MAILHOG_HOST || 'mailhog',
-    port: parseInt(process.env.MAILHOG_PORT || '1025', 10),
+  // Gmail API — used when MAIL_TRANSPORT=gmail
+  // Run `npm run gmail-setup` to obtain GMAIL_REFRESH_TOKEN
+  gmail: {
+    clientId:     process.env.GMAIL_CLIENT_ID     || '',
+    clientSecret: process.env.GMAIL_CLIENT_SECRET || '',
+    refreshToken: process.env.GMAIL_REFRESH_TOKEN || '',
+    user:         process.env.GMAIL_USER          || '',
   },
+
 };
 
 module.exports = config;
