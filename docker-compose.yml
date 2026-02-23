@@ -16,13 +16,4 @@ services:
     environment:
       - NODE_ENV=development
     restart: unless-stopped
-    depends_on:
-      - mailhog
     command: npx nodemon src/app.js
-
-  mailhog:
-    image: mailhog/mailhog:latest
-    ports:
-      - "1025:1025"   # SMTP
-      - "8025:8025"   # Web UI - view captured emails at http://localhost:8025
-    restart: unless-stopped

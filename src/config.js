@@ -52,10 +52,6 @@ const config = {
     pass: process.env.SMTP_RELAY_PASS || '',
   },
 
-  mailhog: {
-    host: process.env.MAILHOG_HOST || 'mailhog',
-    port: parseInt(process.env.MAILHOG_PORT || '1025', 10),
-  },
 };
 
 module.exports = config;

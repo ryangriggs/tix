@@ -9,15 +9,7 @@ let _transport = null;
 function getTransport() {
   if (_transport) return _transport;
 
-  if (config.isDev) {
-    // MailHog — catches all outbound mail in a local web UI
-    _transport = nodemailer.createTransport({
-      host: config.mailhog.host,
-      port: config.mailhog.port,
-      secure: false,
-      ignoreTLS: true,
-    });
-  } else if (config.mailTransport === 'smtp') {
+  if (config.mailTransport === 'smtp') {
     // SMTP relay (e.g. Google Workspace smtp-relay.gmail.com)
     // port 587 → STARTTLS, port 465 → implicit TLS
     _transport = nodemailer.createTransport({
@@ -66,11 +58,11 @@ async function send({ to, subject, html, text, messageId, inReplyTo, references,
   const from = `Ticketing <${config.ticketEmail}>`;
   const transport = getTransport();
 
-  if (!config.isDev && config.mailTransport === 'mailgun') {
+  if (config.mailTransport === 'mailgun') {
     // Mailgun REST wrapper expects flat options; headers are passed as h:* keys
     await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references, replyTo });
   } else {
-    // nodemailer (MailHog in dev, SMTP relay in prod)
+    // nodemailer SMTP relay
     await transport.sendMail({
       from, to, subject, html, text,
       messageId,
