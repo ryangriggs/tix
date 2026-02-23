@@ -152,14 +152,14 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_tickets_status        ON tickets(status);
   CREATE INDEX IF NOT EXISTS idx_tickets_updated       ON tickets(updated_at DESC);
 
-  CREATE VIRTUAL TABLE IF NOT EXISTS ticket_fts USING fts5(
+  CREATE VIRTUAL TABLE IF NOT EXISTS ticket_fts USING fts4(
     text,
-    tokenize = 'unicode61'
+    tokenize=unicode61
   );
 
-  CREATE VIRTUAL TABLE IF NOT EXISTS comment_fts USING fts5(
+  CREATE VIRTUAL TABLE IF NOT EXISTS comment_fts USING fts4(
     text,
-    tokenize = 'unicode61'
+    tokenize=unicode61
   );
 
   CREATE TRIGGER IF NOT EXISTS fts_ticket_ai
@@ -434,10 +434,10 @@ function getTickets({ userId, userRole, status, priority, sort = 'updated_at', o
   if (priority) { conditions.push('t.priority = ?'); params.push(priority); }
   if (dateFrom) { conditions.push('t.updated_at >= ?'); params.push(dateFrom); }
   if (search) {
-    // Build an FTS5 MATCH query: each whitespace-delimited token becomes a prefix phrase search.
-    // e.g. "john smith" → `"john"* "smith"*`  (both tokens must appear, prefix-matched)
+    // Build an FTS4 MATCH query: each whitespace-delimited token becomes a prefix search.
+    // e.g. "john smith" → `john* smith*`  (both tokens must appear, prefix-matched)
     const ftsQuery = search.trim().split(/\s+/).filter(Boolean)
-      .map(t => `"${t.replace(/"/g, '""')}"*`).join(' ');
+      .map(t => `${t.replace(/['"*:]/g, '')}*`).join(' ');
     conditions.push(`t.id IN (
       SELECT rowid FROM ticket_fts WHERE ticket_fts MATCH ?
       UNION
