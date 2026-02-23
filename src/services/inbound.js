@@ -174,6 +174,11 @@ async function handleReply(ticketId, fromEmail, parsed, subjectFallback = false)
   const fromName = parsed.from?.value?.[0]?.name || '';
   const user = db.findOrCreateUser(fromEmail, fromName);
 
+  if (user.blocked_at) {
+    console.log(`[Inbound] Ignoring email from blocked user ${fromEmail}`);
+    return;
+  }
+
   // Subject-tag matches ([Ticket #N]) are only trusted if the sender is already
   // a party — otherwise anyone who knows a ticket number could post to it.
   // Message-ID matches (In-Reply-To / References) are always trusted because
@@ -226,6 +231,11 @@ async function handleReply(ticketId, fromEmail, parsed, subjectFallback = false)
 async function handleNewTicket(fromEmail, parsed) {
   const fromName = parsed.from?.value?.[0]?.name || '';
   const senderUser = db.findOrCreateUser(fromEmail, fromName);
+
+  if (senderUser.blocked_at) {
+    console.log(`[Inbound] Ignoring email from blocked user ${fromEmail}`);
+    return;
+  }
 
   // Strip Re:/Fwd: prefixes from subject
   let subject = (parsed.subject || '(No Subject)').replace(/^(Re|Fwd?|Rv):\s*/gi, '').trim();
