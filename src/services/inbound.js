@@ -367,7 +367,7 @@ async function handleNewTicket(fromEmail, parsed) {
       ticketSubject: ticket.subject,
       body: `
         <p>A ticket has been created on your behalf with ID <strong>#${ticket.id}</strong>.</p>
-        <p>Ticket Subject: <strong>%{ticket.subject}</strong></p>
+        <p>Ticket Subject: <strong>${ticket.subject}</strong></p>
         <p>Created by: <strong>${fromEmail}</strong><p>
         `,
       ticketId: ticket.id,
