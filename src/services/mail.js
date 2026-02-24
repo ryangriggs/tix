@@ -37,6 +37,9 @@ function getTransport() {
         const boundary = `tix_${Date.now()}`;
         const lines = [
           `From: ${opts.from}`,
+          // Sender header lets Gmail honour a From != the authenticated account
+          // (works for Google Workspace; personal Gmail requires a verified alias)
+          ...(config.gmail.user ? [`Sender: ${config.gmail.user}`] : []),
           `To: ${Array.isArray(opts.to) ? opts.to.join(', ') : opts.to}`,
           `Subject: ${opts.subject}`,
           ...(opts.replyTo    ? [`Reply-To: ${opts.replyTo}`]         : []),

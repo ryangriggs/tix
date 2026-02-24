@@ -1,7 +1,7 @@
 <%- include('../partials/head', { title: 'Check your email' }) %>
 <main class="auth-page">
   <div class="auth-card">
-    <div class="auth-logo">🎫 Ticketing</div>
+    <div class="auth-logo"><%= siteName %></div>
     <h1 class="auth-title">Check your email</h1>
 
     <% if (sent) { %>
@@ -51,14 +51,18 @@
   </div>
 </main>
 <script>
-  // Auto-submit when 6 digits are pasted or typed
   const otpInput = document.getElementById('otp');
   if (otpInput) {
+    // Auto-submit when 6 digits are typed or pasted
     otpInput.addEventListener('input', () => {
       if (otpInput.value.replace(/\D/g, '').length === 6) {
         otpInput.value = otpInput.value.replace(/\D/g, '');
         document.getElementById('otp-form').submit();
       }
+    });
+    // Submit on Enter regardless of digit count (server validates)
+    otpInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('otp-form').submit(); }
     });
   }
 </script>

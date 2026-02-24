@@ -8,9 +8,9 @@
     <div class="alert alert-info"><%= message %></div>
   <% } %>
 
-  <!-- Pre-add user -->
+  <!-- Add user -->
   <details style="margin-bottom:1.25rem">
-    <summary class="link-btn">+ Pre-add user</summary>
+    <summary class="link-btn">+ Add user</summary>
     <form method="POST" action="/admin/users/pre-add" class="inline-form" style="margin-top:.5rem;gap:.5rem;flex-wrap:wrap">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <input type="email" name="email" placeholder="Email address" class="form-input form-input-sm" required style="width:220px">
@@ -27,8 +27,6 @@
         <th>Name</th>
         <th>Role</th>
         <th>Organization</th>
-        <th>Superuser</th>
-        <th>Tech Orgs</th>
         <th>Created</th>
         <th>Status</th>
         <th>Actions</th>
@@ -38,91 +36,22 @@
       <% for (const u of users) { %>
         <tr class="<%= u.blocked_at ? 'row-blocked' : '' %>">
           <td><%= u.email %></td>
-          <td>
-            <form method="POST" action="/admin/users/<%= u.id %>/name" class="inline-form">
-              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <input type="text" name="name" value="<%= u.name || '' %>" placeholder="—"
-                class="form-input form-input-sm" style="width:140px">
-              <button type="submit" class="btn btn-sm btn-secondary">Save</button>
-            </form>
-          </td>
-          <td>
-            <form method="POST" action="/admin/users/<%= u.id %>/role" style="display:inline">
-              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <select name="role" class="form-select form-select-sm" onchange="this.form.submit()">
-                <option value="user"       <%= u.role === 'user'       ? 'selected' : '' %>>User</option>
-                <option value="technician" <%= u.role === 'technician' ? 'selected' : '' %>>Technician</option>
-                <option value="admin"      <%= u.role === 'admin'      ? 'selected' : '' %>>Admin</option>
-              </select>
-            </form>
-          </td>
-          <td>
-            <form method="POST" action="/admin/users/<%= u.id %>/organization" class="inline-form">
-              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <div style="position:relative">
-                <input type="text" name="organization_name"
-                       class="form-input form-input-sm org-autocomplete"
-                       value="<%= u.organization_name || '' %>"
-                       placeholder="—" style="width:150px" autocomplete="off">
-              </div>
-              <button type="submit" class="btn btn-sm btn-secondary">Set</button>
-            </form>
-          </td>
-          <td>
-            <% if (u.role === 'user') { %>
-              <form method="POST" action="/admin/users/<%= u.id %>/superuser" style="display:inline">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <input type="hidden" name="is_group_superuser" value="<%= u.is_group_superuser ? '0' : '1' %>">
-                <button type="submit" class="btn btn-sm <%= u.is_group_superuser ? 'btn-primary' : 'btn-secondary' %>">
-                  <%= u.is_group_superuser ? 'Yes' : 'No' %>
-                </button>
-              </form>
-            <% } else { %>
-              —
-            <% } %>
-          </td>
-          <td>
-            <% if (u.role === 'technician') { %>
-              <div style="display:flex;flex-wrap:wrap;gap:.25rem;align-items:center;min-width:160px">
-                <% for (const o of (techOrgMap[u.id] || [])) { %>
-                  <span style="display:inline-flex;align-items:center;gap:.25rem">
-                    <span class="badge"><%= o.name %></span>
-                    <form method="POST" action="/admin/users/<%= u.id %>/tech-orgs/remove" style="display:inline;margin:0">
-                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                      <input type="hidden" name="organization_id" value="<%= o.id %>">
-                      <button type="submit" class="btn-icon" title="Remove" style="line-height:1">×</button>
-                    </form>
-                  </span>
-                <% } %>
-                <form method="POST" action="/admin/users/<%= u.id %>/tech-orgs/add" class="inline-form" style="margin-top:.25rem">
-                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                  <div style="position:relative">
-                    <input type="text" name="organization_name"
-                           class="form-input form-input-sm org-autocomplete"
-                           placeholder="Assign org…" style="width:120px" autocomplete="off">
-                  </div>
-                  <button type="submit" class="btn btn-sm btn-secondary">+</button>
-                </form>
-              </div>
-            <% } else { %>
-              —
-            <% } %>
-          </td>
+          <td><%= u.name || '—' %></td>
+          <td><span class="badge badge-role"><%= u.role %></span></td>
+          <td><%= u.organization_name || '—' %></td>
           <td><%= formatDate(u.created_at) %></td>
           <td><%= u.blocked_at ? '🚫 Blocked' : '✓ Active' %></td>
           <td class="actions-cell">
-            <% if (!u.blocked_at) { %>
-              <form method="POST" action="/admin/users/<%= u.id %>/block">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <button type="submit" class="btn btn-sm btn-danger"
-                  onclick="return confirm('Block <%= u.email %>?')">Block</button>
-              </form>
-            <% } else { %>
-              <form method="POST" action="/admin/users/<%= u.id %>/unblock">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <button type="submit" class="btn btn-sm btn-secondary">Unblock</button>
-              </form>
-            <% } %>
+            <button type="button" class="btn btn-sm btn-secondary"
+              onclick="openEditDialog(this)"
+              data-user-id="<%= u.id %>"
+              data-user-email="<%= u.email %>"
+              data-user-name="<%= (u.name || '').replace(/"/g,'&quot;') %>"
+              data-user-role="<%= u.role %>"
+              data-user-org="<%= (u.organization_name || '').replace(/"/g,'&quot;') %>"
+              data-user-superuser="<%= u.is_group_superuser ? '1' : '0' %>"
+              data-user-blocked="<%= u.blocked_at ? '1' : '0' %>"
+              data-is-self="<%= u.id === user.id ? '1' : '0' %>">Edit</button>
           </td>
         </tr>
       <% } %>
@@ -131,14 +60,197 @@
   </div>
 </main>
 
+<!-- Edit User Dialog -->
+<dialog id="edit-user-dialog">
+  <div class="dialog-header">
+    <h2 id="dialog-title">Edit User</h2>
+    <button type="button" class="btn-icon" style="font-size:1.25rem" onclick="document.getElementById('edit-user-dialog').close()">×</button>
+  </div>
+  <div class="dialog-body">
+
+    <p id="dialog-email" style="font-size:.9rem;color:var(--text-muted);margin-bottom:1rem"></p>
+
+    <!-- Main edit form (name, role, org, superuser) -->
+    <form id="dialog-edit-form" method="POST" action="">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+      <div class="form-group">
+        <label for="dialog-name">Name</label>
+        <input type="text" id="dialog-name" name="name" class="form-input" placeholder="Full name">
+      </div>
+
+      <div class="form-group">
+        <label for="dialog-role">Role</label>
+        <select id="dialog-role" name="role" class="form-select" onchange="updateDialogSections()">
+          <option value="user">User</option>
+          <option value="technician">Technician</option>
+          <option value="admin">Admin</option>
+        </select>
+        <p id="dialog-role-note" style="display:none;font-size:.8rem;color:var(--text-muted);margin-top:.25rem">You cannot change your own role.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="dialog-org">Organization</label>
+        <div style="position:relative">
+          <input type="text" id="dialog-org" name="organization_name" class="form-input" autocomplete="off" placeholder="None">
+        </div>
+      </div>
+
+      <div class="form-group" id="dialog-superuser-row">
+        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:normal">
+          <input type="checkbox" id="dialog-superuser" name="is_group_superuser" value="1">
+          <span>Group Superuser — can view all tickets in their organization</span>
+        </label>
+      </div>
+
+      <div class="form-actions" style="margin-top:1.25rem">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('edit-user-dialog').close()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+
+    <!-- Tech Orgs section (technicians only) -->
+    <div id="dialog-tech-orgs" style="display:none">
+      <hr class="dialog-section-divider">
+      <div class="sidebar-label" style="margin-bottom:.5rem">Assigned Organizations</div>
+      <div id="dialog-tech-orgs-list" style="display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.5rem"></div>
+      <div class="inline-form">
+        <div style="position:relative;flex:1">
+          <input type="text" id="dialog-tech-org-input" class="form-input form-input-sm"
+                 placeholder="Add org…" autocomplete="off">
+        </div>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="addTechOrg()">Add</button>
+      </div>
+    </div>
+
+    <!-- Block / Unblock -->
+    <hr class="dialog-section-divider">
+    <button type="button" id="dialog-block-btn" class="btn btn-sm btn-danger" onclick="dialogToggleBlock()">Block User</button>
+
+  </div>
+</dialog>
+
 <script>
-document.querySelectorAll('.org-autocomplete').forEach(input => {
-  if (typeof createAutocomplete !== 'function') return;
-  createAutocomplete(input, {
-    fetchUrl: q => `/api/organizations/search?q=${encodeURIComponent(q)}`,
-    formatItem: item => `<span>${item.name}</span>`,
-    onSelect: item => { input.value = item.name; },
+let _dialogUserId = null;
+let _dialogBlocked = false;
+const _csrf = '<%= csrfToken %>';
+
+function openEditDialog(btn) {
+  const d = btn.dataset;
+  _dialogUserId = d.userId;
+  _dialogBlocked = d.userBlocked === '1';
+
+  document.getElementById('dialog-email').textContent = d.userEmail;
+  document.getElementById('dialog-name').value  = d.userName;
+  document.getElementById('dialog-org').value   = d.userOrg;
+  document.getElementById('dialog-superuser').checked = d.userSuperuser === '1';
+
+  const roleEl = document.getElementById('dialog-role');
+  roleEl.value    = d.userRole;
+  roleEl.disabled = d.isSelf === '1';
+  document.getElementById('dialog-role-note').style.display = d.isSelf === '1' ? 'block' : 'none';
+
+  document.getElementById('dialog-edit-form').action = `/admin/users/${d.userId}/edit`;
+
+  const blockBtn = document.getElementById('dialog-block-btn');
+  blockBtn.textContent = _dialogBlocked ? 'Unblock User' : 'Block User';
+  blockBtn.className   = `btn btn-sm ${_dialogBlocked ? 'btn-secondary' : 'btn-danger'}`;
+  if (d.isSelf === '1') blockBtn.style.display = 'none';
+  else blockBtn.style.display = '';
+
+  updateDialogSections();
+
+  if (d.userRole === 'technician') loadTechOrgs();
+
+  document.getElementById('edit-user-dialog').showModal();
+}
+
+function updateDialogSections() {
+  const role = document.getElementById('dialog-role').value;
+  document.getElementById('dialog-superuser-row').style.display = role === 'user' ? '' : 'none';
+  const techSection = document.getElementById('dialog-tech-orgs');
+  techSection.style.display = role === 'technician' ? '' : 'none';
+  if (role === 'technician' && _dialogUserId) loadTechOrgs();
+}
+
+async function loadTechOrgs() {
+  const r = await fetch(`/admin/users/${_dialogUserId}/tech-orgs`);
+  if (!r.ok) return;
+  renderTechOrgs(await r.json());
+}
+
+function renderTechOrgs(orgs) {
+  const list = document.getElementById('dialog-tech-orgs-list');
+  if (!orgs.length) {
+    list.innerHTML = '<span style="color:var(--text-muted);font-size:.85rem">None assigned</span>';
+    return;
+  }
+  list.innerHTML = orgs.map(o =>
+    `<span style="display:inline-flex;align-items:center;gap:.2rem">
+      <span class="badge">${esc(o.name)}</span>
+      <button type="button" class="btn-icon" onclick="removeTechOrg(${o.id})" title="Remove">×</button>
+    </span>`
+  ).join('');
+}
+
+async function addTechOrg() {
+  const input = document.getElementById('dialog-tech-org-input');
+  const name = input.value.trim();
+  if (!name || !_dialogUserId) return;
+  await fetch(`/admin/users/${_dialogUserId}/tech-orgs/add`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `_csrf=${encodeURIComponent(_csrf)}&organization_name=${encodeURIComponent(name)}`,
   });
+  input.value = '';
+  loadTechOrgs();
+}
+
+async function removeTechOrg(orgId) {
+  if (!_dialogUserId) return;
+  await fetch(`/admin/users/${_dialogUserId}/tech-orgs/remove`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `_csrf=${encodeURIComponent(_csrf)}&organization_id=${orgId}`,
+  });
+  loadTechOrgs();
+}
+
+async function dialogToggleBlock() {
+  if (!_dialogUserId) return;
+  const action = _dialogBlocked ? 'unblock' : 'block';
+  if (!_dialogBlocked && !confirm('Block this user? They will be unable to log in.')) return;
+  await fetch(`/admin/users/${_dialogUserId}/${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `_csrf=${encodeURIComponent(_csrf)}`,
+  });
+  document.getElementById('edit-user-dialog').close();
+  window.location.reload();
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// Org autocomplete on dialog org input
+document.addEventListener('DOMContentLoaded', () => {
+  const orgInput = document.getElementById('dialog-org');
+  if (orgInput && typeof createAutocomplete === 'function') {
+    createAutocomplete(orgInput, {
+      fetchUrl: q => `/api/organizations/search?q=${encodeURIComponent(q)}`,
+      formatItem: item => `<span>${item.name}</span>`,
+      onSelect: item => { orgInput.value = item.name; },
+      showOnFocus: true,
+    });
+  }
+  const techOrgInput = document.getElementById('dialog-tech-org-input');
+  if (techOrgInput && typeof createAutocomplete === 'function') {
+    createAutocomplete(techOrgInput, {
+      fetchUrl: q => `/api/organizations/search?q=${encodeURIComponent(q)}`,
+      formatItem: item => `<span>${item.name}</span>`,
+      onSelect: item => { techOrgInput.value = item.name; },
+      showOnFocus: true,
+    });
+  }
 });
 </script>
 

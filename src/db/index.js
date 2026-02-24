@@ -469,6 +469,7 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
     id:            't.id',
     subject:       't.subject',
     submitter:     'submitter_name',
+    organization:  'organization_name',
   };
   const sortCol   = validSorts[sort] || 't.updated_at';
   const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
@@ -521,13 +522,15 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
     // e.g. "john smith" → `john* smith*`  (both tokens must appear, prefix-matched)
     const ftsQuery = search.trim().split(/\s+/).filter(Boolean)
       .map(t => `${t.replace(/['"*:]/g, '')}*`).join(' ');
-    conditions.push(`t.id IN (
+    conditions.push(`(t.id IN (
       SELECT rowid FROM ticket_fts WHERE ticket_fts MATCH ?
       UNION
       SELECT c.ticket_id FROM comments c
       WHERE c.id IN (SELECT rowid FROM comment_fts WHERE comment_fts MATCH ?)
-    )`);
-    params.push(ftsQuery, ftsQuery);
+    ) OR EXISTS (
+      SELECT 1 FROM organizations o WHERE o.id = t.organization_id AND o.name LIKE ?
+    ))`);
+    params.push(ftsQuery, ftsQuery, `%${search}%`);
   }
 
   if (conditions.length > 0) query += ' WHERE ' + conditions.join(' AND ');

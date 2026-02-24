@@ -110,9 +110,11 @@
           <form method="POST" action="/tickets/<%= ticket.id %>/status">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <select name="status" class="form-select" onchange="this.form.submit()">
-              <% for (const s of ['open','pending','on_hold','completed','cancelled']) { %>
-                <option value="<%= s %>" <%= ticket.status === s ? 'selected' : '' %>><%= s.replace('_',' ') %></option>
-              <% } %>
+              <option value="open"      <%= ticket.status==='open'      ? 'selected':'' %>>🟡 Open</option>
+              <option value="pending"   <%= ticket.status==='pending'   ? 'selected':'' %>>🔵 Pending</option>
+              <option value="on_hold"   <%= ticket.status==='on_hold'   ? 'selected':'' %>>⬛ On Hold</option>
+              <option value="completed" <%= ticket.status==='completed' ? 'selected':'' %>>🟢 Completed</option>
+              <option value="cancelled" <%= ticket.status==='cancelled' ? 'selected':'' %>>⭕ Cancelled</option>
             </select>
           </form>
         </div>
@@ -123,9 +125,10 @@
           <form method="POST" action="/tickets/<%= ticket.id %>/priority">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <select name="priority" class="form-select" onchange="this.form.submit()">
-              <% for (const p of ['low','medium','high','urgent']) { %>
-                <option value="<%= p %>" <%= ticket.priority === p ? 'selected' : '' %>><%= p %></option>
-              <% } %>
+              <option value="urgent" <%= ticket.priority==='urgent' ? 'selected':'' %>>🔴 Urgent</option>
+              <option value="high"   <%= ticket.priority==='high'   ? 'selected':'' %>>🟠 High</option>
+              <option value="medium" <%= ticket.priority==='medium' ? 'selected':'' %>>🔵 Medium</option>
+              <option value="low"    <%= ticket.priority==='low'    ? 'selected':'' %>>⚫ Low</option>
             </select>
           </form>
         </div>
@@ -268,6 +271,7 @@
         fetchUrl: q => `/api/organizations/search?q=${encodeURIComponent(q)}`,
         formatItem: item => `<span>${item.name}</span>`,
         onSelect: item => { orgInput.value = item.name; },
+        showOnFocus: true,
       });
     }
 

@@ -133,7 +133,7 @@
  *   minChars       — min chars before triggering (default 1)
  *   allowFreeform  — if true, free-typed text is preserved on blur
  */
-function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars = 1 } = {}) {
+function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars = 1, showOnFocus = false } = {}) {
   const wrap = inputEl.parentElement;
   if (getComputedStyle(wrap).position === 'static') wrap.style.position = 'relative';
 
@@ -183,17 +183,26 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
 
   function close() { dropdown.style.display = 'none'; activeIdx = -1; }
 
+  function doFetch(q) {
+    fetch(fetchUrl(q), { headers: { Accept: 'application/json' } })
+      .then(r => r.ok ? r.json() : [])
+      .then(render)
+      .catch(close);
+  }
+
   inputEl.addEventListener('input', () => {
     const q = inputEl.value.trim();
     if (q.length < minChars) { close(); return; }
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      fetch(fetchUrl(q), { headers: { Accept: 'application/json' } })
-        .then(r => r.ok ? r.json() : [])
-        .then(render)
-        .catch(close);
-    }, 150);
+    debounceTimer = setTimeout(() => doFetch(q), 150);
   });
+
+  if (showOnFocus) {
+    inputEl.addEventListener('focus', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => doFetch(inputEl.value.trim()), 50);
+    });
+  }
 
   inputEl.addEventListener('keydown', e => {
     if (!currentItems.length) return;

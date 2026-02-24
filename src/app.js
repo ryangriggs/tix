@@ -8,7 +8,7 @@ const config = require('./config');
 const { requireAuth, requireAdmin, optionalAuth, verifyCsrf } = require('./middleware/auth');
 const { startSMTPServer } = require('./smtp');
 const sse = require('./services/sse');
-const { initDb, getTicketsDueSoon } = require('./db');
+const { initDb, getTicketsDueSoon, getSetting } = require('./db');
 const { sendDueReminder } = require('./services/mail');
 
 const app = express();
@@ -33,6 +33,7 @@ const { version } = require('../package.json');
 app.use((req, res, next) => {
   res.locals.user = null;
   res.locals.appVersion = version;
+  try { res.locals.siteName = getSetting('site_name') || config.siteName; } catch (_) { res.locals.siteName = config.siteName; }
 
   res.locals.formatDate = function (ts) {
     if (!ts) return '—';

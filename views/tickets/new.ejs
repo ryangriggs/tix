@@ -32,10 +32,10 @@
       <div class="form-group">
         <label for="priority">Priority</label>
         <select id="priority" name="priority" class="form-select">
-          <option value="low">Low</option>
-          <option value="medium" selected>Medium</option>
-          <option value="high">High</option>
-          <option value="urgent">Urgent</option>
+          <option value="urgent">🔴 Urgent</option>
+          <option value="high">🟠 High</option>
+          <option value="medium" selected>🔵 Medium</option>
+          <option value="low">⚫ Low</option>
         </select>
       </div>
       <div class="form-group">
@@ -48,11 +48,11 @@
       <label for="organization_name">Organization <span class="optional">(optional)</span></label>
       <div style="position:relative">
         <input type="text" id="organization_name" name="organization_name"
-               class="form-input" placeholder="Type to search or create…"
+               class="form-input" placeholder="Type to search or click to browse…"
                autocomplete="off"
                value="<%= user && user.organization_name ? user.organization_name : '' %>">
       </div>
-      <p class="form-hint">Start typing to find an existing organization, or enter a new name to create one.</p>
+      <p class="form-hint">Start typing to search, or click the field to browse existing organizations. Enter a new name to create one.</p>
     </div>
 
     <div class="form-group">
@@ -83,17 +83,26 @@
     }
   });
 
+  // Tab from subject skips toolbar and jumps directly into editor
+  document.getElementById('subject').addEventListener('keydown', function(e) {
+    if (e.key === 'Tab' && !e.shiftKey) {
+      e.preventDefault();
+      quill.focus();
+    }
+  });
+
   document.getElementById('ticket-form').addEventListener('submit', () => {
     document.getElementById('body').value = quill.root.innerHTML;
   });
 
-  // Organization autocomplete
+  // Organization autocomplete — show all orgs on focus, filter on type
   const orgInput = document.getElementById('organization_name');
   if (orgInput && typeof createAutocomplete === 'function') {
     createAutocomplete(orgInput, {
       fetchUrl: q => `/api/organizations/search?q=${encodeURIComponent(q)}`,
       formatItem: item => `<span>${item.name}</span>`,
       onSelect: item => { orgInput.value = item.name; },
+      showOnFocus: true,
     });
   }
 </script>

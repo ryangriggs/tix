@@ -8,23 +8,30 @@
     <div class="alert alert-info"><%= message %></div>
   <% } %>
 
-  <div class="card">
+  <!-- Editable settings -->
+  <div class="card" style="margin-bottom:1.5rem">
+    <h2 style="font-size:1rem;font-weight:600;margin-bottom:1.25rem">Application Settings</h2>
     <form method="POST" action="/admin/settings" class="ticket-form">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 
       <div class="form-group">
+        <label for="site_name">Site name</label>
+        <input type="text" id="site_name" name="site_name"
+               value="<%= siteName %>"
+               placeholder="✅ Tix"
+               class="form-input">
+        <p class="form-hint">Displayed in the navigation bar and on login pages.</p>
+      </div>
+
+      <div class="form-group">
         <label for="default_assignee_email">Default assignee email</label>
-        <input
-          type="email"
-          id="default_assignee_email"
-          name="default_assignee_email"
-          value="<%= defaultAssignee %>"
-          placeholder="assignee@example.com"
-          class="form-input"
-        >
+        <input type="email" id="default_assignee_email" name="default_assignee_email"
+               value="<%= defaultAssignee %>"
+               placeholder="assignee@example.com"
+               class="form-input">
         <p class="form-hint">
-          All tickets created via inbound email or web (by others) will be assigned to this person as an owner.
-          Leave blank to disable automatic assignment.
+          Tickets created via inbound email or web (by others) are automatically assigned to this person.
+          Leave blank to disable.
         </p>
       </div>
 
@@ -32,6 +39,26 @@
         <button type="submit" class="btn btn-primary">Save settings</button>
       </div>
     </form>
+  </div>
+
+  <!-- Read-only system config -->
+  <div class="card">
+    <h2 style="font-size:1rem;font-weight:600;margin-bottom:.25rem">System Configuration</h2>
+    <p class="form-hint" style="margin-bottom:1.25rem">These values come from your <code>.env</code> file and require a server restart to change.</p>
+
+    <% const sections = Object.entries(configDisplay); %>
+    <% for (const [sectionKey, fields] of sections) { %>
+      <% const sectionTitle = { application:'Application', security:'Security', email:'Email Transport', mailgun:'Mailgun', smtp:'SMTP Relay', gmail:'Gmail API', uploads:'Uploads & Rate Limits' }[sectionKey] || sectionKey; %>
+      <h3 style="font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin:.75rem 0 .4rem"><%= sectionTitle %></h3>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:.75rem">
+        <% for (const [key, val] of Object.entries(fields)) { %>
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:.35rem .5rem .35rem 0;font-size:.8rem;color:var(--text-muted);white-space:nowrap;width:55%"><%= key %></td>
+            <td style="padding:.35rem 0;font-size:.85rem;font-family:monospace;word-break:break-all"><%= val %></td>
+          </tr>
+        <% } %>
+      </table>
+    <% } %>
   </div>
 </main>
 

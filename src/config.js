@@ -24,6 +24,8 @@ const config = {
     || 'jpg,jpeg,png,gif,webp,bmp,pdf,txt,md,csv,zip,doc,docx,xls,xlsx,ppt,pptx',
   uploadBlockedExtensions: process.env.UPLOAD_BLOCKED_EXTENSIONS || '',
 
+  siteName: process.env.SITE_NAME || '✅ Tix',
+
   ticketEmail: process.env.TICKET_EMAIL || 'tickets@example.com',
   defaultAssigneeEmail: process.env.DEFAULT_ASSIGNEE_EMAIL || null,
   adminEmail: process.env.ADMIN_EMAIL || null,

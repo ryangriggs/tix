@@ -351,8 +351,8 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 
 .tlh-inner {
   display: grid;
-  grid-template-columns: 80px 130px 1fr 70px 70px 32px;
-  grid-template-areas: "num creator subject created updated replies";
+  grid-template-columns: 64px 140px 1fr 140px 80px;
+  grid-template-areas: "num creator subject org updated";
   align-items: center;
   gap: 0.625rem;
   padding: 0 1rem 0 calc(1rem + 4px); /* +4px aligns with card content past border-left */
@@ -463,8 +463,8 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 /* Single-row grid inside the card link */
 .ticket-card-link {
   display: grid;
-  grid-template-columns: 80px 130px 1fr 70px 70px 32px;
-  grid-template-areas: "num creator subject created updated replies";
+  grid-template-columns: 64px 140px 1fr 140px 80px;
+  grid-template-areas: "num creator subject org updated";
   align-items: center;
   gap: 0.625rem;
   padding: 0.6rem 1rem;
@@ -491,16 +491,21 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 /* Priority dot — colored circle encoding ticket priority */
 .priority-dot {
   display: inline-block;
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
   cursor: help;
 }
-.priority-dot-low    { background: #93c5fd; }  /* light blue */
-.priority-dot-medium { background: #fbbf24; }  /* yellow */
-.priority-dot-high   { background: #f97316; }  /* orange */
-.priority-dot-urgent { background: #ef4444; }  /* red */
+.priority-dot-low    { background: #9ca3af; }
+.priority-dot-medium { background: #3b82f6; }
+.priority-dot-high   { background: #f97316; }
+.priority-dot-urgent { background: #ef4444; animation: urgent-pulse 1s ease-in-out infinite; }
+
+@keyframes urgent-pulse {
+  0%, 100% { background: #ef4444; }
+  50%       { background: #fca5a5; }
+}
 
 .tc-creator {
   grid-area: creator;
@@ -520,12 +525,13 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
   white-space: nowrap;
 }
 
-.tc-created {
-  grid-area: created;
-  font-size: 0.75rem;
+.tc-org {
+  grid-area: org;
+  font-size: 0.78rem;
   color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
-  text-align: right;
 }
 
 .tc-updated {
@@ -534,35 +540,7 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
   color: var(--text-muted);
   white-space: nowrap;
   text-align: right;
-  position: relative;
-}
-
-/* "Last modified by" tooltip on updated date */
-.tc-updated[data-by]::after {
-  content: 'by ' attr(data-by);
-  position: absolute;
-  bottom: calc(100% + 5px);
-  right: 0;
-  background: #1e293b;
-  color: #f8fafc;
-  padding: 0.2rem 0.5rem;
-  border-radius: 0.3rem;
-  font-size: 0.72rem;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s;
-  z-index: 50;
-}
-.tc-updated[data-by] { cursor: default; }
-.tc-updated[data-by]:hover::after { opacity: 1; }
-
-.tc-replies {
-  grid-area: replies;
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-  text-align: center;
+  cursor: default;
 }
 
 /* Checkbox column on the right */
@@ -585,14 +563,12 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
   accent-color: var(--accent);
 }
 
-.ticket-card.priority-low    { border-left-color: #16a34a; }
-.ticket-card.priority-medium { border-left-color: #d97706; }
-.ticket-card.priority-high   { border-left-color: #ea580c; }
-.ticket-card.priority-urgent { border-left-color: #dc2626; }
-
-/* Terminal status overrides — take precedence over priority colour */
-.ticket-card.status-completed { border-left-color: var(--success) !important; }
-.ticket-card.status-cancelled { border-left-color: var(--text-muted) !important; opacity: 0.7; }
+/* Left border = ticket status */
+.ticket-card.status-open      { border-left-color: #fbbf24; }
+.ticket-card.status-pending   { border-left-color: #3b82f6; }
+.ticket-card.status-on_hold   { border-left-color: #6b7280; }
+.ticket-card.status-completed { border-left-color: #16a34a; }
+.ticket-card.status-cancelled { border-left-color: #d1d5db; opacity: 0.65; }
 
 .ticket-card-left {
   display: flex;
@@ -960,6 +936,43 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 .ticket-form { display: flex; flex-direction: column; gap: 0; }
 
 /* ============================================================
+   <dialog> modal
+   ============================================================ */
+dialog {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 0;
+  width: 520px;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+dialog::backdrop { background: rgba(0,0,0,.45); }
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .875rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+.dialog-header h2 { font-size: 1rem; font-weight: 600; margin: 0; }
+
+.dialog-body { padding: 1.25rem; }
+.dialog-body .form-group { margin-bottom: 1rem; }
+
+.dialog-section-divider {
+  margin: 1rem 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+/* ============================================================
    Responsive
    ============================================================ */
 @media (max-width: 700px) {
@@ -970,17 +983,17 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
   /* Move sidebar above comments on mobile, disable sticky */
   .ticket-sidebar { order: -1; position: static; }
 
-  /* 2-row card layout on mobile — all columns visible */
+  /* 2-row card layout on mobile */
   .ticket-card-link {
-    grid-template-columns: auto 1fr auto auto;
+    grid-template-columns: auto 1fr auto;
     grid-template-areas:
-      "num creator updated replies"
-      "subject subject created created";
+      "num creator updated"
+      "subject subject org";
     gap: 0.2rem 0.5rem;
     padding: 0.625rem 0.75rem;
   }
   .tc-subject { font-size: 0.85rem; }
-  .tc-created { font-size: 0.72rem; text-align: right; }
+  .tc-org     { font-size: 0.72rem; }
   .tc-updated { font-size: 0.72rem; text-align: right; }
 
   .ticket-list-header { display: none; }

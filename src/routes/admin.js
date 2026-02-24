@@ -4,6 +4,13 @@ const express = require('express');
 const router = express.Router();
 
 const db = require('../db');
+const config = require('../config');
+
+function maskSecret(val) {
+  if (!val) return '(not set)';
+  if (val.length <= 8) return '***';
+  return val.slice(0, 4) + '···' + val.slice(-4);
+}
 
 // GET /admin/users
 router.get('/users', (req, res) => {
@@ -23,6 +30,39 @@ router.get('/users', (req, res) => {
     techOrgMap,
     message: req.query.message || null,
   });
+});
+
+// GET /admin/users/:id/tech-orgs — JSON for dialog
+router.get('/users/:id/tech-orgs', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  res.json(db.getTechnicianOrganizations(id));
+});
+
+// POST /admin/users/:id/edit — combined property update from dialog
+router.post('/users/:id/edit', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const name = (req.body.name || '').trim();
+  const role = req.body.role;
+  const orgName = (req.body.organization_name || '').trim();
+  const isSuperuser = req.body.is_group_superuser === '1' ? 1 : 0;
+
+  db.updateUserName(id, name || null);
+
+  if (role && ['admin', 'user', 'technician'].includes(role)) {
+    if (id !== req.user.id) db.updateUserRole(id, role);
+  }
+
+  let orgId = null;
+  if (orgName) {
+    const org = db.findOrCreateOrganization(orgName);
+    orgId = org ? org.id : null;
+  }
+  db.updateUserOrganization(id, orgId);
+
+  const effectiveRole = role || (db.getUserById(id)?.role ?? 'user');
+  if (effectiveRole === 'user') db.updateUserSuperuser(id, isSuperuser);
+
+  res.redirect('/admin/users?message=User+updated');
 });
 
 // POST /admin/users/pre-add — must be before /:id routes
@@ -140,23 +180,32 @@ router.post('/organizations/:id/delete', (req, res) => {
 
 // GET /admin/settings
 router.get('/settings', (req, res) => {
+  const configDisplay = {
+    application: { APP_URL: config.appUrl, TICKET_EMAIL: config.ticketEmail, PORT: config.port, SMTP_PORT: config.smtpPort, ADMIN_EMAIL: config.adminEmail || '(not set)' },
+    security:    { JWT_SECRET: maskSecret(config.jwtSecret), OTP_MAX_TRIES: config.otpMaxTries, OTP_LOCKOUT_SECONDS: config.otpLockoutSeconds, SECURE_SESSION: config.secureSession },
+    email:       { MAIL_TRANSPORT: config.mailTransport },
+    mailgun:     { MAILGUN_API_KEY: maskSecret(config.mailgun.apiKey), MAILGUN_DOMAIN: config.mailgun.domain || '(not set)' },
+    smtp:        { SMTP_RELAY_HOST: config.smtpRelay.host || '(not set)', SMTP_RELAY_PORT: config.smtpRelay.port, SMTP_RELAY_USER: config.smtpRelay.user || '(not set)', SMTP_RELAY_PASS: config.smtpRelay.pass ? '***' : '(not set)' },
+    gmail:       { GMAIL_CLIENT_ID: maskSecret(config.gmail.clientId), GMAIL_CLIENT_SECRET: maskSecret(config.gmail.clientSecret), GMAIL_REFRESH_TOKEN: config.gmail.refreshToken ? 'Set ✓' : '(not set)', GMAIL_USER: config.gmail.user || '(not set)' },
+    uploads:     { UPLOAD_ALLOWED_EXTENSIONS: config.uploadAllowedExtensions, UPLOAD_BLOCKED_EXTENSIONS: config.uploadBlockedExtensions || '(none)', EMAIL_RATE_LIMIT_PER_TICKET: config.emailRateLimitPerTicket, EMAIL_RATE_LIMIT_NEW_TICKETS: config.emailRateLimitNewTickets },
+  };
   res.render('admin/settings', {
     title: 'Settings',
-    defaultAssignee: db.getSetting('default_assignee_email') || '',
+    siteName:       db.getSetting('site_name') ?? config.siteName,
+    defaultAssignee: db.getSetting('default_assignee_email') ?? config.defaultAssigneeEmail ?? '',
+    configDisplay,
     message: req.query.message || null,
   });
 });
 
 // POST /admin/settings
 router.post('/settings', (req, res) => {
+  const siteName = (req.body.site_name || '').trim();
   const email = (req.body.default_assignee_email || '').trim().toLowerCase();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.render('admin/settings', {
-      title: 'Settings',
-      defaultAssignee: email,
-      message: 'Invalid email address.',
-    });
+    return res.redirect('/admin/settings?message=Invalid+email+address');
   }
+  if (siteName) db.setSetting('site_name', siteName);
   db.setSetting('default_assignee_email', email);
   res.redirect('/admin/settings?message=Settings+saved');
 });
