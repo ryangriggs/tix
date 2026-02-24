@@ -506,6 +506,7 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
   0%, 100% { background: #ef4444; }
   50%       { background: #fca5a5; }
 }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .tc-creator {
   grid-area: creator;
@@ -947,6 +948,11 @@ dialog {
   max-width: 95vw;
   max-height: 90vh;
   overflow-y: auto;
+  margin: auto;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 dialog::backdrop { background: rgba(0,0,0,.45); }
 
@@ -965,6 +971,15 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 
 .dialog-body { padding: 1.25rem; }
 .dialog-body .form-group { margin-bottom: 1rem; }
+
+.dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .75rem 1.25rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg-subtle, #f9fafb);
+}
 
 .dialog-section-divider {
   margin: 1rem 0;

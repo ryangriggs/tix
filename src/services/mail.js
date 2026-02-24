@@ -1,7 +1,18 @@
 'use strict';
 
+const path      = require('path');
+const ejs       = require('ejs');
 const nodemailer = require('nodemailer');
 const config = require('../config');
+
+const TEMPLATE_DIR = path.join(__dirname, '../../views/emails');
+
+function renderEmail(template, data) {
+  return ejs.renderFile(
+    path.join(TEMPLATE_DIR, `${template}.ejs`),
+    { siteName: config.siteName, appUrl: config.appUrl, ...data },
+  );
+}
 
 // Lazily initialised transport (allows config to be fully loaded first)
 let _transport = null;
@@ -131,15 +142,11 @@ async function send({ to, subject, html, text, messageId, inReplyTo, references,
 // ============================================================
 
 async function sendMagicLink(toEmail, magicLinkUrl, otp) {
+  const html = await renderEmail('login', { magicLinkUrl, otp });
   await send({
     to: toEmail,
     subject: 'Your login link',
-    html: `
-      <p>Click the link below to log in. It expires in 15 minutes.</p>
-      <p><a href="${magicLinkUrl}">${magicLinkUrl}</a></p>
-      <p>Or enter this code on the verification page: <strong style="font-size:1.4em;letter-spacing:0.1em">${otp}</strong></p>
-      <p style="color:#888;font-size:.9em">If you did not request this, you can ignore it.</p>
-    `,
+    html,
     text: `Login link (expires 15 min): ${magicLinkUrl}\nOr enter code: ${otp}`,
   });
 }
@@ -152,22 +159,16 @@ async function sendTicketNotification({ to, ticketSubject, body, ticketId, messa
     replyTo = `${config.mailFromName} <${localPart}+${replyToken}@${mailDomain}>`;
   }
 
-  const footer = `
-    <hr style="border:none;border-top:1px solid #e0e0e0;margin:24px 0">
-    <p style="color:#666;font-size:.85em;margin:0">
-      You can reply to this email to add a comment, or
-      <a href="${config.appUrl}/tickets/${ticketId}">view ticket #${ticketId} online</a>.
-    </p>
-  `;
-  const fullHtml = body + footer;
+  const html = await renderEmail('ticket-notification', { body, ticketId, ticketSubject });
+  const text = html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 
   const recipients = Array.isArray(to) ? to : [to];
   for (const email of recipients) {
     await send({
       to: email,
       subject: `[Ticket #${ticketId}] ${ticketSubject}`,
-      html: fullHtml,
-      text: fullHtml.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(),
+      html,
+      text,
       messageId,
       inReplyTo,
       references,
@@ -184,10 +185,11 @@ async function sendDueReminder(email, ticket) {
     const localPart  = config.ticketEmail.split('@')[0];
     replyTo = `${config.mailFromName} <${localPart}+${ticket.reply_token}@${mailDomain}>`;
   }
+  const html = await renderEmail('due-reminder', { ticket, dueDate });
   await send({
     to: email,
     subject: `[Ticket #${ticket.id}] Due date reminder`,
-    html: `<p>Ticket <strong>#${ticket.id}: ${ticket.subject}</strong> is due on <strong>${dueDate}</strong>.</p>`,
+    html,
     text: `Ticket #${ticket.id}: ${ticket.subject} is due on ${dueDate}.`,
     replyTo,
   });

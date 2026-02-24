@@ -1,0 +1,11 @@
+<%- include('_header') %>
+
+<p>This is a reminder that the following ticket is due <strong><%= dueDate %></strong>:</p>
+
+<p style="margin:16px 0">
+  <a href="<%= appUrl %>/tickets/<%= ticket.id %>" style="font-weight:600">
+    #<%= ticket.id %>: <%= ticket.subject %>
+  </a>
+</p>
+
+<%- include('_footer') %>

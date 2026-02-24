@@ -67,6 +67,15 @@
     const list = document.getElementById('ticket-list');
     if (!list) return;
 
+    // Show a loading overlay over the list
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:absolute;inset:0;background:rgba(255,255,255,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;z-index:10;border-radius:4px';
+    overlay.innerHTML = '<div style="width:28px;height:28px;border:3px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:spin 0.7s linear infinite"></div><span style="font-size:.8rem;color:#6b7280">Loading…</span>';
+    const wrapper = list.parentElement;
+    const prevPosition = getComputedStyle(wrapper).position;
+    if (prevPosition === 'static') wrapper.style.position = 'relative';
+    wrapper.appendChild(overlay);
+
     fetch(window.location.href, { headers: { 'Accept': 'text/html' } })
       .then(r => r.text())
       .then(html => {
@@ -75,7 +84,11 @@
         const newList = doc.getElementById('ticket-list');
         if (newList) list.replaceWith(newList);
       })
-      .catch(() => { /* network error — ignore */ });
+      .catch(() => { /* network error — ignore */ })
+      .finally(() => {
+        overlay.remove();
+        if (prevPosition === 'static') wrapper.style.position = '';
+      });
   }
 
   // Fetch a specific comment HTML and append it to the comment thread

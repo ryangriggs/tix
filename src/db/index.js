@@ -361,6 +361,10 @@ function unblockUser(id) {
   prepare('UPDATE users SET blocked_at = NULL WHERE id = ?').run(id);
 }
 
+function deleteUser(id) {
+  prepare('DELETE FROM users WHERE id = ?').run(id);
+}
+
 // ============================================================
 // Auth tokens
 // ============================================================
@@ -762,7 +766,7 @@ module.exports = {
   initDb,
   // Users
   findOrCreateUser, getUserById, getUserByEmail, getAllUsers,
-  updateUserRole, updateUserName, blockUser, unblockUser,
+  updateUserRole, updateUserName, blockUser, unblockUser, deleteUser,
   updateUserOrganization, updateUserSuperuser, searchUsers,
   // Auth
   createAuthToken, verifyAuthToken, verifyOTPByTokenId,

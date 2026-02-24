@@ -62,6 +62,11 @@ router.post('/users/:id/edit', (req, res) => {
   const effectiveRole = role || (db.getUserById(id)?.role ?? 'user');
   if (effectiveRole === 'user') db.updateUserSuperuser(id, isSuperuser);
 
+  if (id !== req.user.id) {
+    const isActive = req.body.active === '1';
+    if (isActive) db.unblockUser(id); else db.blockUser(id);
+  }
+
   res.redirect('/admin/users?message=User+updated');
 });
 
@@ -150,6 +155,14 @@ router.post('/users/:id/unblock', (req, res) => {
   const id = parseInt(req.params.id, 10);
   db.unblockUser(id);
   res.redirect('/admin/users?message=User+unblocked');
+});
+
+// POST /admin/users/:id/delete
+router.post('/users/:id/delete', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (id === req.user.id) return res.redirect('/admin/users?message=Cannot+delete+yourself');
+  db.deleteUser(id);
+  res.redirect('/admin/users?message=User+deleted');
 });
 
 // GET /admin/organizations
