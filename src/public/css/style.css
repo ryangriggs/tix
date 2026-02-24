@@ -337,8 +337,14 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 }
 
 .filter-controls .form-select { width: auto; font-size: .8rem; padding: 0.3rem 0.5rem; }
-.search-wrap { flex: 1; min-width: 140px; }
-.search-wrap .form-input { width: 100%; }
+.search-wrap { flex: 1; min-width: 140px; position: relative; }
+.search-wrap .form-input { width: 100%; padding-right: 1.75rem; }
+.search-clear {
+  position: absolute; right: .4rem; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; font-size: 1rem; line-height: 1;
+  color: var(--text-muted); padding: 0 .15rem;
+}
+.search-clear:hover { color: var(--text); }
 
 /* Ticket list column headers */
 .ticket-list-header {
@@ -519,11 +525,13 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 
 .tc-subject {
   grid-area: subject;
-  font-size: 0.9rem;
-  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.ticket-card .tc-subject {
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .tc-org {

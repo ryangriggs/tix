@@ -49,7 +49,9 @@
       <% } %>
 
       <div class="search-wrap">
-        <input type="search" name="q" value="<%= filters.q %>" placeholder="Search…" class="form-input form-input-sm">
+        <input type="text" name="q" id="search-input" value="<%= filters.q %>" placeholder="Search…" class="form-input form-input-sm">
+        <button type="button" class="search-clear" id="search-clear" title="Clear search"
+          style="<%= filters.q ? '' : 'display:none' %>">×</button>
       </div>
 
       <input type="hidden" name="status" value="<%= filters.status %>">
@@ -188,6 +190,20 @@ function bulkDelete() {
 window.addEventListener('scroll', () => {
   document.getElementById('scroll-top-btn').classList.toggle('visible', window.scrollY > 300);
 }, { passive: true });
+
+// Search clear button
+const _searchInput = document.getElementById('search-input');
+const _searchClear = document.getElementById('search-clear');
+if (_searchInput && _searchClear) {
+  _searchInput.addEventListener('input', () => {
+    _searchClear.style.display = _searchInput.value ? '' : 'none';
+  });
+  _searchClear.addEventListener('click', () => {
+    _searchInput.value = '';
+    _searchClear.style.display = 'none';
+    document.getElementById('filter-form').submit();
+  });
+}
 </script>
 
 <%- include('../partials/foot') %>
