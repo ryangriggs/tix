@@ -354,7 +354,9 @@ async function handleNewTicket(fromEmail, parsed) {
     to: fromEmail,
     ticketSubject: ticket.subject,
     body: `
-      <p>Your ticket has been received and assigned ID <strong>#${ticket.id}</strong>.</p>`,
+      <p>Your ticket has been received and assigned ID <strong>#${ticket.id}</strong>.</p>
+      <p>Ticket Subject: <strong>${ticket.subject}</strong></p>
+      `,
     ticketId: ticket.id,
     messageId: outMsgId,
     replyToken: ticket.reply_token,
@@ -369,6 +371,7 @@ async function handleNewTicket(fromEmail, parsed) {
         <p>A ticket has been created on your behalf with ID <strong>#${ticket.id}</strong>.</p>
         <p>Ticket Subject: <strong>${ticket.subject}</strong></p>
         <p>Created by: <strong>${fromEmail}</strong><p>
+        <p>${body}</p>
         `,
       ticketId: ticket.id,
       messageId: `<ticket-${ticket.id}-orig-${Date.now()}@${domain}>`,
