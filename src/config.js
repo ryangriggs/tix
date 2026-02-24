@@ -27,6 +27,7 @@ const config = {
   siteName: process.env.SITE_NAME || '✅ Tix',
 
   ticketEmail: process.env.TICKET_EMAIL || 'tickets@example.com',
+  mailFromName: process.env.MAIL_FROM_NAME || 'Ticketing',
   defaultAssigneeEmail: process.env.DEFAULT_ASSIGNEE_EMAIL || null,
   adminEmail: process.env.ADMIN_EMAIL || null,
 

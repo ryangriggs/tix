@@ -37,9 +37,6 @@ function getTransport() {
         const boundary = `tix_${Date.now()}`;
         const lines = [
           `From: ${opts.from}`,
-          // Sender header lets Gmail honour a From != the authenticated account
-          // (works for Google Workspace; personal Gmail requires a verified alias)
-          ...(config.gmail.user ? [`Sender: ${config.gmail.user}`] : []),
           `To: ${Array.isArray(opts.to) ? opts.to.join(', ') : opts.to}`,
           `Subject: ${opts.subject}`,
           ...(opts.replyTo    ? [`Reply-To: ${opts.replyTo}`]         : []),
@@ -103,7 +100,7 @@ function getTransport() {
 
 // Low-level send — all helpers funnel through here
 async function send({ to, subject, html, text, messageId, inReplyTo, references, replyTo }) {
-  const from = `Ticketing <${config.ticketEmail}>`;
+  const from = `${config.mailFromName} <${config.ticketEmail}>`;
   const transport = getTransport();
 
   if (config.mailTransport === 'mailgun') {
@@ -152,7 +149,7 @@ async function sendTicketNotification({ to, ticketSubject, body, ticketId, messa
   if (replyToken) {
     const mailDomain = config.ticketEmail.includes('@') ? config.ticketEmail.split('@')[1] : 'ticketing.local';
     const localPart  = config.ticketEmail.split('@')[0];
-    replyTo = `Ticketing <${localPart}+${replyToken}@${mailDomain}>`;
+    replyTo = `${config.mailFromName} <${localPart}+${replyToken}@${mailDomain}>`;
   }
 
   const footer = `
@@ -185,7 +182,7 @@ async function sendDueReminder(email, ticket) {
   if (ticket.reply_token) {
     const mailDomain = config.ticketEmail.includes('@') ? config.ticketEmail.split('@')[1] : 'ticketing.local';
     const localPart  = config.ticketEmail.split('@')[0];
-    replyTo = `Ticketing <${localPart}+${ticket.reply_token}@${mailDomain}>`;
+    replyTo = `${config.mailFromName} <${localPart}+${ticket.reply_token}@${mailDomain}>`;
   }
   await send({
     to: email,
