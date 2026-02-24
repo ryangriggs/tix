@@ -57,6 +57,8 @@ app.use((req, res, next) => {
     return new Date(ts * 1000).toISOString().slice(0, 10);
   };
 
+  res.locals.formatTicketId = id => `${config.ticketPrefix}${id}`;
+
   next();
 });
 

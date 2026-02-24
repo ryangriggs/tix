@@ -104,6 +104,37 @@ function getMailDomain() {
     : 'ticketing.local';
 }
 
+// Returns true if the address belongs to the ticket system itself
+// (exact match, or local+token variant like tickets+abc123@domain)
+function isTicketSystemAddress(email) {
+  const domain    = getMailDomain();
+  const localPart = config.ticketEmail.split('@')[0].toLowerCase();
+  const lc        = email.toLowerCase();
+  if (lc === config.ticketEmail.toLowerCase()) return true;
+  const at = lc.lastIndexOf('@');
+  if (at === -1) return false;
+  const addrLocal  = lc.slice(0, at);
+  const addrDomain = lc.slice(at + 1);
+  return addrDomain === domain &&
+    (addrLocal === localPart || addrLocal.startsWith(localPart + '+'));
+}
+
+// Parse a RFC 2822 address list string (e.g. Mailgun To/CC fields) into
+// the same { address, name } shape that mailparser produces.
+function parseAddressString(str) {
+  if (!str) return [];
+  return str.split(',').flatMap(part => {
+    part = part.trim();
+    const angled = part.match(/<([^>]+)>/);
+    if (angled) {
+      const name = part.slice(0, part.indexOf('<')).replace(/["']/g, '').trim();
+      return [{ address: angled[1].toLowerCase(), name }];
+    }
+    if (part.includes('@')) return [{ address: part.toLowerCase(), name: '' }];
+    return [];
+  });
+}
+
 // ============================================================
 // In-memory sliding-window rate limiter
 // ============================================================
@@ -207,7 +238,9 @@ async function processInboundEmail(rawEmail) {
   }
 
   if (!existingTicketId && parsed.subject) {
-    const m = parsed.subject.match(/\[Ticket\s*#(\d+)\]/i) || parsed.subject.match(/\[#(\d+)\]/i);
+    const pfx = config.ticketPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const m = parsed.subject.match(new RegExp(`\\[Ticket\\s*#${pfx}(\\d+)\\]`, 'i'))
+           || parsed.subject.match(new RegExp(`\\[#${pfx}(\\d+)\\]`, 'i'));
     if (m) { existingTicketId = parseInt(m[1], 10); subjectFallback = true; }
   }
 
@@ -317,6 +350,28 @@ async function handleNewTicket(fromEmail, parsed) {
   // Sender is submitter (and an owner)
   db.addParty(ticket.id, senderUser.id, 'submitter');
 
+  // Add To:/CC: recipients as collaborators.
+  // This handles the "reply to a user and CC the ticket system" workflow —
+  // the To: party gets added and notified so they're part of the thread.
+  const toAndCc = [
+    ...(parsed.to?.value  || []),
+    ...(parsed.cc?.value  || []),
+  ];
+  const ccCollaboratorEmails = [];
+  for (const addr of toAndCc) {
+    const email = (addr.address || '').toLowerCase();
+    if (!email) continue;
+    if (isTicketSystemAddress(email)) continue;  // skip ourselves
+    if (email === fromEmail) continue;            // skip sender (already submitter)
+    const u = db.findOrCreateUser(email, addr.name || null);
+    if (u.blocked_at) continue;
+    if (!db.getUserTicketRole(ticket.id, u.id)) {
+      db.addParty(ticket.id, u.id, 'collaborator');
+      ccCollaboratorEmails.push(email);
+      console.log(`[Inbound] Added To/CC recipient ${email} as collaborator on ticket #${ticket.id}`);
+    }
+  }
+
   // If this looks like a forward, try to add the original sender too
   let originalSenderEmail = null;
   if (isForwarded(parsed)) {
@@ -354,7 +409,7 @@ async function handleNewTicket(fromEmail, parsed) {
     to: fromEmail,
     ticketSubject: ticket.subject,
     body: `
-      <p>Your ticket has been received and assigned ID <strong>#${ticket.id}</strong>.</p>
+      <p>Your ticket has been received and assigned ID <strong>#${config.ticketPrefix}${ticket.id}</strong>.</p>
       <p>Ticket Subject: <strong>${ticket.subject}</strong></p>
       `,
     ticketId: ticket.id,
@@ -368,7 +423,7 @@ async function handleNewTicket(fromEmail, parsed) {
       to: originalSenderEmail,
       ticketSubject: ticket.subject,
       body: `
-        <p>A ticket has been created on your behalf with ID <strong>#${ticket.id}</strong>.</p>
+        <p>A ticket has been created on your behalf with ID <strong>#${config.ticketPrefix}${ticket.id}</strong>.</p>
         <p>Ticket Subject: <strong>${ticket.subject}</strong></p>
         <p>Created by: <strong>${fromEmail}</strong><p>
         <p>${body}</p>
@@ -384,9 +439,31 @@ async function handleNewTicket(fromEmail, parsed) {
     await sendTicketNotification({
       to: defaultEmail,
       ticketSubject: ticket.subject,
-      body: `<p>New ticket <strong>#${ticket.id}</strong> from ${fromEmail}:</p>${body}`,
+      body: `<p>New ticket <strong>#${config.ticketPrefix}${ticket.id}</strong> from ${fromEmail}:</p>${body}`,
       ticketId: ticket.id,
       messageId: `<ticket-${ticket.id}-notify-${Date.now()}@${domain}>`,
+      replyToken: ticket.reply_token,
+    });
+  }
+
+  // Notify To/CC collaborators (skip any already notified above)
+  const alreadyNotified = new Set([
+    fromEmail,
+    originalSenderEmail,
+    defaultEmail?.toLowerCase(),
+  ].filter(Boolean));
+  for (const email of ccCollaboratorEmails) {
+    if (alreadyNotified.has(email)) continue;
+    await sendTicketNotification({
+      to: email,
+      ticketSubject: ticket.subject,
+      body: `
+        <p>You have been added to ticket <strong>#${config.ticketPrefix}${ticket.id}</strong>.</p>
+        <p>Ticket Subject: <strong>${ticket.subject}</strong></p>
+        <p>${body}</p>
+        `,
+      ticketId: ticket.id,
+      messageId: `<ticket-${ticket.id}-cc-${Date.now()}@${domain}>`,
       replyToken: ticket.reply_token,
     });
   }
@@ -486,6 +563,8 @@ async function processMailgunWebhook(fields, files) {
 
   const parsed = {
     from:        { value: [{ address: fromEmail, name: fromName }] },
+    to:          { value: parseAddressString(fields.To || fields.to || '') },
+    cc:          { value: parseAddressString(fields.Cc || fields.cc || '') },
     subject:     fields.subject || '(No Subject)',
     html:        fields['body-html']   || null,
     text:        fields['body-plain']  || null,
@@ -522,7 +601,9 @@ async function processMailgunWebhook(fields, files) {
     }
   }
   if (!existingTicketId && parsed.subject) {
-    const m = parsed.subject.match(/\[Ticket\s*#(\d+)\]/i) || parsed.subject.match(/\[#(\d+)\]/i);
+    const pfx = config.ticketPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const m = parsed.subject.match(new RegExp(`\\[Ticket\\s*#${pfx}(\\d+)\\]`, 'i'))
+           || parsed.subject.match(new RegExp(`\\[#${pfx}(\\d+)\\]`, 'i'));
     if (m) { existingTicketId = parseInt(m[1], 10); subjectFallback = true; }
   }
 

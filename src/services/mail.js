@@ -10,7 +10,7 @@ const TEMPLATE_DIR = path.join(__dirname, '../../views/emails');
 function renderEmail(template, data) {
   return ejs.renderFile(
     path.join(TEMPLATE_DIR, `${template}.ejs`),
-    { siteName: config.siteName, appUrl: config.appUrl, ...data },
+    { siteName: config.siteName, appUrl: config.appUrl, ticketPrefix: config.ticketPrefix, ...data },
   );
 }
 
@@ -166,7 +166,7 @@ async function sendTicketNotification({ to, ticketSubject, body, ticketId, messa
   for (const email of recipients) {
     await send({
       to: email,
-      subject: `[Ticket #${ticketId}] ${ticketSubject}`,
+      subject: `[Ticket #${config.ticketPrefix}${ticketId}] ${ticketSubject}`,
       html,
       text,
       messageId,
@@ -188,9 +188,9 @@ async function sendDueReminder(email, ticket) {
   const html = await renderEmail('due-reminder', { ticket, dueDate });
   await send({
     to: email,
-    subject: `[Ticket #${ticket.id}] Due date reminder`,
+    subject: `[Ticket #${config.ticketPrefix}${ticket.id}] Due date reminder`,
     html,
-    text: `Ticket #${ticket.id}: ${ticket.subject} is due on ${dueDate}.`,
+    text: `Ticket #${config.ticketPrefix}${ticket.id}: ${ticket.subject} is due on ${dueDate}.`,
     replyTo,
   });
 }

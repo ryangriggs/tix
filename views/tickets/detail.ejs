@@ -1,4 +1,4 @@
-<%- include('../partials/head', { title: `#${ticket.id} — ${ticket.subject}` }) %>
+<%- include('../partials/head', { title: `#${formatTicketId(ticket.id)} — ${ticket.subject}` }) %>
 <%- include('../partials/nav') %>
 
 <!-- Quill (only needed for the comment editor) -->
@@ -15,7 +15,7 @@
   <!-- Ticket header -->
   <div class="ticket-header">
     <div class="ticket-header-top">
-      <span class="ticket-num">#<%= ticket.id %></span>
+      <span class="ticket-num">#<%= formatTicketId(ticket.id) %></span>
       <span class="badge badge-priority-<%= ticket.priority %>" id="badge-priority"><%= ticket.priority %></span>
       <span class="badge badge-status-<%= ticket.status %>" id="badge-status"><%= ticket.status.replace('_',' ') %></span>
     </div>

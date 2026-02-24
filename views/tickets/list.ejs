@@ -90,7 +90,7 @@
       <% for (const t of tickets) { %>
         <div class="ticket-card status-<%= t.status %>" data-ticket-id="<%= t.id %>">
           <a href="/tickets/<%= t.id %>" class="ticket-card-link">
-            <span class="tc-num"><span class="priority-dot priority-dot-<%= t.priority %>" title="<%= t.priority %> priority"></span><%= t.id %></span>
+            <span class="tc-num"><span class="priority-dot priority-dot-<%= t.priority %>" title="<%= t.priority %> priority"></span><%= formatTicketId(t.id) %></span>
             <% if (t.submitter_name) { %>
               <span class="tc-creator name-tip" data-email="<%= t.submitter_email %>"><%= t.submitter_name %></span>
             <% } else { %>

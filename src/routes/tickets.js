@@ -137,6 +137,18 @@ router.get('/', (req, res) => {
 
   const { status, priority, sort, order, q, since, org } = req.query;
 
+  // Strip ticket prefix from search term; if remainder is a plain integer treat as ID lookup
+  const prefix = config.ticketPrefix;
+  let search = q || '';
+  let idSearch = null;
+  if (prefix && search.toLowerCase().startsWith(prefix.toLowerCase())) {
+    search = search.slice(prefix.length);
+  }
+  if (/^\d+$/.test(search.trim())) {
+    idSearch = parseInt(search.trim(), 10);
+    search = '';
+  }
+
   // Persist filter choices (not the search query)
   db.setUserPrefs(req.user.id, {
     status:   status   || '',
@@ -160,7 +172,8 @@ router.get('/', (req, res) => {
     priority:        priority || '',
     sort:            sort     || DEFAULT_PREFS.sort,
     order:           order    || DEFAULT_PREFS.order,
-    search:          q        || '',
+    search,
+    idSearch,
     dateFrom,
     orgFilter:       org ? parseInt(org, 10) : null,
   });
