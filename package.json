@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "gmail-setup": "node scripts/gmail-setup.js"
+    "gmail-setup": "node scripts/gmail-setup.js",
+    "gmail-test": "node scripts/gmail-test.js"
   },
   "dependencies": {
     "cookie-parser": "^1.4.6",

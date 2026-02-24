@@ -144,6 +144,21 @@ const SCHEMA = `
     value TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS organizations (
+    id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE
+  );
+
+  CREATE TABLE IF NOT EXISTS technician_organizations (
+    technician_id   INTEGER NOT NULL REFERENCES users(id)         ON DELETE CASCADE,
+    organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    PRIMARY KEY (technician_id, organization_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_tech_orgs_tech ON technician_organizations(technician_id);
+  CREATE INDEX IF NOT EXISTS idx_tech_orgs_org  ON technician_organizations(organization_id);
+  CREATE INDEX IF NOT EXISTS idx_tickets_org    ON tickets(organization_id);
+  CREATE INDEX IF NOT EXISTS idx_users_org      ON users(organization_id);
   CREATE INDEX IF NOT EXISTS idx_ticket_parties_ticket ON ticket_parties(ticket_id);
   CREATE INDEX IF NOT EXISTS idx_ticket_parties_user   ON ticket_parties(user_id);
   CREATE INDEX IF NOT EXISTS idx_comments_ticket       ON comments(ticket_id);
@@ -238,6 +253,9 @@ async function initDb() {
   try { _db.exec('ALTER TABLE auth_tokens ADD COLUMN otp_tries INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   try { _db.exec('ALTER TABLE auth_tokens ADD COLUMN locked_until INTEGER'); } catch (_) {}
   try { _db.exec('ALTER TABLE tickets ADD COLUMN reply_token TEXT'); } catch (_) {}
+  try { _db.exec('ALTER TABLE users   ADD COLUMN organization_id    INTEGER REFERENCES organizations(id) ON DELETE SET NULL'); } catch (_) {}
+  try { _db.exec('ALTER TABLE users   ADD COLUMN is_group_superuser INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
+  try { _db.exec('ALTER TABLE tickets ADD COLUMN organization_id    INTEGER REFERENCES organizations(id) ON DELETE SET NULL'); } catch (_) {}
   // Back-fill reply tokens for any existing tickets that pre-date this migration
   _db.exec(`UPDATE tickets SET reply_token = lower(hex(randomblob(16))) WHERE reply_token IS NULL`);
   _db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_reply_token ON tickets(reply_token)');
@@ -299,7 +317,7 @@ function updateUserName(id, name) {
 }
 
 function getUserById(id) {
-  return prepare('SELECT * FROM users WHERE id = ?').get(id);
+  return prepare('SELECT u.*, o.name AS organization_name FROM users u LEFT JOIN organizations o ON o.id = u.organization_id WHERE u.id = ?').get(id);
 }
 
 function getUserByEmail(email) {
@@ -307,7 +325,28 @@ function getUserByEmail(email) {
 }
 
 function getAllUsers() {
-  return prepare('SELECT * FROM users ORDER BY created_at DESC').all();
+  return prepare('SELECT u.*, o.name AS organization_name FROM users u LEFT JOIN organizations o ON o.id = u.organization_id ORDER BY u.created_at DESC').all();
+}
+
+function updateUserOrganization(userId, orgId) {
+  prepare('UPDATE users SET organization_id = ? WHERE id = ?').run(orgId || null, userId);
+}
+
+function updateUserSuperuser(userId, val) {
+  prepare('UPDATE users SET is_group_superuser = ? WHERE id = ?').run(val ? 1 : 0, userId);
+}
+
+function searchUsers(q, scopeOrgId = null) {
+  const like = `%${q}%`;
+  let sql = `
+    SELECT u.id, u.email, u.name, u.role, u.organization_id, o.name AS organization_name
+    FROM users u LEFT JOIN organizations o ON o.id = u.organization_id
+    WHERE (u.name LIKE ? OR u.email LIKE ? OR o.name LIKE ?) AND u.blocked_at IS NULL
+  `;
+  const params = [like, like, like];
+  if (scopeOrgId != null) { sql += ' AND u.organization_id = ?'; params.push(scopeOrgId); }
+  sql += ' ORDER BY u.name ASC, u.email ASC LIMIT 20';
+  return prepare(sql).all(...params);
 }
 
 function updateUserRole(id, role) {
@@ -391,21 +430,25 @@ function verifyOTPByTokenId(tokenId, otp) {
 // Tickets
 // ============================================================
 
-function createTicket({ subject, body, priority = 'medium', dueDate = null }) {
+function createTicket({ subject, body, priority = 'medium', dueDate = null, organizationId = null }) {
   const replyToken = uuidv4().replace(/-/g, '');
   const result = prepare(`
-    INSERT INTO tickets (subject, body, priority, due_date, reply_token)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(subject, body, priority, dueDate, replyToken);
+    INSERT INTO tickets (subject, body, priority, due_date, reply_token, organization_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(subject, body, priority, dueDate, replyToken, organizationId || null);
   return prepare('SELECT * FROM tickets WHERE id = ?').get(result.lastInsertRowid);
 }
 
 function getTicketById(id) {
-  return prepare('SELECT * FROM tickets WHERE id = ?').get(id);
+  return prepare(`
+    SELECT t.*, o.name AS organization_name
+    FROM tickets t LEFT JOIN organizations o ON o.id = t.organization_id
+    WHERE t.id = ?
+  `).get(id);
 }
 
 function updateTicket(id, fields) {
-  const allowed = ['subject', 'body', 'status', 'priority', 'due_date'];
+  const allowed = ['subject', 'body', 'status', 'priority', 'due_date', 'organization_id'];
   const keys = Object.keys(fields).filter(k => allowed.includes(k));
   if (keys.length === 0) return;
 
@@ -414,7 +457,9 @@ function updateTicket(id, fields) {
   prepare(`UPDATE tickets SET ${sets.join(', ')} WHERE id = ?`).run(...values);
 }
 
-function getTickets({ userId, userRole, status, priority, sort = 'updated_at', order = 'desc', search = '', dateFrom = null }) {
+function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgIds = [],
+                      status, priority, sort = 'updated_at', order = 'desc', search = '',
+                      dateFrom = null, orgFilter = null }) {
   const validSorts = {
     created_at:    't.created_at',
     updated_at:    't.updated_at',
@@ -430,6 +475,7 @@ function getTickets({ userId, userRole, status, priority, sort = 'updated_at', o
 
   let query = `
     SELECT DISTINCT t.*,
+      (SELECT o.name FROM organizations o WHERE o.id = t.organization_id) AS organization_name,
       (SELECT COUNT(*) FROM comments WHERE ticket_id = t.id) AS comment_count,
       (SELECT u.email FROM ticket_parties tp2
          JOIN users u ON u.id = tp2.user_id
@@ -451,15 +497,25 @@ function getTickets({ userId, userRole, status, priority, sort = 'updated_at', o
   const conditions = [];
   const params = [];
 
-  if (userRole !== 'admin') {
+  if (userRole === 'admin') {
+    // no restriction
+  } else if (userRole === 'technician') {
+    const ph = userTechOrgIds.length ? userTechOrgIds.map(() => '?').join(',') : 'NULL';
+    conditions.push(`(t.organization_id IN (${ph}) OR EXISTS (SELECT 1 FROM ticket_parties tp2 WHERE tp2.ticket_id = t.id AND tp2.user_id = ?))`);
+    params.push(...userTechOrgIds, userId);
+  } else if (userIsSuperuser && userOrgId) {
+    conditions.push(`(t.organization_id = ? OR EXISTS (SELECT 1 FROM ticket_parties tp2 WHERE tp2.ticket_id = t.id AND tp2.user_id = ?))`);
+    params.push(userOrgId, userId);
+  } else {
     query += ' JOIN ticket_parties tp ON t.id = tp.ticket_id';
     conditions.push('tp.user_id = ?');
     params.push(userId);
   }
 
-  if (status)   { conditions.push('t.status = ?');   params.push(status); }
-  if (priority) { conditions.push('t.priority = ?'); params.push(priority); }
-  if (dateFrom) { conditions.push('t.updated_at >= ?'); params.push(dateFrom); }
+  if (orgFilter) { conditions.push('t.organization_id = ?'); params.push(orgFilter); }
+  if (status)    { conditions.push('t.status = ?');          params.push(status); }
+  if (priority)  { conditions.push('t.priority = ?');        params.push(priority); }
+  if (dateFrom)  { conditions.push('t.updated_at >= ?');     params.push(dateFrom); }
   if (search) {
     // Build an FTS4 MATCH query: each whitespace-delimited token becomes a prefix search.
     // e.g. "john smith" → `john* smith*`  (both tokens must appear, prefix-matched)
@@ -519,9 +575,10 @@ function removeParty(ticketId, userId) {
 
 function getParties(ticketId) {
   return prepare(`
-    SELECT tp.*, u.email, u.name, u.role AS user_role
+    SELECT tp.*, u.email, u.name, u.role AS user_role, o.name AS organization_name
     FROM ticket_parties tp
     JOIN users u ON tp.user_id = u.id
+    LEFT JOIN organizations o ON o.id = u.organization_id
     WHERE tp.ticket_id = ?
     ORDER BY tp.created_at ASC
   `).all(ticketId);
@@ -629,6 +686,57 @@ function setUserPrefs(userId, prefs) {
 }
 
 // ============================================================
+// Organizations
+// ============================================================
+
+function findOrCreateOrganization(name) {
+  const t = (name || '').trim();
+  if (!t) return null;
+  let o = prepare('SELECT * FROM organizations WHERE name = ?').get(t);
+  if (!o) {
+    const r = prepare('INSERT INTO organizations (name) VALUES (?)').run(t);
+    o = prepare('SELECT * FROM organizations WHERE id = ?').get(r.lastInsertRowid);
+  }
+  return o;
+}
+
+function getAllOrganizations() {
+  return prepare('SELECT * FROM organizations ORDER BY name ASC').all();
+}
+
+function searchOrganizations(q) {
+  return prepare('SELECT * FROM organizations WHERE name LIKE ? ORDER BY name ASC LIMIT 20').all(`%${q}%`);
+}
+
+function renameOrganization(id, name) {
+  prepare('UPDATE organizations SET name = ? WHERE id = ?').run(name.trim(), id);
+}
+
+function deleteOrganization(id) {
+  prepare('DELETE FROM organizations WHERE id = ?').run(id);
+}
+
+// ============================================================
+// Technician org assignments
+// ============================================================
+
+function getTechnicianOrganizations(techId) {
+  return prepare(`
+    SELECT o.* FROM technician_organizations t
+    JOIN organizations o ON o.id = t.organization_id
+    WHERE t.technician_id = ? ORDER BY o.name ASC
+  `).all(techId);
+}
+
+function addTechnicianOrganization(techId, orgId) {
+  try { prepare('INSERT INTO technician_organizations (technician_id, organization_id) VALUES (?, ?)').run(techId, orgId); } catch (_) {}
+}
+
+function removeTechnicianOrganization(techId, orgId) {
+  prepare('DELETE FROM technician_organizations WHERE technician_id = ? AND organization_id = ?').run(techId, orgId);
+}
+
+// ============================================================
 // Due-date reminders
 // ============================================================
 
@@ -652,6 +760,7 @@ module.exports = {
   // Users
   findOrCreateUser, getUserById, getUserByEmail, getAllUsers,
   updateUserRole, updateUserName, blockUser, unblockUser,
+  updateUserOrganization, updateUserSuperuser, searchUsers,
   // Auth
   createAuthToken, verifyAuthToken, verifyOTPByTokenId,
   // Tickets
@@ -669,4 +778,9 @@ module.exports = {
   getSetting, setSetting, getUserPrefs, setUserPrefs,
   // Reminders
   getTicketsDueSoon,
+  // Organizations
+  findOrCreateOrganization, getAllOrganizations, searchOrganizations,
+  renameOrganization, deleteOrganization,
+  // Technician orgs
+  getTechnicianOrganizations, addTechnicianOrganization, removeTechnicianOrganization,
 };

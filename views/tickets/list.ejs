@@ -39,11 +39,23 @@
         <option value=""    <%= filters.since===''    ? 'selected' : '' %>>All time</option>
       </select>
 
+      <% if (organizations && organizations.length) { %>
+        <select name="org" class="form-select" onchange="this.form.submit()">
+          <option value="" <%= !filters.org ? 'selected' : '' %>>Any org</option>
+          <% for (const o of organizations) { %>
+            <option value="<%= o.id %>" <%= filters.org == o.id ? 'selected' : '' %>><%= o.name %></option>
+          <% } %>
+        </select>
+      <% } %>
+
       <div class="search-wrap">
         <input type="search" name="q" value="<%= filters.q %>" placeholder="Search…" class="form-input form-input-sm">
       </div>
 
       <input type="hidden" name="status" value="<%= filters.status %>">
+      <% if (!organizations || !organizations.length) { %>
+        <input type="hidden" name="org" value="">
+      <% } %>
     </div>
   </form>
 
@@ -85,7 +97,7 @@
             <% } else { %>
               <span class="tc-creator"><%= t.submitter_email || '—' %></span>
             <% } %>
-            <span class="tc-subject"><%= t.subject %></span>
+            <span class="tc-subject"><%= t.subject %><% if (t.organization_name) { %> <span class="badge badge-org" style="font-size:.7em;vertical-align:middle"><%= t.organization_name %></span><% } %></span>
             <span class="tc-created"><%= formatDate(t.created_at) %></span>
             <span class="tc-updated"<% if (t.last_actor) { %> data-by="<%= t.last_actor %>"<% } %>><%= formatDate(t.updated_at) %></span>
             <span class="tc-replies"><% if (t.comment_count > 0) { %>💬 <%= t.comment_count %><% } %></span>

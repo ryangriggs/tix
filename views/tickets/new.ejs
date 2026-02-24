@@ -45,6 +45,17 @@
     </div>
 
     <div class="form-group">
+      <label for="organization_name">Organization <span class="optional">(optional)</span></label>
+      <div style="position:relative">
+        <input type="text" id="organization_name" name="organization_name"
+               class="form-input" placeholder="Type to search or create…"
+               autocomplete="off"
+               value="<%= user && user.organization_name ? user.organization_name : '' %>">
+      </div>
+      <p class="form-hint">Start typing to find an existing organization, or enter a new name to create one.</p>
+    </div>
+
+    <div class="form-group">
       <label for="attachments">Attachments <span class="optional">(optional)</span></label>
       <input type="file" id="attachments" name="attachments" multiple class="form-file">
       <p class="form-hint">Max 25 MB per file. Accepted: images, PDF, text, CSV, ZIP, Office documents.</p>
@@ -75,6 +86,16 @@
   document.getElementById('ticket-form').addEventListener('submit', () => {
     document.getElementById('body').value = quill.root.innerHTML;
   });
+
+  // Organization autocomplete
+  const orgInput = document.getElementById('organization_name');
+  if (orgInput && typeof createAutocomplete === 'function') {
+    createAutocomplete(orgInput, {
+      fetchUrl: q => `/api/organizations/search?q=${encodeURIComponent(q)}`,
+      formatItem: item => `<span>${item.name}</span>`,
+      onSelect: item => { orgInput.value = item.name; },
+    });
+  }
 </script>
 
 <%- include('../partials/foot') %>

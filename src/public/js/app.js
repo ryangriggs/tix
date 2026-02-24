@@ -122,6 +122,91 @@
 })();
 
 // ============================================================
+// Autocomplete — reusable dropdown component
+// ============================================================
+
+/**
+ * createAutocomplete(inputEl, options)
+ *   fetchUrl(q)    — returns URL string for the given query
+ *   formatItem(i)  — returns HTML string for a suggestion row
+ *   onSelect(i)    — called when a suggestion is chosen
+ *   minChars       — min chars before triggering (default 1)
+ *   allowFreeform  — if true, free-typed text is preserved on blur
+ */
+function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars = 1 } = {}) {
+  const wrap = inputEl.parentElement;
+  if (getComputedStyle(wrap).position === 'static') wrap.style.position = 'relative';
+
+  const dropdown = document.createElement('ul');
+  dropdown.className = 'autocomplete-dropdown';
+  dropdown.style.cssText = [
+    'display:none', 'position:absolute', 'z-index:1000', 'list-style:none',
+    'margin:0', 'padding:0', 'background:#fff', 'border:1px solid #d1d5db',
+    'border-radius:4px', 'max-height:240px', 'overflow-y:auto',
+    'min-width:100%', 'box-shadow:0 4px 6px rgba(0,0,0,.08)', 'top:100%', 'left:0',
+  ].join(';');
+  wrap.appendChild(dropdown);
+
+  let activeIdx = -1;
+  let currentItems = [];
+  let debounceTimer = null;
+
+  function render(items) {
+    currentItems = items;
+    activeIdx = -1;
+    dropdown.innerHTML = '';
+    if (!items.length) { dropdown.style.display = 'none'; return; }
+    items.forEach((item, i) => {
+      const li = document.createElement('li');
+      li.style.cssText = 'padding:.4rem .75rem;cursor:pointer;font-size:.875rem;white-space:nowrap;';
+      li.innerHTML = formatItem(item);
+      li.addEventListener('mouseenter', () => setActive(i));
+      li.addEventListener('mousedown', e => { e.preventDefault(); choose(item); });
+      dropdown.appendChild(li);
+    });
+    dropdown.style.display = 'block';
+  }
+
+  function setActive(i) {
+    activeIdx = i;
+    Array.from(dropdown.children).forEach((li, idx) => {
+      li.style.background = idx === i ? '#eff6ff' : '';
+    });
+  }
+
+  function choose(item) {
+    onSelect(item);
+    dropdown.style.display = 'none';
+    currentItems = [];
+    activeIdx = -1;
+  }
+
+  function close() { dropdown.style.display = 'none'; activeIdx = -1; }
+
+  inputEl.addEventListener('input', () => {
+    const q = inputEl.value.trim();
+    if (q.length < minChars) { close(); return; }
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      fetch(fetchUrl(q), { headers: { Accept: 'application/json' } })
+        .then(r => r.ok ? r.json() : [])
+        .then(render)
+        .catch(close);
+    }, 150);
+  });
+
+  inputEl.addEventListener('keydown', e => {
+    if (!currentItems.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive(Math.min(activeIdx + 1, currentItems.length - 1)); }
+    else if (e.key === 'ArrowUp')  { e.preventDefault(); setActive(Math.max(activeIdx - 1, 0)); }
+    else if (e.key === 'Enter' && activeIdx >= 0) { e.preventDefault(); choose(currentItems[activeIdx]); }
+    else if (e.key === 'Escape') close();
+  });
+
+  inputEl.addEventListener('blur', () => setTimeout(close, 150));
+}
+
+// ============================================================
 // PWA — register service worker
 // ============================================================
 if ('serviceWorker' in navigator) {

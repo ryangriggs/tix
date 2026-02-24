@@ -312,7 +312,7 @@ async function handleNewTicket(fromEmail, parsed) {
 
   const { prepared } = prepareAttachments(parsed.attachments);
   const body = formatEmailAsPlaintext(parsed);
-  const ticket = db.createTicket({ subject, body });
+  const ticket = db.createTicket({ subject, body, organizationId: senderUser.organization_id || null });
 
   // Sender is submitter (and an owner)
   db.addParty(ticket.id, senderUser.id, 'submitter');

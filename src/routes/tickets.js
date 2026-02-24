@@ -56,12 +56,16 @@ const upload = multer({
 function getTicketAccess(ticket, user) {
   if (!ticket) return null;
   if (user.role === 'admin') return 'admin';
+  if (user.role === 'technician' && ticket.organization_id &&
+      (user.techOrgIds || []).includes(ticket.organization_id)) return 'technician';
+  if (user.isGroupSuperuser && user.organization_id &&
+      ticket.organization_id === user.organization_id) return 'superuser';
   return db.getUserTicketRole(ticket.id, user.id); // 'submitter'|'owner'|'collaborator'|null
 }
 
 function canManage(ticket, user) {
   const access = getTicketAccess(ticket, user);
-  return access === 'admin' || access === 'submitter' || access === 'owner';
+  return ['admin', 'submitter', 'owner', 'technician'].includes(access);
 }
 
 // Sanitize Quill-generated HTML (trusted tags only)
@@ -119,7 +123,7 @@ async function notifyParties(ticket, actorEmail, messageBody, commentId, inReply
 // ============================================================
 
 const SINCE_SECONDS = { '1d': 86400, '7d': 7 * 86400, '30d': 30 * 86400 };
-const DEFAULT_PREFS  = { status: 'open', priority: '', sort: 'priority', order: 'desc', since: '1d' };
+const DEFAULT_PREFS  = { status: 'open', priority: '', sort: 'priority', order: 'desc', since: '1d', org: '' };
 
 // GET /tickets
 router.get('/', (req, res) => {
@@ -131,7 +135,7 @@ router.get('/', (req, res) => {
     return res.redirect(`/tickets?${qs}`);
   }
 
-  const { status, priority, sort, order, q, since } = req.query;
+  const { status, priority, sort, order, q, since, org } = req.query;
 
   // Persist filter choices (not the search query)
   db.setUserPrefs(req.user.id, {
@@ -140,25 +144,35 @@ router.get('/', (req, res) => {
     sort:     sort     || DEFAULT_PREFS.sort,
     order:    order    || DEFAULT_PREFS.order,
     since:    since    || DEFAULT_PREFS.since,
+    org:      org      || '',
   });
 
   const sinceSeconds = SINCE_SECONDS[since];
   const dateFrom = sinceSeconds ? Math.floor(Date.now() / 1000) - sinceSeconds : null;
 
   const tickets = db.getTickets({
-    userId:   req.user.id,
-    userRole: req.user.role,
-    status:   status   || '',
-    priority: priority || '',
-    sort:     sort     || DEFAULT_PREFS.sort,
-    order:    order    || DEFAULT_PREFS.order,
-    search:   q        || '',
+    userId:          req.user.id,
+    userRole:        req.user.role,
+    userOrgId:       req.user.organization_id || null,
+    userIsSuperuser: req.user.isGroupSuperuser,
+    userTechOrgIds:  req.user.techOrgIds || [],
+    status:          status   || '',
+    priority:        priority || '',
+    sort:            sort     || DEFAULT_PREFS.sort,
+    order:           order    || DEFAULT_PREFS.order,
+    search:          q        || '',
     dateFrom,
+    orgFilter:       org ? parseInt(org, 10) : null,
   });
+
+  // Org filter dropdown — visible to admins, technicians, and superusers
+  const canFilterOrg = req.user.role === 'admin' || req.user.role === 'technician' || req.user.isGroupSuperuser;
+  const organizations = canFilterOrg ? db.getAllOrganizations() : [];
 
   res.render('tickets/list', {
     title: 'Tickets',
     tickets,
+    organizations,
     filters: {
       status:   status   || '',
       priority: priority || '',
@@ -166,6 +180,7 @@ router.get('/', (req, res) => {
       order:    order    || DEFAULT_PREFS.order,
       q:        q        || '',
       since:    since    || DEFAULT_PREFS.since,
+      org:      org      || '',
     },
   });
 });
@@ -177,7 +192,7 @@ router.get('/new', (req, res) => {
 
 // POST /tickets — create a ticket
 router.post('/', upload.array('attachments'), async (req, res) => {
-  const { subject, body, priority, due_date } = req.body;
+  const { subject, body, priority, due_date, organization_name } = req.body;
 
   if (!subject || !subject.trim()) {
     return res.render('tickets/new', { title: 'New Ticket', error: 'Subject is required.' });
@@ -186,7 +201,16 @@ router.post('/', upload.array('attachments'), async (req, res) => {
   const cleanBody = sanitize(body);
   const dueDate = due_date ? Math.floor(new Date(due_date).getTime() / 1000) : null;
 
-  const ticket = db.createTicket({ subject: subject.trim(), body: cleanBody, priority: priority || 'medium', dueDate });
+  // Resolve organization — use typed name or fall back to submitter's org
+  let orgId = null;
+  if (organization_name && organization_name.trim()) {
+    const org = db.findOrCreateOrganization(organization_name.trim());
+    orgId = org ? org.id : null;
+  } else if (req.user.organization_id) {
+    orgId = req.user.organization_id;
+  }
+
+  const ticket = db.createTicket({ subject: subject.trim(), body: cleanBody, priority: priority || 'medium', dueDate, organizationId: orgId });
   db.addParty(ticket.id, req.user.id, 'submitter');
 
   saveUploadedFiles(req.files, ticket.id, null);
@@ -283,6 +307,8 @@ router.get('/:id', (req, res) => {
     commentAttachmentsMap,
     access,
     canManage: canManage(ticket, req.user),
+    isSuperuser: req.user.isGroupSuperuser,
+    organizations: db.getAllOrganizations(),
   });
 });
 
@@ -372,20 +398,44 @@ router.post('/:id/due-date', (req, res) => {
   res.redirect(`/tickets/${ticket.id}`);
 });
 
+// POST /tickets/:id/organization — set or clear ticket org (canManage)
+router.post('/:id/organization', (req, res) => {
+  const ticket = db.getTicketById(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Not found' });
+  if (!canManage(ticket, req.user)) return res.status(403).json({ error: 'Forbidden' });
+
+  const orgName = (req.body.organization_name || '').trim();
+  let orgId = null;
+  if (orgName) {
+    const org = db.findOrCreateOrganization(orgName);
+    orgId = org ? org.id : null;
+  }
+  db.updateTicket(ticket.id, { organization_id: orgId });
+  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
+  res.redirect(`/tickets/${ticket.id}`);
+});
+
 // POST /tickets/:id/parties — add a party
 router.post('/:id/parties', async (req, res) => {
   const ticket = db.getTicketById(req.params.id);
   if (!ticket) return res.status(404).json({ error: 'Not found' });
   if (!canManage(ticket, req.user)) return res.status(403).json({ error: 'Forbidden' });
 
-  const email = (req.body.email || '').trim().toLowerCase();
   const role = ['owner', 'collaborator'].includes(req.body.role) ? req.body.role : 'collaborator';
+  let newUser;
 
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.redirect(`/tickets/${ticket.id}?error=invalid_email`);
+  if (req.body.userId) {
+    // Selected from autocomplete
+    newUser = db.getUserById(parseInt(req.body.userId, 10));
+    if (!newUser) return res.redirect(`/tickets/${ticket.id}?error=user_not_found`);
+  } else {
+    const email = (req.body.email || '').trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.redirect(`/tickets/${ticket.id}?error=invalid_email`);
+    }
+    newUser = db.findOrCreateUser(email);
   }
-
-  const newUser = db.findOrCreateUser(email);
+  const email = newUser.email;
   db.addParty(ticket.id, newUser.id, role);
 
   // Notify the newly added party

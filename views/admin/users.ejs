@@ -8,12 +8,27 @@
     <div class="alert alert-info"><%= message %></div>
   <% } %>
 
+  <!-- Pre-add user -->
+  <details style="margin-bottom:1.25rem">
+    <summary class="link-btn">+ Pre-add user</summary>
+    <form method="POST" action="/admin/users/pre-add" class="inline-form" style="margin-top:.5rem;gap:.5rem;flex-wrap:wrap">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="email" name="email" placeholder="Email address" class="form-input form-input-sm" required style="width:220px">
+      <input type="text"  name="name"  placeholder="Full name (optional)" class="form-input form-input-sm" style="width:200px">
+      <button type="submit" class="btn btn-sm btn-primary">Add User</button>
+    </form>
+  </details>
+
+  <div style="overflow-x:auto">
   <table class="data-table">
     <thead>
       <tr>
         <th>Email</th>
         <th>Name</th>
         <th>Role</th>
+        <th>Organization</th>
+        <th>Superuser</th>
+        <th>Tech Orgs</th>
         <th>Created</th>
         <th>Status</th>
         <th>Actions</th>
@@ -27,7 +42,7 @@
             <form method="POST" action="/admin/users/<%= u.id %>/name" class="inline-form">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <input type="text" name="name" value="<%= u.name || '' %>" placeholder="—"
-                class="form-input form-input-sm" style="width:160px">
+                class="form-input form-input-sm" style="width:140px">
               <button type="submit" class="btn btn-sm btn-secondary">Save</button>
             </form>
           </td>
@@ -35,10 +50,63 @@
             <form method="POST" action="/admin/users/<%= u.id %>/role" style="display:inline">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <select name="role" class="form-select form-select-sm" onchange="this.form.submit()">
-                <option value="user"  <%= u.role === 'user'  ? 'selected' : '' %>>User</option>
-                <option value="admin" <%= u.role === 'admin' ? 'selected' : '' %>>Admin</option>
+                <option value="user"       <%= u.role === 'user'       ? 'selected' : '' %>>User</option>
+                <option value="technician" <%= u.role === 'technician' ? 'selected' : '' %>>Technician</option>
+                <option value="admin"      <%= u.role === 'admin'      ? 'selected' : '' %>>Admin</option>
               </select>
             </form>
+          </td>
+          <td>
+            <form method="POST" action="/admin/users/<%= u.id %>/organization" class="inline-form">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <div style="position:relative">
+                <input type="text" name="organization_name"
+                       class="form-input form-input-sm org-autocomplete"
+                       value="<%= u.organization_name || '' %>"
+                       placeholder="—" style="width:150px" autocomplete="off">
+              </div>
+              <button type="submit" class="btn btn-sm btn-secondary">Set</button>
+            </form>
+          </td>
+          <td>
+            <% if (u.role === 'user') { %>
+              <form method="POST" action="/admin/users/<%= u.id %>/superuser" style="display:inline">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="is_group_superuser" value="<%= u.is_group_superuser ? '0' : '1' %>">
+                <button type="submit" class="btn btn-sm <%= u.is_group_superuser ? 'btn-primary' : 'btn-secondary' %>">
+                  <%= u.is_group_superuser ? 'Yes' : 'No' %>
+                </button>
+              </form>
+            <% } else { %>
+              —
+            <% } %>
+          </td>
+          <td>
+            <% if (u.role === 'technician') { %>
+              <div style="display:flex;flex-wrap:wrap;gap:.25rem;align-items:center;min-width:160px">
+                <% for (const o of (techOrgMap[u.id] || [])) { %>
+                  <span style="display:inline-flex;align-items:center;gap:.25rem">
+                    <span class="badge"><%= o.name %></span>
+                    <form method="POST" action="/admin/users/<%= u.id %>/tech-orgs/remove" style="display:inline;margin:0">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input type="hidden" name="organization_id" value="<%= o.id %>">
+                      <button type="submit" class="btn-icon" title="Remove" style="line-height:1">×</button>
+                    </form>
+                  </span>
+                <% } %>
+                <form method="POST" action="/admin/users/<%= u.id %>/tech-orgs/add" class="inline-form" style="margin-top:.25rem">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <div style="position:relative">
+                    <input type="text" name="organization_name"
+                           class="form-input form-input-sm org-autocomplete"
+                           placeholder="Assign org…" style="width:120px" autocomplete="off">
+                  </div>
+                  <button type="submit" class="btn btn-sm btn-secondary">+</button>
+                </form>
+              </div>
+            <% } else { %>
+              —
+            <% } %>
           </td>
           <td><%= formatDate(u.created_at) %></td>
           <td><%= u.blocked_at ? '🚫 Blocked' : '✓ Active' %></td>
@@ -60,6 +128,18 @@
       <% } %>
     </tbody>
   </table>
+  </div>
 </main>
+
+<script>
+document.querySelectorAll('.org-autocomplete').forEach(input => {
+  if (typeof createAutocomplete !== 'function') return;
+  createAutocomplete(input, {
+    fetchUrl: q => `/api/organizations/search?q=${encodeURIComponent(q)}`,
+    formatItem: item => `<span>${item.name}</span>`,
+    onSelect: item => { input.value = item.name; },
+  });
+});
+</script>
 
 <%- include('../partials/foot') %>

@@ -1,0 +1,46 @@
+<%- include('../partials/head', { title: 'Organizations' }) %>
+<%- include('../partials/nav') %>
+
+<main class="container">
+  <h1 class="page-title">Organizations</h1>
+
+  <% if (message) { %>
+    <div class="alert alert-info"><%= message %></div>
+  <% } %>
+
+  <% if (!organizations.length) { %>
+    <p style="color:#6b7280">No organizations yet. They are created automatically when assigned to users or tickets.</p>
+  <% } else { %>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% for (const o of organizations) { %>
+          <tr>
+            <td>
+              <form method="POST" action="/admin/organizations/<%= o.id %>/rename" class="inline-form">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="text" name="name" value="<%= o.name %>"
+                       class="form-input form-input-sm" style="width:260px" required>
+                <button type="submit" class="btn btn-sm btn-secondary">Rename</button>
+              </form>
+            </td>
+            <td>
+              <form method="POST" action="/admin/organizations/<%= o.id %>/delete"
+                    onsubmit="return confirm('Delete organization &quot;<%= o.name %>&quot;?\nUsers and tickets will lose this org assignment.')">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  <% } %>
+</main>
+
+<%- include('../partials/foot') %>

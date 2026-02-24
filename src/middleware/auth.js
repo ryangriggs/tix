@@ -3,7 +3,7 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const { getUserById } = require('../db');
+const { getUserById, getTechnicianOrganizations } = require('../db');
 
 // ============================================================
 // CSRF — HMAC token tied to the session cookie value.
@@ -49,6 +49,10 @@ function requireAuth(req, res, next) {
       return res.redirect('/auth/login');
     }
     req.user = user;
+    req.user.isGroupSuperuser = !!user.is_group_superuser;
+    req.user.techOrgIds = user.role === 'technician'
+      ? getTechnicianOrganizations(user.id).map(o => o.id)
+      : [];
     res.locals.user = user;
     // Expose CSRF token to every authenticated view
     res.locals.csrfToken = makeCsrfToken(token);

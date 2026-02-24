@@ -156,6 +156,25 @@
         <% } %>
       <% } %>
 
+      <!-- Organization -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">Organization</div>
+        <% if (canManage) { %>
+          <form method="POST" action="/tickets/<%= ticket.id %>/organization" class="inline-form">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <div style="position:relative">
+              <input type="text" id="org-name-input" name="organization_name"
+                     class="form-input form-input-sm"
+                     value="<%= ticket.organization_name || '' %>"
+                     placeholder="None" autocomplete="off">
+            </div>
+            <button type="submit" class="btn btn-sm btn-secondary">Set</button>
+          </form>
+        <% } else { %>
+          <span><%= ticket.organization_name || '—' %></span>
+        <% } %>
+      </div>
+
       <!-- Parties -->
       <div class="sidebar-section">
         <div class="sidebar-label">People</div>
@@ -169,6 +188,7 @@
                 <% } else { %>
                   <span class="party-name"><%= p.email %></span>
                 <% } %>
+                <% if (p.organization_name) { %><span class="party-org">[<%= p.organization_name %>]</span><% } %>
               </div>
               <span class="badge badge-role"><%= p.role %></span>
               <% if (canManage && p.user_id !== user.id) { %>
@@ -187,7 +207,15 @@
             <summary class="link-btn">+ Add person</summary>
             <form method="POST" action="/tickets/<%= ticket.id %>/parties" class="add-party-form">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <input type="email" name="email" placeholder="email@example.com" class="form-input form-input-sm" required>
+              <input type="hidden" name="userId" id="add-party-user-id" value="">
+              <div style="position:relative">
+                <input type="text" id="add-party-input"
+                       placeholder="Name, email, or org…"
+                       class="form-input form-input-sm" autocomplete="off">
+              </div>
+              <input type="email" name="email" id="add-party-email"
+                     placeholder="or type email directly"
+                     class="form-input form-input-sm" style="margin-top:.25rem">
               <select name="role" class="form-select form-select-sm">
                 <option value="collaborator">Collaborator</option>
                 <option value="owner">Owner</option>
@@ -231,6 +259,41 @@
   document.getElementById('comment-form').addEventListener('submit', () => {
     document.getElementById('comment-body').value = quill.root.innerHTML;
   });
+
+  if (typeof createAutocomplete === 'function') {
+    // Organization autocomplete on sidebar
+    const orgInput = document.getElementById('org-name-input');
+    if (orgInput) {
+      createAutocomplete(orgInput, {
+        fetchUrl: q => `/api/organizations/search?q=${encodeURIComponent(q)}`,
+        formatItem: item => `<span>${item.name}</span>`,
+        onSelect: item => { orgInput.value = item.name; },
+      });
+    }
+
+    // User autocomplete on add-party form
+    const addPartyInput = document.getElementById('add-party-input');
+    if (addPartyInput) {
+      createAutocomplete(addPartyInput, {
+        fetchUrl: q => `/api/users/search?q=${encodeURIComponent(q)}`,
+        formatItem: item => {
+          const name = item.name ? `<strong>${item.name}</strong> ` : '';
+          const org  = item.org  ? ` <em style="color:#6b7280">[${item.org}]</em>` : '';
+          return `${name}(${item.email})${org}`;
+        },
+        onSelect: item => {
+          addPartyInput.value = item.name ? `${item.name} <${item.email}>` : item.email;
+          document.getElementById('add-party-user-id').value = item.id;
+          document.getElementById('add-party-email').value   = '';
+        },
+      });
+      addPartyInput.addEventListener('input', () => {
+        if (!addPartyInput.value.trim()) {
+          document.getElementById('add-party-user-id').value = '';
+        }
+      });
+    }
+  }
 </script>
 
 <%- include('../partials/foot') %>

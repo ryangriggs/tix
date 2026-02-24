@@ -65,6 +65,7 @@ app.use((req, res, next) => {
 app.use('/auth', optionalAuth, require('./routes/auth'));
 app.use('/tickets', requireAuth, verifyCsrf, require('./routes/tickets'));
 app.use('/admin', requireAuth, requireAdmin, verifyCsrf, require('./routes/admin'));
+app.use('/api', requireAuth, require('./routes/api'));
 app.use('/inbound', require('./routes/inbound'));
 
 // Root
@@ -121,7 +122,7 @@ async function start() {
   await initDb();
 
   app.listen(config.port, '0.0.0.0', () => {
-    console.log(`[HTTP] Listening on port ${config.port} (${config.nodeEnv})`);
+    console.log(`[HTTP] Listening on port ${config.port} (${process.env.NODE_ENV || 'development'})`);
   });
 
   startSMTPServer();
