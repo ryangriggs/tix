@@ -95,7 +95,9 @@
     document.getElementById('body').value = quill.root.innerHTML;
   });
 
-  // Organization autocomplete — show all orgs on focus, filter on type
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
   const orgInput = document.getElementById('organization_name');
   if (orgInput && typeof createAutocomplete === 'function') {
     createAutocomplete(orgInput, {
@@ -105,6 +107,6 @@
       showOnFocus: true,
     });
   }
-</script>
+});
 
 <%- include('../partials/foot') %>

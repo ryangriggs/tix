@@ -263,41 +263,44 @@
     document.getElementById('comment-body').value = quill.root.innerHTML;
   });
 
-  if (typeof createAutocomplete === 'function') {
-    // Organization autocomplete on sidebar
-    const orgInput = document.getElementById('org-name-input');
-    if (orgInput) {
-      createAutocomplete(orgInput, {
-        fetchUrl: q => `/api/organizations/search?q=${encodeURIComponent(q)}`,
-        formatItem: item => `<span>${item.name}</span>`,
-        onSelect: item => { orgInput.value = item.name; },
-        showOnFocus: true,
-      });
-    }
-
-    // User autocomplete on add-party form
-    const addPartyInput = document.getElementById('add-party-input');
-    if (addPartyInput) {
-      createAutocomplete(addPartyInput, {
-        fetchUrl: q => `/api/users/search?q=${encodeURIComponent(q)}`,
-        formatItem: item => {
-          const name = item.name ? `<strong>${item.name}</strong> ` : '';
-          const org  = item.org  ? ` <em style="color:#6b7280">[${item.org}]</em>` : '';
-          return `${name}(${item.email})${org}`;
-        },
-        onSelect: item => {
-          addPartyInput.value = item.name ? `${item.name} <${item.email}>` : item.email;
-          document.getElementById('add-party-user-id').value = item.id;
-          document.getElementById('add-party-email').value   = '';
-        },
-      });
-      addPartyInput.addEventListener('input', () => {
-        if (!addPartyInput.value.trim()) {
-          document.getElementById('add-party-user-id').value = '';
-        }
-      });
-    }
-  }
 </script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof createAutocomplete !== 'function') return;
+
+  // Organization autocomplete on sidebar
+  const orgInput = document.getElementById('org-name-input');
+  if (orgInput) {
+    createAutocomplete(orgInput, {
+      fetchUrl: q => `/api/organizations/search?q=${encodeURIComponent(q)}`,
+      formatItem: item => `<span>${item.name}</span>`,
+      onSelect: item => { orgInput.value = item.name; },
+      showOnFocus: true,
+    });
+  }
+
+  // User autocomplete on add-party form
+  const addPartyInput = document.getElementById('add-party-input');
+  if (addPartyInput) {
+    createAutocomplete(addPartyInput, {
+      fetchUrl: q => `/api/users/search?q=${encodeURIComponent(q)}`,
+      formatItem: item => {
+        const name = item.name ? `<strong>${item.name}</strong> ` : '';
+        const org  = item.org  ? ` <em style="color:#6b7280">[${item.org}]</em>` : '';
+        return `${name}(${item.email})${org}`;
+      },
+      onSelect: item => {
+        addPartyInput.value = item.name ? `${item.name} <${item.email}>` : item.email;
+        document.getElementById('add-party-user-id').value = item.id;
+        document.getElementById('add-party-email').value   = '';
+      },
+    });
+    addPartyInput.addEventListener('input', () => {
+      if (!addPartyInput.value.trim()) {
+        document.getElementById('add-party-user-id').value = '';
+      }
+    });
+  }
+});
 
 <%- include('../partials/foot') %>
