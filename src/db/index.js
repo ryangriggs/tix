@@ -157,8 +157,6 @@ const SCHEMA = `
 
   CREATE INDEX IF NOT EXISTS idx_tech_orgs_tech ON technician_organizations(technician_id);
   CREATE INDEX IF NOT EXISTS idx_tech_orgs_org  ON technician_organizations(organization_id);
-  CREATE INDEX IF NOT EXISTS idx_tickets_org    ON tickets(organization_id);
-  CREATE INDEX IF NOT EXISTS idx_users_org      ON users(organization_id);
   CREATE INDEX IF NOT EXISTS idx_ticket_parties_ticket ON ticket_parties(ticket_id);
   CREATE INDEX IF NOT EXISTS idx_ticket_parties_user   ON ticket_parties(user_id);
   CREATE INDEX IF NOT EXISTS idx_comments_ticket       ON comments(ticket_id);
@@ -256,6 +254,8 @@ async function initDb() {
   try { _db.exec('ALTER TABLE users   ADD COLUMN organization_id    INTEGER REFERENCES organizations(id) ON DELETE SET NULL'); } catch (_) {}
   try { _db.exec('ALTER TABLE users   ADD COLUMN is_group_superuser INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   try { _db.exec('ALTER TABLE tickets ADD COLUMN organization_id    INTEGER REFERENCES organizations(id) ON DELETE SET NULL'); } catch (_) {}
+  _db.exec('CREATE INDEX IF NOT EXISTS idx_tickets_org ON tickets(organization_id)');
+  _db.exec('CREATE INDEX IF NOT EXISTS idx_users_org   ON users(organization_id)');
   // Back-fill reply tokens for any existing tickets that pre-date this migration
   _db.exec(`UPDATE tickets SET reply_token = lower(hex(randomblob(16))) WHERE reply_token IS NULL`);
   _db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_reply_token ON tickets(reply_token)');
