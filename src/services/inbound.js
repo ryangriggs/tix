@@ -244,10 +244,13 @@ async function processInboundEmail(rawEmail) {
     if (m) { existingTicketId = parseInt(m[1], 10); subjectFallback = true; }
   }
 
+  const isSilent = !!(config.ticketSilentEmail &&
+    toAddrs.some(a => (a.address || '').toLowerCase() === config.ticketSilentEmail.toLowerCase()));
+
   if (existingTicketId) {
     await handleReply(existingTicketId, fromEmail, parsed, subjectFallback);
   } else {
-    await handleNewTicket(fromEmail, parsed);
+    await handleNewTicket(fromEmail, parsed, { silent: isSilent });
   }
 }
 
@@ -326,7 +329,7 @@ async function handleReply(ticketId, fromEmail, parsed, subjectFallback = false)
 // New ticket from an inbound email
 // ============================================================
 
-async function handleNewTicket(fromEmail, parsed) {
+async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
   const fromName = parsed.from?.value?.[0]?.name || '';
   const senderUser = db.findOrCreateUser(fromEmail, fromName);
 
@@ -347,7 +350,17 @@ async function handleNewTicket(fromEmail, parsed) {
   const body = formatEmailAsPlaintext(parsed);
   const ticket = db.createTicket({ subject, body, organizationId: senderUser.organization_id || null });
 
-  // Sender is submitter (and an owner)
+  // Silent mode: sender is sole owner, no collaborators, no notifications.
+  if (silent) {
+    db.addParty(ticket.id, senderUser.id, 'owner');
+    commitAttachments(prepared, ticket.id, null);
+    if (parsed.messageId) db.recordEmailMessage(ticket.id, parsed.messageId, 'in');
+    sse.broadcastToAll({ type: 'ticket_created', ticketId: ticket.id });
+    console.log(`[Inbound] Created silent ticket #${ticket.id} from ${fromEmail}`);
+    return;
+  }
+
+  // Sender is submitter
   db.addParty(ticket.id, senderUser.id, 'submitter');
 
   // Add To:/CC: recipients as collaborators.
@@ -607,10 +620,18 @@ async function processMailgunWebhook(fields, files) {
     if (m) { existingTicketId = parseInt(m[1], 10); subjectFallback = true; }
   }
 
+  const allAddrs = [
+    ...(parsed.to?.value || []),
+    ...(parsed.cc?.value || []),
+    { address: fields.recipient || '' },
+  ];
+  const isSilent = !!(config.ticketSilentEmail &&
+    allAddrs.some(a => (a.address || '').toLowerCase() === config.ticketSilentEmail.toLowerCase()));
+
   if (existingTicketId) {
     await handleReply(existingTicketId, fromEmail, parsed, subjectFallback);
   } else {
-    await handleNewTicket(fromEmail, parsed);
+    await handleNewTicket(fromEmail, parsed, { silent: isSilent });
   }
 }
 
