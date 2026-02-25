@@ -1,0 +1,103 @@
+<%- include('../partials/head', { title: 'Logs' }) %>
+<%- include('../partials/nav') %>
+
+<main class="container">
+  <h1 class="page-title">Logs</h1>
+
+  <div class="tab-bar" style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.5rem">
+    <a href="/admin/logs?tab=email"
+       class="tab-link<% if (tab === 'email') { %> tab-active<% } %>"
+       style="padding:.5rem 1.25rem;font-size:.9rem;font-weight:500;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:<%= tab==='email' ? 'var(--primary)' : 'var(--text-muted)' %>;border-bottom-color:<%= tab==='email' ? 'var(--primary)' : 'transparent' %>">
+      Email Log
+    </a>
+    <a href="/admin/logs?tab=users"
+       class="tab-link<% if (tab === 'users') { %> tab-active<% } %>"
+       style="padding:.5rem 1.25rem;font-size:.9rem;font-weight:500;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:<%= tab==='users' ? 'var(--primary)' : 'var(--text-muted)' %>;border-bottom-color:<%= tab==='users' ? 'var(--primary)' : 'transparent' %>">
+      User Log
+    </a>
+  </div>
+
+  <% if (tab === 'email') { %>
+
+    <% if (!emailLogPath) { %>
+      <div class="card" style="color:var(--text-muted)">
+        <p>Email logging is not configured. Set <code>EMAIL_LOG=/path/to/email.log</code> in your <code>.env</code> file and restart the server.</p>
+      </div>
+    <% } else if (!emailEntries.length) { %>
+      <div class="card" style="color:var(--text-muted)">
+        <p>No email log entries yet. Log file: <code><%= emailLogPath %></code></p>
+      </div>
+    <% } else { %>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:.75rem">
+        <p style="margin:0;font-size:.875rem;color:var(--text-muted)">
+          Showing last <%= emailEntries.length %> of <%= emailTotal %> entries &mdash; <code><%= emailLogPath %></code>
+        </p>
+        <span style="font-size:.8rem;color:var(--text-muted)">Newest first</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="white-space:nowrap">Time</th>
+              <th>Recipient</th>
+              <th>Subject</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% for (const e of emailEntries) { %>
+              <tr<% if (e.isError) { %> style="background:#fff5f5"<% } %>>
+                <td style="white-space:nowrap;font-size:.8rem;font-family:monospace;color:var(--text-muted)"><%= e.timestamp %></td>
+                <td style="font-size:.875rem;word-break:break-all"><%= e.recipient %></td>
+                <td style="font-size:.875rem"><%= e.subject %></td>
+                <td style="font-size:.8rem;color:#b91c1c;word-break:break-all"><%= e.error || '' %></td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+  <% } else { %>
+
+    <% if (!userLogPath) { %>
+      <div class="card" style="color:var(--text-muted)">
+        <p>User login logging is not configured. Set <code>USER_LOG=/path/to/user.log</code> in your <code>.env</code> file and restart the server.</p>
+      </div>
+    <% } else if (!userEntries.length) { %>
+      <div class="card" style="color:var(--text-muted)">
+        <p>No user log entries yet. Log file: <code><%= userLogPath %></code></p>
+      </div>
+    <% } else { %>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:.75rem">
+        <p style="margin:0;font-size:.875rem;color:var(--text-muted)">
+          Showing last <%= userEntries.length %> of <%= userTotal %> entries &mdash; <code><%= userLogPath %></code>
+        </p>
+        <span style="font-size:.8rem;color:var(--text-muted)">Newest first</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="white-space:nowrap">Time</th>
+              <th>Email</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% for (const e of userEntries) { %>
+              <tr<% if (e.isFailure) { %> style="background:#fff5f5"<% } %>>
+                <td style="white-space:nowrap;font-size:.8rem;font-family:monospace;color:var(--text-muted)"><%= e.timestamp %></td>
+                <td style="font-size:.875rem"><%= e.email %></td>
+                <td style="font-size:.875rem;<% if (e.isFailure) { %>color:#b91c1c;<% } else { %>color:#15803d;<% } %>font-weight:500"><%= e.status %></td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+  <% } %>
+</main>
+
+<%- include('../partials/foot') %>

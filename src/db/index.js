@@ -397,6 +397,13 @@ function verifyAuthToken(tokenId, rawToken) {
   return record;
 }
 
+function getAuthTokenEmail(tokenId) {
+  const row = prepare(
+    'SELECT u.email FROM auth_tokens t JOIN users u ON u.id = t.user_id WHERE t.id = ?'
+  ).get(tokenId);
+  return row ? row.email : null;
+}
+
 // Returns: a token record on success; { locked, lockedUntil } on lockout; null on wrong OTP.
 function verifyOTPByTokenId(tokenId, otp) {
   const now = Math.floor(Date.now() / 1000);
@@ -782,7 +789,7 @@ module.exports = {
   updateUserRole, updateUserName, blockUser, unblockUser, deleteUser,
   updateUserOrganization, updateUserSuperuser, searchUsers,
   // Auth
-  createAuthToken, verifyAuthToken, verifyOTPByTokenId,
+  createAuthToken, verifyAuthToken, verifyOTPByTokenId, getAuthTokenEmail,
   // Tickets
   createTicket, getTicketById, updateTicket, getTickets,
   deleteTicket, bulkDeleteTickets, bulkUpdateStatus, bulkUpdatePriority,

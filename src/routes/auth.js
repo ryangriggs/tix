@@ -1,8 +1,9 @@
 'use strict';
 
 const crypto = require('crypto');
+const fs     = require('fs');
 const express = require('express');
-const router = express.Router();
+const router  = express.Router();
 
 const jwt = require('jsonwebtoken');
 const config = require('../config');
@@ -14,6 +15,17 @@ const { issueSessionCookie } = require('../middleware/auth');
 function safeRedirectUrl(url) {
   if (typeof url === 'string' && url.startsWith('/') && !url.startsWith('//')) return url;
   return '/tickets';
+}
+
+function logUser(email, status) {
+  if (!config.userLog) return;
+  const ts   = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const line = `${ts} | ${email} | ${status}\n`;
+  try {
+    fs.appendFileSync(config.userLog, line, 'utf8');
+  } catch (err) {
+    console.error('[Auth] Failed to write user log:', err.message);
+  }
 }
 
 // GET /auth/login
@@ -34,6 +46,7 @@ router.post('/login', async (req, res) => {
 
   const user = db.findOrCreateUser(email);
   if (user.blocked_at) {
+    logUser(email, 'FAILED - account blocked');
     return res.render('auth/login', { title: 'Log in', error: 'This account has been blocked.', email, next });
   }
 
@@ -86,6 +99,7 @@ router.post('/verify', (req, res) => {
     // Magic link confirmation — user clicked the "Log in" button in the browser
     record = db.verifyAuthToken(tokenId, rawToken);
     if (!record) {
+      logUser(db.getAuthTokenEmail(tokenId) || '(unknown)', 'FAILED - invalid or expired link');
       return res.render('auth/verify', {
         title: 'Check your email',
         error: 'This link has expired or already been used. Please request a new one.',
@@ -100,6 +114,7 @@ router.post('/verify', (req, res) => {
     const result = db.verifyOTPByTokenId(tokenId, otp.trim());
 
     if (!result) {
+      logUser(db.getAuthTokenEmail(tokenId) || '(unknown)', 'FAILED - invalid code');
       return res.render('auth/verify', {
         title: 'Check your email',
         error: 'Invalid or expired code. Please try again or request a new link.',
@@ -111,6 +126,7 @@ router.post('/verify', (req, res) => {
     }
 
     if (result.locked) {
+      logUser(db.getAuthTokenEmail(tokenId) || '(unknown)', 'FAILED - too many attempts, locked');
       const waitSecs = result.lockedUntil - Math.floor(Date.now() / 1000);
       const waitMins = Math.ceil(waitSecs / 60);
       const msg = waitMins > 1
@@ -132,6 +148,7 @@ router.post('/verify', (req, res) => {
   }
 
   const user = db.getUserById(record.user_id);
+  logUser(user.email, 'SUCCESS');
   issueSessionCookie(res, user);
   res.redirect(redirectTo);
 });

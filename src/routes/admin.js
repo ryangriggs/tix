@@ -212,20 +212,28 @@ router.post('/organizations/:id/delete', (req, res) => {
   res.redirect('/admin/organizations?message=Organization+deleted');
 });
 
-// GET /admin/email-log
-router.get('/email-log', (req, res) => {
-  if (!config.emailLog) {
-    return res.render('admin/email-log', { title: 'Email Log', entries: null, logPath: null, totalLines: 0 });
-  }
-
-  let entries = [];
-  let totalLines = 0;
+// Helper — read last N lines of a log file, newest first
+function readLogFile(filePath, limit = 100) {
   try {
-    const content = fs.readFileSync(config.emailLog, 'utf8');
-    const lines = content.split('\n').filter(l => l.trim());
-    totalLines = lines.length;
-    const last100 = lines.slice(-100).reverse();
-    entries = last100.map(line => {
+    const lines = fs.readFileSync(filePath, 'utf8').split('\n').filter(l => l.trim());
+    return { total: lines.length, lines: lines.slice(-limit).reverse() };
+  } catch (err) {
+    if (err.code !== 'ENOENT') console.error('[Admin] Log read error:', err.message);
+    return { total: 0, lines: [] };
+  }
+}
+
+// GET /admin/logs?tab=email|users
+router.get('/logs', (req, res) => {
+  const tab = req.query.tab === 'users' ? 'users' : 'email';
+
+  // Email log
+  let emailEntries = [];
+  let emailTotal = 0;
+  if (config.emailLog) {
+    const { total, lines } = readLogFile(config.emailLog);
+    emailTotal = total;
+    emailEntries = lines.map(line => {
       const parts = line.split(' | ');
       const isError = (parts[1] || '').startsWith('[ERROR] ');
       return {
@@ -236,11 +244,32 @@ router.get('/email-log', (req, res) => {
         error:     isError ? (parts[3] || '') : null,
       };
     });
-  } catch (err) {
-    if (err.code !== 'ENOENT') console.error('[Admin] Email log read error:', err.message);
   }
 
-  res.render('admin/email-log', { title: 'Email Log', entries, logPath: config.emailLog, totalLines });
+  // User log
+  let userEntries = [];
+  let userTotal = 0;
+  if (config.userLog) {
+    const { total, lines } = readLogFile(config.userLog);
+    userTotal = total;
+    userEntries = lines.map(line => {
+      const parts = line.split(' | ');
+      const isFailure = (parts[2] || '').startsWith('FAILED');
+      return {
+        timestamp: parts[0] || '',
+        email:     parts[1] || '',
+        status:    parts[2] || '',
+        isFailure,
+      };
+    });
+  }
+
+  res.render('admin/logs', {
+    title: 'Logs',
+    tab,
+    emailEntries, emailTotal, emailLogPath: config.emailLog || '',
+    userEntries,  userTotal,  userLogPath:  config.userLog  || '',
+  });
 });
 
 // GET /admin/settings
