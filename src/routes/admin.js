@@ -1,7 +1,8 @@
 'use strict';
 
 const express = require('express');
-const router = express.Router();
+const fs      = require('fs');
+const router  = express.Router();
 
 const db = require('../db');
 const config = require('../config');
@@ -209,6 +210,37 @@ router.post('/organizations/:id/delete', (req, res) => {
   const id = parseInt(req.params.id, 10);
   db.deleteOrganization(id);
   res.redirect('/admin/organizations?message=Organization+deleted');
+});
+
+// GET /admin/email-log
+router.get('/email-log', (req, res) => {
+  if (!config.emailLog) {
+    return res.render('admin/email-log', { title: 'Email Log', entries: null, logPath: null, totalLines: 0 });
+  }
+
+  let entries = [];
+  let totalLines = 0;
+  try {
+    const content = fs.readFileSync(config.emailLog, 'utf8');
+    const lines = content.split('\n').filter(l => l.trim());
+    totalLines = lines.length;
+    const last100 = lines.slice(-100).reverse();
+    entries = last100.map(line => {
+      const parts = line.split(' | ');
+      const isError = (parts[1] || '').startsWith('[ERROR] ');
+      return {
+        timestamp: parts[0] || '',
+        isError,
+        recipient: isError ? parts[1].slice(8) : (parts[1] || ''),
+        subject:   parts[2] || '',
+        error:     isError ? (parts[3] || '') : null,
+      };
+    });
+  } catch (err) {
+    if (err.code !== 'ENOENT') console.error('[Admin] Email log read error:', err.message);
+  }
+
+  res.render('admin/email-log', { title: 'Email Log', entries, logPath: config.emailLog, totalLines });
 });
 
 // GET /admin/settings
