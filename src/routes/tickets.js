@@ -117,6 +117,7 @@ async function notifyParties(ticket, actorEmail, messageBody, commentId, inReply
     ticketId: ticket.id,
     messageId: msgId,
     inReplyTo: inReplyTo || `<ticket-${ticket.id}@${domain}>`,
+    replyToken: ticket.reply_token,
   });
 }
 
@@ -569,6 +570,7 @@ router.post('/:id/parties', async (req, res) => {
       body: `<p>You have been added to ticket <strong>#${ticket.id}: ${ticket.subject}</strong> as a ${role}.</p>
              <p><a href="${config.appUrl}/tickets/${ticket.id}">View ticket</a></p>`,
       ticketId: ticket.id,
+      replyToken: ticket.reply_token,
     });
   } catch (err) { console.error('[Tickets] Notification error:', err); }
 
