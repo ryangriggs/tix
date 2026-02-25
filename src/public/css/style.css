@@ -285,6 +285,54 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 .badge-status-completed { background: transparent; color: var(--success);     border: 1px solid currentColor; }
 .badge-status-cancelled { background: transparent; color: var(--danger);      border: 1px solid currentColor; }
 
+/* ============================================================
+   Pill button groups — status / priority selectors
+   ============================================================ */
+.pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.1rem;
+}
+
+.pill-btn {
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-family: var(--font);
+  cursor: pointer;
+  border: 1.5px solid;
+  background: transparent;
+  transition: background .12s, color .12s;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+/* Status pills */
+.pill-btn.pill-status-open      { border-color: #d97706; color: #d97706; }
+.pill-btn.pill-status-pending   { border-color: #2563eb; color: #2563eb; }
+.pill-btn.pill-status-on_hold   { border-color: #6b7280; color: #6b7280; }
+.pill-btn.pill-status-completed { border-color: #16a34a; color: #16a34a; }
+.pill-btn.pill-status-cancelled { border-color: #dc2626; color: #dc2626; }
+
+.pill-btn.pill-status-open.pill-active      { background: #d97706; color: #fff; }
+.pill-btn.pill-status-pending.pill-active   { background: #2563eb; color: #fff; }
+.pill-btn.pill-status-on_hold.pill-active   { background: #6b7280; color: #fff; }
+.pill-btn.pill-status-completed.pill-active { background: #16a34a; color: #fff; }
+.pill-btn.pill-status-cancelled.pill-active { background: #dc2626; color: #fff; }
+
+/* Priority pills */
+.pill-btn.pill-priority-urgent { border-color: #dc2626; color: #dc2626; }
+.pill-btn.pill-priority-high   { border-color: #ea580c; color: #ea580c; }
+.pill-btn.pill-priority-medium { border-color: #2563eb; color: #2563eb; }
+.pill-btn.pill-priority-low    { border-color: #6b7280; color: #6b7280; }
+
+.pill-btn.pill-priority-urgent.pill-active { background: #dc2626; color: #fff; }
+.pill-btn.pill-priority-high.pill-active   { background: #ea580c; color: #fff; }
+.pill-btn.pill-priority-medium.pill-active { background: #2563eb; color: #fff; }
+.pill-btn.pill-priority-low.pill-active    { background: #6b7280; color: #fff; }
+
 /* Flat solid-colour dots used in filter tabs (replaces shaded emoji circles) */
 .flat-dot {
   display: inline-block;

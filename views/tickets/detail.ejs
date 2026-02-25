@@ -129,29 +129,36 @@
       <% if (canManage) { %>
         <div class="sidebar-section">
           <div class="sidebar-label">Status</div>
-          <form method="POST" action="/tickets/<%= ticket.id %>/status">
+          <form method="POST" action="/tickets/<%= ticket.id %>/status" id="status-form">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <select name="status" class="form-select" onchange="this.form.submit()">
-              <option value="open"      <%= ticket.status==='open'      ? 'selected':'' %>>Open</option>
-              <option value="pending"   <%= ticket.status==='pending'   ? 'selected':'' %>>Pending</option>
-              <option value="on_hold"   <%= ticket.status==='on_hold'   ? 'selected':'' %>>On Hold</option>
-              <option value="completed" <%= ticket.status==='completed' ? 'selected':'' %>>Completed</option>
-              <option value="cancelled" <%= ticket.status==='cancelled' ? 'selected':'' %>>Cancelled</option>
-            </select>
+            <input type="hidden" name="status" id="status-val">
+            <div class="pill-group">
+              <% for (const [sv, sl] of [['open','Open'],['pending','Pending'],['on_hold','On Hold'],['completed','Completed'],['cancelled','Cancelled']]) { %>
+                <button type="button"
+                  class="pill-btn pill-status-<%= sv %><%= ticket.status===sv ? ' pill-active' : '' %>"
+                  onclick="document.getElementById('status-val').value='<%= sv %>';document.getElementById('status-form').submit()">
+                  <%= sl %>
+                </button>
+              <% } %>
+            </div>
           </form>
         </div>
 
         <!-- Priority -->
         <div class="sidebar-section">
           <div class="sidebar-label">Priority</div>
-          <form method="POST" action="/tickets/<%= ticket.id %>/priority">
+          <form method="POST" action="/tickets/<%= ticket.id %>/priority" id="priority-form">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <select name="priority" class="form-select" onchange="this.form.submit()">
-              <option value="urgent" <%= ticket.priority==='urgent' ? 'selected':'' %>>Urgent</option>
-              <option value="high"   <%= ticket.priority==='high'   ? 'selected':'' %>>High</option>
-              <option value="medium" <%= ticket.priority==='medium' ? 'selected':'' %>>Medium</option>
-              <option value="low"    <%= ticket.priority==='low'    ? 'selected':'' %>>Low</option>
-            </select>
+            <input type="hidden" name="priority" id="priority-val">
+            <div class="pill-group">
+              <% for (const [pv, pl] of [['urgent','Urgent'],['high','High'],['medium','Medium'],['low','Low']]) { %>
+                <button type="button"
+                  class="pill-btn pill-priority-<%= pv %><%= ticket.priority===pv ? ' pill-active' : '' %>"
+                  onclick="document.getElementById('priority-val').value='<%= pv %>';document.getElementById('priority-form').submit()">
+                  <%= pl %>
+                </button>
+              <% } %>
+            </div>
           </form>
         </div>
 
