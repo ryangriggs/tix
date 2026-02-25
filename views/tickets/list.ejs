@@ -11,11 +11,11 @@
   <form method="GET" action="/tickets" class="filter-bar" id="filter-form">
     <div class="filter-tabs">
       <% const statuses = ['', 'open', 'pending', 'on_hold', 'completed', 'cancelled']; %>
-      <% const statusLabels = { '': 'All', open: '🟡 Open', pending: '🔵 Pending', on_hold: '⬛ On Hold', completed: '🟢 Completed', cancelled: '⭕ Cancelled' }; %>
+      <% const statusLabels = { '': 'All', open: '<span class="flat-dot flat-dot-open"></span> Open', pending: '<span class="flat-dot flat-dot-pending"></span> Pending', on_hold: '<span class="flat-dot flat-dot-on_hold"></span> On Hold', completed: '<span class="flat-dot flat-dot-completed"></span> Completed', cancelled: '<span class="flat-dot flat-dot-cancelled"></span> Cancelled' }; %>
       <% for (const s of statuses) { %>
         <button type="button" class="filter-tab <%= filters.status === s ? 'active' : '' %>"
           onclick="setFilter('status','<%= s %>')">
-          <%= statusLabels[s] %>
+          <%- statusLabels[s] %>
         </button>
       <% } %>
     </div>
@@ -23,10 +23,10 @@
     <div class="filter-controls">
       <select name="priority" class="form-select" onchange="this.form.submit()">
         <option value="" <%= !filters.priority ? 'selected' : '' %>>Any priority</option>
-        <option value="urgent"  <%= filters.priority==='urgent'  ? 'selected' : '' %>>🔴 Urgent</option>
-        <option value="high"    <%= filters.priority==='high'    ? 'selected' : '' %>>🟠 High</option>
-        <option value="medium"  <%= filters.priority==='medium'  ? 'selected' : '' %>>🔵 Medium</option>
-        <option value="low"     <%= filters.priority==='low'     ? 'selected' : '' %>>⚫ Low</option>
+        <option value="urgent"  <%= filters.priority==='urgent'  ? 'selected' : '' %>>Urgent</option>
+        <option value="high"    <%= filters.priority==='high'    ? 'selected' : '' %>>High</option>
+        <option value="medium"  <%= filters.priority==='medium'  ? 'selected' : '' %>>Medium</option>
+        <option value="low"     <%= filters.priority==='low'     ? 'selected' : '' %>>Low</option>
       </select>
 
       <input type="hidden" name="sort"  value="<%= filters.sort %>">
@@ -124,18 +124,18 @@
       <div class="bulk-actions">
         <select id="bulk-status" name="bulkStatus" class="form-select form-select-sm" onchange="bulkSubmit('status')">
           <option value="">Status…</option>
-          <option value="open">🟡 Open</option>
-          <option value="pending">🔵 Pending</option>
-          <option value="on_hold">⬛ On Hold</option>
-          <option value="completed">🟢 Completed</option>
-          <option value="cancelled">⭕ Cancelled</option>
+          <option value="open">Open</option>
+          <option value="pending">Pending</option>
+          <option value="on_hold">On Hold</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
         </select>
         <select id="bulk-priority" name="bulkPriority" class="form-select form-select-sm" onchange="bulkSubmit('priority')">
           <option value="">Priority…</option>
-          <option value="urgent">🔴 Urgent</option>
-          <option value="high">🟠 High</option>
-          <option value="medium">🔵 Medium</option>
-          <option value="low">⚫ Low</option>
+          <option value="urgent">Urgent</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
         </select>
         <button type="button" class="btn btn-sm btn-danger" onclick="bulkDelete()">Delete</button>
       </div>

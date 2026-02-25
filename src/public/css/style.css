@@ -274,16 +274,32 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
   white-space: nowrap;
 }
 
-.badge-priority-low    { background: transparent; color: #15803d; }
-.badge-priority-medium { background: transparent; color: #a16207; }
-.badge-priority-high   { background: transparent; color: #c2410c; }
-.badge-priority-urgent { background: transparent; color: #b91c1c; }
+.badge-priority-low    { background: transparent; color: #15803d; border: 1px solid currentColor; }
+.badge-priority-medium { background: transparent; color: #a16207; border: 1px solid currentColor; }
+.badge-priority-high   { background: transparent; color: #c2410c; border: 1px solid currentColor; }
+.badge-priority-urgent { background: transparent; color: #b91c1c; border: 1px solid currentColor; }
 
-.badge-status-open      { background: transparent; color: var(--accent); }
-.badge-status-pending   { background: transparent; color: var(--warn); }
-.badge-status-on_hold   { background: transparent; color: var(--text-muted); }
-.badge-status-completed { background: transparent; color: var(--success); }
-.badge-status-cancelled { background: transparent; color: var(--danger); }
+.badge-status-open      { background: transparent; color: var(--accent);      border: 1px solid currentColor; }
+.badge-status-pending   { background: transparent; color: var(--warn);        border: 1px solid currentColor; }
+.badge-status-on_hold   { background: transparent; color: var(--text-muted);  border: 1px solid currentColor; }
+.badge-status-completed { background: transparent; color: var(--success);     border: 1px solid currentColor; }
+.badge-status-cancelled { background: transparent; color: var(--danger);      border: 1px solid currentColor; }
+
+/* Flat solid-colour dots used in filter tabs (replaces shaded emoji circles) */
+.flat-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-bottom: 1px;
+  flex-shrink: 0;
+}
+.flat-dot-open      { background: #fbbf24; }
+.flat-dot-pending   { background: #3b82f6; }
+.flat-dot-on_hold   { background: #6b7280; }
+.flat-dot-completed { background: #16a34a; }
+.flat-dot-cancelled { background: #dc2626; }
 
 .badge-role  { background: #f1f5f9; color: var(--text-muted); font-size: .68rem; }
 .badge-email { background: #e0e7ff; color: #4338ca; font-size: .68rem; }
