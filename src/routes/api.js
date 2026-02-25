@@ -26,7 +26,6 @@ router.get('/users/search', (req, res) => {
 // GET /api/organizations/search?q=
 router.get('/organizations/search', (req, res) => {
   const q = (req.query.q || '').trim();
-  if (q.length < 1) return res.json([]);
 
   const orgs = db.searchOrganizations(q);
   res.json(orgs.map(o => ({ id: o.id, name: o.name })));
