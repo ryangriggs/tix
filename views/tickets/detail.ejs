@@ -266,7 +266,7 @@
   // Comment editor
   const quill = new Quill('#comment-editor', {
     theme: 'snow',
-    placeholder: 'Write a comment…',
+    placeholder: 'Write a comment… (Ctrl+Enter to submit)',
     modules: {
       toolbar: [
         ['bold', 'italic', 'underline', 'strike'],
@@ -274,7 +274,19 @@
         [{ list: 'ordered' }, { list: 'bullet' }],
         ['link'],
         ['clean'],
-      ]
+      ],
+      keyboard: {
+        bindings: {
+          submitComment: {
+            key: 'Enter',
+            ctrlKey: true,
+            handler() {
+              document.getElementById('comment-body').value = quill.root.innerHTML;
+              document.getElementById('comment-form').submit();
+            }
+          }
+        }
+      }
     }
   });
 
