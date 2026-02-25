@@ -48,8 +48,8 @@
 
       <% if (organizations && organizations.length) { %>
         <select name="org" class="form-select" onchange="this.form.submit()">
-          <option value="" <%= !filters.org ? 'selected' : '' %>>Any org</option>
-          <option value="unassigned" <%= filters.org === 'unassigned' ? 'selected' : '' %>>— Not assigned</option>
+          <option value="" <%= !filters.org ? 'selected' : '' %>>✳️ Any organization</option>
+          <option value="unassigned" <%= filters.org === 'unassigned' ? 'selected' : '' %>>⛔ Not assigned</option>
           <% for (const o of organizations) { %>
             <option value="<%= o.id %>" <%= filters.org == o.id ? 'selected' : '' %>><%= o.name %></option>
           <% } %>
