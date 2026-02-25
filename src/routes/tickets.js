@@ -355,6 +355,21 @@ router.post('/:id/comments', upload.array('attachments'), async (req, res) => {
   res.redirect(`/tickets/${ticket.id}#comment-${comment.id}`);
 });
 
+// POST /tickets/:id/subject — rename ticket (admin only)
+router.post('/:id/subject', async (req, res) => {
+  const ticket = db.getTicketById(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Not found' });
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+
+  const subject = (req.body.subject || '').trim();
+  if (!subject) return res.redirect(`/tickets/${ticket.id}`);
+
+  db.updateTicket(ticket.id, { subject });
+  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
+
+  res.redirect(`/tickets/${ticket.id}`);
+});
+
 // POST /tickets/:id/status — change status
 router.post('/:id/status', async (req, res) => {
   const ticket = db.getTicketById(req.params.id);

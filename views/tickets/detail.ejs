@@ -19,7 +19,19 @@
       <span class="badge badge-priority-<%= ticket.priority %>" id="badge-priority"><%= ticket.priority %></span>
       <span class="badge badge-status-<%= ticket.status %>" id="badge-status"><%= ticket.status.replace('_',' ') %></span>
     </div>
-    <h1 class="ticket-title"><%= ticket.subject %></h1>
+    <% if (user && user.role === 'admin') { %>
+      <form method="POST" action="/tickets/<%= ticket.id %>/subject" id="subject-form" style="display:flex;align-items:center;gap:.5rem;margin:.25rem 0">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="text" name="subject" id="subject-input"
+               value="<%= ticket.subject %>"
+               class="form-input ticket-title-input"
+               style="font-size:1.4rem;font-weight:700;flex:1;min-width:0">
+        <button type="submit" id="subject-save" class="btn btn-sm btn-primary" style="display:none">Save</button>
+        <button type="button" id="subject-cancel" class="btn btn-sm btn-ghost" style="display:none">Cancel</button>
+      </form>
+    <% } else { %>
+      <h1 class="ticket-title"><%= ticket.subject %></h1>
+    <% } %>
     <div class="ticket-meta-row">
       <span class="meta-item">Created <%= formatDateFull(ticket.created_at) %></span>
       <span class="meta-item">Updated <%= formatDate(ticket.updated_at) %></span>
@@ -265,6 +277,24 @@
 
 </script>
 <script>
+// Editable ticket title
+const _subjectInput  = document.getElementById('subject-input');
+const _subjectSave   = document.getElementById('subject-save');
+const _subjectCancel = document.getElementById('subject-cancel');
+if (_subjectInput) {
+  const _original = _subjectInput.value;
+  const _setDirty = () => {
+    const dirty = _subjectInput.value !== _original;
+    _subjectSave.style.display   = dirty ? '' : 'none';
+    _subjectCancel.style.display = dirty ? '' : 'none';
+  };
+  _subjectInput.addEventListener('input', _setDirty);
+  _subjectCancel.addEventListener('click', () => {
+    _subjectInput.value = _original;
+    _setDirty();
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof createAutocomplete !== 'function') return;
 
