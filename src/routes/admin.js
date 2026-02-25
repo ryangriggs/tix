@@ -5,6 +5,7 @@ const router = express.Router();
 
 const db = require('../db');
 const config = require('../config');
+const { issueSessionCookie } = require('../middleware/auth');
 
 function maskSecret(val) {
   if (!val) return '(not set)';
@@ -68,6 +69,25 @@ router.post('/users/:id/edit', (req, res) => {
   }
 
   res.redirect('/admin/users?message=User+updated');
+});
+
+// POST /admin/users/:id/impersonate — sign in as another user
+router.post('/users/:id/impersonate', (req, res) => {
+  const target = db.getUserById(parseInt(req.params.id, 10));
+  if (!target) return res.status(404).render('error', { title: 'Not found', message: 'User not found.' });
+  if (target.id === req.user.id) return res.redirect('/admin/users?message=Cannot+impersonate+yourself');
+  if (target.blocked_at) return res.redirect('/admin/users?message=Cannot+impersonate+a+blocked+user');
+
+  // Stash the current admin session so we can restore it later
+  res.cookie('admin_session', req.cookies.session, {
+    httpOnly: true,
+    secure:   config.secureSession,
+    maxAge:   8 * 60 * 60 * 1000, // 8-hour window
+    sameSite: 'lax',
+  });
+
+  issueSessionCookie(res, target);
+  res.redirect('/tickets');
 });
 
 // POST /admin/users/pre-add — must be before /:id routes

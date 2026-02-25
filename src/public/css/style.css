@@ -59,6 +59,15 @@ a:hover { text-decoration: underline; }
 /* ============================================================
    Header / Nav
    ============================================================ */
+.impersonation-banner {
+  background: #fef3c7;
+  border-bottom: 1px solid #f59e0b;
+  color: #92400e;
+  font-size: .8rem;
+  padding: .4rem 1rem;
+  text-align: center;
+}
+
 .app-header {
   background: var(--surface);
   border-bottom: 1px solid var(--border);

@@ -517,7 +517,8 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
     params.push(userId);
   }
 
-  if (orgFilter) { conditions.push('t.organization_id = ?'); params.push(orgFilter); }
+  if (orgFilter === -1) { conditions.push('t.organization_id IS NULL'); }
+  else if (orgFilter)  { conditions.push('t.organization_id = ?'); params.push(orgFilter); }
   if (status)    { conditions.push('t.status = ?');          params.push(status); }
   if (priority)  { conditions.push('t.priority = ?');        params.push(priority); }
   if (dateFrom)  { conditions.push('t.updated_at >= ?');     params.push(dateFrom); }

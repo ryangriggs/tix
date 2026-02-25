@@ -131,6 +131,13 @@
   <div class="dialog-footer">
     <div style="display:flex;gap:.5rem">
       <button type="button" id="dialog-delete-btn" class="btn btn-sm btn-danger" onclick="dialogDeleteUser()">Delete</button>
+      <form id="dialog-impersonate-form" method="POST" action="" style="display:inline">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button type="submit" id="dialog-impersonate-btn" class="btn btn-sm btn-secondary"
+          onclick="return confirm('Sign in as this user? You\'ll see the system exactly as they do.')">
+          Sign In As
+        </button>
+      </form>
     </div>
     <div style="display:flex;gap:.5rem">
       <button type="button" class="btn btn-ghost" onclick="document.getElementById('edit-user-dialog').close()">Cancel</button>
@@ -161,10 +168,13 @@ function openEditDialog(btn) {
   document.getElementById('dialog-role-note').style.display = d.isSelf === '1' ? 'block' : 'none';
 
   document.getElementById('dialog-edit-form').action = `/admin/users/${d.userId}/edit`;
+  document.getElementById('dialog-impersonate-form').action = `/admin/users/${d.userId}/impersonate`;
 
+  const isSelf = d.isSelf === '1';
   const deleteBtn = document.getElementById('dialog-delete-btn');
-  deleteBtn.style.display = d.isSelf === '1' ? 'none' : '';
-  document.getElementById('dialog-active-row').style.display = d.isSelf === '1' ? 'none' : '';
+  deleteBtn.style.display = isSelf ? 'none' : '';
+  document.getElementById('dialog-impersonate-btn').style.display = isSelf ? 'none' : '';
+  document.getElementById('dialog-active-row').style.display = isSelf ? 'none' : '';
 
   updateDialogSections();
 

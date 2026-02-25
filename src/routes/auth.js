@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
 
+const jwt = require('jsonwebtoken');
 const config = require('../config');
 const db = require('../db');
 const { sendMagicLink } = require('../services/mail');
@@ -138,7 +139,30 @@ router.post('/verify', (req, res) => {
 // POST /auth/logout
 router.post('/logout', (req, res) => {
   res.clearCookie('session');
+  res.clearCookie('admin_session');
   res.redirect('/auth/login');
+});
+
+// POST /auth/impersonate-return — restore admin session
+router.post('/impersonate-return', (req, res) => {
+  const adminToken = req.cookies.admin_session;
+  if (!adminToken) return res.redirect('/tickets');
+  try {
+    const payload = jwt.verify(adminToken, config.jwtSecret);
+    if (payload.role !== 'admin') throw new Error('not admin');
+    // Restore the admin's session cookie verbatim
+    res.cookie('session', adminToken, {
+      httpOnly: true,
+      secure:   config.secureSession,
+      maxAge:   30 * 24 * 60 * 60 * 1000,
+      sameSite: 'lax',
+    });
+    res.clearCookie('admin_session');
+    res.redirect('/admin/users');
+  } catch (_) {
+    res.clearCookie('admin_session');
+    res.redirect('/tickets');
+  }
 });
 
 module.exports = router;

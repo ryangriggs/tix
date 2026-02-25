@@ -197,7 +197,7 @@ router.get('/', (req, res) => {
     idSearch,
     dateFrom,
     dateTo,
-    orgFilter:       org ? parseInt(org, 10) : null,
+    orgFilter:       org === 'unassigned' ? -1 : (org ? parseInt(org, 10) : null),
   });
 
   // Org filter dropdown — visible to admins, technicians, and superusers

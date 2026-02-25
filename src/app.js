@@ -4,6 +4,7 @@ const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 
+const jwt = require('jsonwebtoken');
 const config = require('./config');
 const { requireAuth, requireAdmin, optionalAuth, verifyCsrf } = require('./middleware/auth');
 const { startSMTPServer } = require('./smtp');
@@ -33,6 +34,16 @@ const { version } = require('../package.json');
 app.use((req, res, next) => {
   res.locals.user = null;
   res.locals.appVersion = version;
+
+  // Detect admin impersonation
+  res.locals.impersonatingAdminEmail = null;
+  if (req.cookies.admin_session) {
+    try {
+      const payload = jwt.verify(req.cookies.admin_session, config.jwtSecret);
+      if (payload.role === 'admin') res.locals.impersonatingAdminEmail = payload.email;
+      else res.clearCookie('admin_session');
+    } catch (_) { res.clearCookie('admin_session'); }
+  }
   try { res.locals.siteName = getSetting('site_name') || config.siteName; } catch (_) { res.locals.siteName = config.siteName; }
 
   res.locals.formatDate = function (ts) {
