@@ -37,6 +37,7 @@ body {
   color: var(--text);
   line-height: 1.6;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 a { color: var(--accent); text-decoration: none; }
@@ -680,6 +681,7 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  min-width: 0;
 }
 
 .ticket-body {
@@ -688,6 +690,7 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
   border-radius: var(--radius);
   padding: 1.25rem;
   min-height: 80px;
+  overflow-x: auto;
 }
 
 /* Quill editor input widget padding */
@@ -697,6 +700,8 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 .rich-content {
   line-height: 1.6;
   word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
   font-size: 0.9rem;
 }
 .rich-content p { margin: 0 0 0.6em; }

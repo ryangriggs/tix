@@ -56,6 +56,18 @@
     </div>
 
     <div class="form-group">
+      <label>Collaborators <span class="optional">(optional)</span></label>
+      <div id="new-collab-tags" style="display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.375rem"></div>
+      <div id="new-collab-hiddens"></div>
+      <div style="position:relative">
+        <input type="text" id="new-collab-input"
+               placeholder="Search by name, email, or org…"
+               class="form-input form-input-sm" autocomplete="off">
+      </div>
+      <p class="form-hint">Search for users, or type an email address and press Enter to add.</p>
+    </div>
+
+    <div class="form-group">
       <label for="attachments">Attachments <span class="optional">(optional)</span></label>
       <input type="file" id="attachments" name="attachments" multiple class="form-file">
       <p class="form-hint">Max 25 MB per file. Accepted: images, PDF, text, CSV, ZIP, Office documents.</p>
@@ -98,8 +110,11 @@
 </script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+  if (typeof createAutocomplete !== 'function') return;
+
+  // Organization autocomplete
   const orgInput = document.getElementById('organization_name');
-  if (orgInput && typeof createAutocomplete === 'function') {
+  if (orgInput) {
     createAutocomplete(orgInput, {
       fetchUrl: q => `/api/organizations/search?q=${encodeURIComponent(q)}`,
       formatItem: item => `<span>${item.name}</span>`,
@@ -107,6 +122,59 @@ document.addEventListener('DOMContentLoaded', () => {
       showOnFocus: true,
     });
   }
+
+  // Collaborators
+  const collabInput   = document.getElementById('new-collab-input');
+  const collabTags    = document.getElementById('new-collab-tags');
+  const collabHiddens = document.getElementById('new-collab-hiddens');
+  if (!collabInput) return;
+
+  const _esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let _collabKey = 0;
+
+  function addCollab(id, email, display) {
+    const key = ++_collabKey;
+    const tag = document.createElement('span');
+    tag.style.cssText = 'display:inline-flex;align-items:center;gap:.2rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;padding:.15rem .5rem .15rem .65rem;font-size:.8rem';
+    tag.dataset.collabKey = key;
+    tag.innerHTML = `<span>${_esc(display)}</span><button type="button" style="background:none;border:none;cursor:pointer;font-size:1.1rem;line-height:1;color:#64748b;padding:0 .1rem" title="Remove">×</button>`;
+    tag.querySelector('button').addEventListener('click', () => {
+      tag.remove();
+      collabHiddens.querySelector(`[data-collab-key="${key}"]`)?.remove();
+    });
+    collabTags.appendChild(tag);
+
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.dataset.collabKey = key;
+    hidden.name = id ? 'collaboratorIds[]' : 'collaboratorEmails[]';
+    hidden.value = id || email;
+    collabHiddens.appendChild(hidden);
+  }
+
+  createAutocomplete(collabInput, {
+    fetchUrl: q => `/api/users/search?q=${encodeURIComponent(q)}`,
+    formatItem: item => {
+      const name = item.name ? `<strong>${item.name}</strong> ` : '';
+      const org  = item.org  ? ` <em style="color:#6b7280">[${item.org}]</em>` : '';
+      return `${name}(${item.email})${org}`;
+    },
+    onSelect: item => {
+      addCollab(item.id, item.email, item.name || item.email);
+      collabInput.value = '';
+    },
+  });
+
+  collabInput.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const val = collabInput.value.trim();
+    if (!val) return;
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+      e.preventDefault();
+      addCollab(null, val, val);
+      collabInput.value = '';
+    }
+  });
 });
 </script>
 

@@ -1,11 +1,14 @@
-<%- include('../partials/head', { title: 'Check your email' }) %>
+<% const _pageTitle = (tokenId && rawToken) ? 'Log in' : 'Check your email'; %>
+<%- include('../partials/head', { title: _pageTitle }) %>
 <main class="auth-page">
   <div class="auth-card">
     <div class="auth-logo"><%= siteName %></div>
-    <h1 class="auth-title">Check your email</h1>
+    <h1 class="auth-title"><%= _pageTitle %></h1>
 
     <% if (sent) { %>
       <p class="auth-subtitle">We sent a login link and 6-digit code to your email. Enter the code below or click the link in the email.</p>
+    <% } else if (tokenId && rawToken) { %>
+      <p class="auth-subtitle">Click the button below to complete your sign-in.</p>
     <% } %>
 
     <% if (error) { %>

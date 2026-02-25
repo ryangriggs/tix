@@ -240,6 +240,21 @@ router.post('/', upload.array('attachments'), async (req, res) => {
   const ticket = db.createTicket({ subject: subject.trim(), body: cleanBody, priority: priority || 'medium', dueDate, organizationId: orgId });
   db.addParty(ticket.id, req.user.id, 'submitter');
 
+  // Add collaborators specified at creation time
+  const collabIds    = [].concat(req.body['collaboratorIds[]']    || req.body.collaboratorIds    || []).filter(Boolean);
+  const collabEmails = [].concat(req.body['collaboratorEmails[]'] || req.body.collaboratorEmails || []).filter(Boolean);
+  for (const id of collabIds) {
+    const u = db.getUserById(parseInt(id, 10));
+    if (u && u.id !== req.user.id) db.addParty(ticket.id, u.id, 'collaborator');
+  }
+  for (const email of collabEmails) {
+    const e = email.trim().toLowerCase();
+    if (e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e !== req.user.email) {
+      const u = db.findOrCreateUser(e);
+      db.addParty(ticket.id, u.id, 'collaborator');
+    }
+  }
+
   saveUploadedFiles(req.files, ticket.id, null);
 
   // Notify the default assignee if different from creator
@@ -350,8 +365,18 @@ router.post('/:id/comments', upload.array('attachments'), async (req, res) => {
   const body = sanitize(req.body.body);
   if (!body.trim() && !req.files?.length) return res.redirect(`/tickets/${ticket.id}`);
 
+  // Optional status change submitted alongside the comment
+  const validStatuses = ['open', 'pending', 'on_hold', 'completed', 'cancelled'];
+  const statusChange = req.body.status_change;
+  const willChangeStatus = statusChange && validStatuses.includes(statusChange) &&
+                           statusChange !== ticket.status && canManage(ticket, req.user);
+
   const comment = db.addComment(ticket.id, req.user.id, body);
   saveUploadedFiles(req.files, ticket.id, comment.id);
+
+  if (willChangeStatus) {
+    db.updateTicket(ticket.id, { status: statusChange });
+  }
 
   try {
     await notifyParties(
@@ -365,6 +390,9 @@ router.post('/:id/comments', upload.array('attachments'), async (req, res) => {
   }
 
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'comment_added', ticketId: ticket.id, commentId: comment.id });
+  if (willChangeStatus) {
+    sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'status', value: statusChange });
+  }
 
   res.redirect(`/tickets/${ticket.id}#comment-${comment.id}`);
 });
