@@ -445,11 +445,15 @@ router.post('/:id/subject', async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
 
   const subject = (req.body.subject || '').trim();
-  if (!subject) return res.redirect(`/tickets/${ticket.id}`);
+  if (!subject) {
+    if (req.accepts('json')) return res.status(400).json({ error: 'Subject cannot be empty.' });
+    return res.redirect(`/tickets/${ticket.id}`);
+  }
 
   db.updateTicket(ticket.id, { subject });
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
 
+  if (req.accepts('json')) return res.json({ ok: true, subject });
   res.redirect(`/tickets/${ticket.id}`);
 });
 
@@ -475,6 +479,7 @@ router.post('/:id/status', async (req, res) => {
 
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'status', value: status });
 
+  if (req.accepts('json')) return res.json({ ok: true, status });
   res.redirect(`/tickets/${ticket.id}`);
 });
 
@@ -492,6 +497,7 @@ router.post('/:id/priority', async (req, res) => {
 
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'priority', value: priority });
 
+  if (req.accepts('json')) return res.json({ ok: true, priority });
   res.redirect(`/tickets/${ticket.id}`);
 });
 
@@ -506,6 +512,10 @@ router.post('/:id/due-date', (req, res) => {
 
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
 
+  if (req.accepts('json')) {
+    const formatted = dueDate ? new Date(dueDate * 1000).toLocaleDateString() : null;
+    return res.json({ ok: true, dueDate, formatted });
+  }
   res.redirect(`/tickets/${ticket.id}`);
 });
 
@@ -516,13 +526,15 @@ router.post('/:id/organization', (req, res) => {
   if (!canManage(ticket, req.user)) return res.status(403).json({ error: 'Forbidden' });
 
   const orgName = (req.body.organization_name || '').trim();
-  let orgId = null;
+  let orgId = null, resolvedOrgName = null;
   if (orgName) {
     const org = db.findOrCreateOrganization(orgName);
     orgId = org ? org.id : null;
+    resolvedOrgName = org ? org.name : null;
   }
   db.updateTicket(ticket.id, { organization_id: orgId });
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
+  if (req.accepts('json')) return res.json({ ok: true, orgName: resolvedOrgName });
   res.redirect(`/tickets/${ticket.id}`);
 });
 
@@ -562,6 +574,16 @@ router.post('/:id/parties', async (req, res) => {
 
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
 
+  if (req.accepts('json')) {
+    const full = db.getUserById(newUser.id); // ensure org name is included
+    return res.json({ ok: true, party: {
+      userId:  full.id,
+      name:    full.name    || null,
+      email:   full.email,
+      orgName: full.organization_name || null,
+      role,
+    }});
+  }
   res.redirect(`/tickets/${ticket.id}`);
 });
 
@@ -578,12 +600,14 @@ router.post('/:id/parties/remove', (req, res) => {
   const parties = db.getParties(ticket.id);
   const target = parties.find(p => p.user_id === userId);
   if (target?.role === 'submitter' && parties.filter(p => p.role === 'submitter').length === 1) {
+    if (req.accepts('json')) return res.status(400).json({ error: 'Cannot remove the only submitter.' });
     return res.redirect(`/tickets/${ticket.id}?error=cannot_remove_submitter`);
   }
 
   db.removeParty(ticket.id, userId);
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
 
+  if (req.accepts('json')) return res.json({ ok: true });
   res.redirect(`/tickets/${ticket.id}`);
 });
 

@@ -36,11 +36,8 @@
     <div class="ticket-meta-row">
       <span class="meta-item">Created <%= formatDateFull(ticket.created_at) %></span>
       <span class="meta-item">Updated <%= formatDate(ticket.updated_at) %></span>
-      <% if (ticket.due_date) { %>
-        <span class="meta-item <%= ticket.due_date < (Date.now()/1000) ? 'overdue' : '' %>">
-          Due <%= formatDateOnly(ticket.due_date) %>
-        </span>
-      <% } %>
+      <span id="due-date-meta" class="meta-item<%= ticket.due_date && ticket.due_date < (Date.now()/1000) ? ' overdue' : '' %>"
+            style="<%= ticket.due_date ? '' : 'display:none' %>">Due <span id="due-date-text"><%= formatDateOnly(ticket.due_date) %></span></span>
     </div>
   </div>
 
@@ -156,44 +153,31 @@
       <% if (canManage) { %>
         <div class="sidebar-section">
           <div class="sidebar-label">Status</div>
-          <form method="POST" action="/tickets/<%= ticket.id %>/status" id="status-form">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <input type="hidden" name="status" id="status-val">
-            <div class="pill-group">
-              <% for (const [sv, sl] of [['open','Open'],['pending','Pending'],['on_hold','On Hold'],['completed','Completed'],['cancelled','Cancelled']]) { %>
-                <button type="button"
-                  class="pill-btn pill-status-<%= sv %><%= ticket.status===sv ? ' pill-active' : '' %>"
-                  onclick="document.getElementById('status-val').value='<%= sv %>';document.getElementById('status-form').submit()">
-                  <%= sl %>
-                </button>
-              <% } %>
-            </div>
-          </form>
+          <div class="pill-group" id="status-pills">
+            <% for (const [sv, sl] of [['open','Open'],['pending','Pending'],['on_hold','On Hold'],['completed','Completed'],['cancelled','Cancelled']]) { %>
+              <button type="button"
+                class="pill-btn pill-status-<%= sv %><%= ticket.status===sv ? ' pill-active' : '' %>"
+                data-status="<%= sv %>"><%= sl %></button>
+            <% } %>
+          </div>
         </div>
 
         <!-- Priority -->
         <div class="sidebar-section">
           <div class="sidebar-label">Priority</div>
-          <form method="POST" action="/tickets/<%= ticket.id %>/priority" id="priority-form">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <input type="hidden" name="priority" id="priority-val">
-            <div class="pill-group">
-              <% for (const [pv, pl] of [['urgent','Urgent'],['high','High'],['medium','Medium'],['low','Low']]) { %>
-                <button type="button"
-                  class="pill-btn pill-priority-<%= pv %><%= ticket.priority===pv ? ' pill-active' : '' %>"
-                  onclick="document.getElementById('priority-val').value='<%= pv %>';document.getElementById('priority-form').submit()">
-                  <%= pl %>
-                </button>
-              <% } %>
-            </div>
-          </form>
+          <div class="pill-group" id="priority-pills">
+            <% for (const [pv, pl] of [['urgent','Urgent'],['high','High'],['medium','Medium'],['low','Low']]) { %>
+              <button type="button"
+                class="pill-btn pill-priority-<%= pv %><%= ticket.priority===pv ? ' pill-active' : '' %>"
+                data-priority="<%= pv %>"><%= pl %></button>
+            <% } %>
+          </div>
         </div>
 
         <!-- Due date -->
         <div class="sidebar-section">
           <div class="sidebar-label">Due date</div>
-          <form method="POST" action="/tickets/<%= ticket.id %>/due-date" class="inline-form">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <form id="due-date-form" class="inline-form">
             <input type="date" name="due_date" value="<%= formatDateInput(ticket.due_date) %>" class="form-input form-input-sm">
             <button type="submit" class="btn btn-sm btn-secondary">Set</button>
           </form>
@@ -219,8 +203,7 @@
       <div class="sidebar-section">
         <div class="sidebar-label">Organization</div>
         <% if (canManage) { %>
-          <form method="POST" action="/tickets/<%= ticket.id %>/organization" class="inline-form">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <form id="org-form" class="inline-form">
             <div style="position:relative">
               <input type="text" id="org-name-input" name="organization_name"
                      class="form-input form-input-sm"
@@ -237,9 +220,9 @@
       <!-- Parties -->
       <div class="sidebar-section">
         <div class="sidebar-label">People</div>
-        <ul class="party-list">
+        <ul class="party-list" id="party-list">
           <% for (const p of parties) { %>
-            <li class="party-item">
+            <li class="party-item" data-user-id="<%= p.user_id %>">
               <div class="party-info">
                 <% if (p.name) { %>
                   <span class="party-name"><%= p.name %></span>
@@ -251,11 +234,7 @@
               </div>
               <span class="badge badge-role"><%= p.role %></span>
               <% if (canManage && p.user_id !== user.id) { %>
-                <form method="POST" action="/tickets/<%= ticket.id %>/parties/remove" style="display:inline">
-                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                  <input type="hidden" name="userId" value="<%= p.user_id %>">
-                  <button type="submit" class="btn-icon" title="Remove">×</button>
-                </form>
+                <button type="button" class="btn-icon remove-party-btn" data-user-id="<%= p.user_id %>" title="Remove">×</button>
               <% } %>
             </li>
           <% } %>
@@ -264,8 +243,7 @@
         <% if (canManage) { %>
           <details class="add-party-details">
             <summary class="link-btn">+ Add person</summary>
-            <form method="POST" action="/tickets/<%= ticket.id %>/parties" class="add-party-form">
-              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <form id="add-party-form" class="add-party-form">
               <input type="hidden" name="userId" id="add-party-user-id" value="">
               <div style="position:relative">
                 <input type="text" id="add-party-input" name="email"
@@ -315,6 +293,7 @@
             key: 'Enter',
             ctrlKey: true,
             handler() {
+              _quillDirty = false;
               document.getElementById('comment-body').value = quill.root.innerHTML;
               document.getElementById('comment-form').submit();
             }
@@ -375,7 +354,7 @@ const _subjectInput  = document.getElementById('subject-input');
 const _subjectSave   = document.getElementById('subject-save');
 const _subjectCancel = document.getElementById('subject-cancel');
 if (_subjectInput) {
-  const _original = _subjectInput.value;
+  let _original = _subjectInput.value;
   const _setDirty = () => {
     const dirty = _subjectInput.value !== _original;
     _subjectSave.style.display   = dirty ? '' : 'none';
@@ -386,6 +365,24 @@ if (_subjectInput) {
   _subjectCancel.addEventListener('click', () => {
     _subjectInput.value = _original;
     _setDirty();
+  });
+
+  document.getElementById('subject-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const subject = _subjectInput.value.trim();
+    if (!subject || subject === _original) { _subjectCancel.click(); return; }
+    try {
+      const res = await fetch(`/tickets/<%= ticket.id %>/subject`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+        body:    new URLSearchParams({ _csrf: '<%= csrfToken %>', subject }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Failed');
+      _original = subject;
+      _setDirty(); // hides Save/Cancel, clears dirty flag
+      document.title = `#<%= formatTicketId(ticket.id) %> \u2014 ${subject}`;
+    } catch (err) { alert('Could not save title: ' + err.message); }
   });
 }
 
@@ -434,6 +431,155 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 });
+</script>
+
+<script>
+// ============================================================
+// Sidebar AJAX actions — no page reload for sidebar changes
+// ============================================================
+(function() {
+  const TICKET_ID = '<%= ticket.id %>';
+  const CSRF      = '<%= csrfToken %>';
+  const CAN_MANAGE     = <%= canManage ? 'true' : 'false' %>;
+  const CURRENT_USER_ID = <%= user.id %>;
+
+  async function sidebarPost(path, data) {
+    const body = new URLSearchParams({ _csrf: CSRF, ...data });
+    const res = await fetch(path, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+      body:    body.toString(),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || `Request failed (${res.status})`);
+    return json;
+  }
+
+  function flashBtn(btn, ok) {
+    const orig = btn.textContent;
+    btn.textContent = ok ? '✓' : '✗';
+    setTimeout(() => { btn.textContent = orig; }, 1200);
+  }
+
+  // --- Status pills ---
+  document.querySelectorAll('#status-pills .pill-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const sv = btn.dataset.status;
+      try {
+        await sidebarPost(`/tickets/${TICKET_ID}/status`, { status: sv });
+        document.querySelectorAll('#status-pills .pill-btn').forEach(b => b.classList.remove('pill-active'));
+        btn.classList.add('pill-active');
+        const badge = document.getElementById('badge-status');
+        if (badge) { badge.className = `badge badge-status-${sv}`; badge.textContent = sv.replace(/_/g, ' '); }
+      } catch (err) { alert('Could not update status: ' + err.message); }
+    });
+  });
+
+  // --- Priority pills ---
+  document.querySelectorAll('#priority-pills .pill-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const pv = btn.dataset.priority;
+      try {
+        await sidebarPost(`/tickets/${TICKET_ID}/priority`, { priority: pv });
+        document.querySelectorAll('#priority-pills .pill-btn').forEach(b => b.classList.remove('pill-active'));
+        btn.classList.add('pill-active');
+        const badge = document.getElementById('badge-priority');
+        if (badge) { badge.className = `badge badge-priority-${pv}`; badge.textContent = pv; }
+      } catch (err) { alert('Could not update priority: ' + err.message); }
+    });
+  });
+
+  // --- Due date form ---
+  const dueDateForm = document.getElementById('due-date-form');
+  if (dueDateForm) {
+    dueDateForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const input = dueDateForm.querySelector('[name="due_date"]');
+      const setBtn = dueDateForm.querySelector('[type="submit"]');
+      try {
+        const data = await sidebarPost(`/tickets/${TICKET_ID}/due-date`, { due_date: input.value });
+        const meta = document.getElementById('due-date-meta');
+        if (data.formatted) {
+          document.getElementById('due-date-text').textContent = data.formatted;
+          const overdue = data.dueDate && data.dueDate < Math.floor(Date.now() / 1000);
+          meta.className = 'meta-item' + (overdue ? ' overdue' : '');
+          meta.style.display = '';
+        } else {
+          meta.style.display = 'none';
+        }
+        flashBtn(setBtn, true);
+      } catch (err) { alert('Could not update due date: ' + err.message); }
+    });
+  }
+
+  // --- Organization form ---
+  const orgForm = document.getElementById('org-form');
+  if (orgForm) {
+    orgForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const input = orgForm.querySelector('[name="organization_name"]');
+      const setBtn = orgForm.querySelector('[type="submit"]');
+      try {
+        const data = await sidebarPost(`/tickets/${TICKET_ID}/organization`, { organization_name: input.value });
+        if (data.orgName) input.value = data.orgName; // normalise capitalisation
+        flashBtn(setBtn, true);
+      } catch (err) { alert('Could not update organization: ' + err.message); }
+    });
+  }
+
+  // --- Remove party ---
+  function _esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function renderPartyItem(p) {
+    const nameHtml = p.name
+      ? `<span class="party-name">${_esc(p.name)}</span><a href="mailto:${_esc(p.email)}" class="party-email-link">${_esc(p.email)}</a>`
+      : `<span class="party-name">${_esc(p.email)}</span>`;
+    const orgHtml    = p.orgName ? `<span class="party-org">[${_esc(p.orgName)}]</span>` : '';
+    const removeHtml = CAN_MANAGE && p.userId !== CURRENT_USER_ID
+      ? `<button type="button" class="btn-icon remove-party-btn" data-user-id="${p.userId}" title="Remove">×</button>`
+      : '';
+    return `<li class="party-item" data-user-id="${p.userId}">
+      <div class="party-info">${nameHtml}${orgHtml}</div>
+      <span class="badge badge-role">${_esc(p.role)}</span>
+      ${removeHtml}
+    </li>`;
+  }
+
+  function bindRemoveBtn(btn) {
+    btn.addEventListener('click', async () => {
+      const userId = btn.dataset.userId;
+      try {
+        await sidebarPost(`/tickets/${TICKET_ID}/parties/remove`, { userId });
+        document.querySelector(`#party-list [data-user-id="${userId}"]`)?.remove();
+      } catch (err) { alert('Could not remove person: ' + err.message); }
+    });
+  }
+  document.querySelectorAll('.remove-party-btn').forEach(bindRemoveBtn);
+
+  // --- Add party form ---
+  const addPartyForm = document.getElementById('add-party-form');
+  if (addPartyForm) {
+    addPartyForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const emailInput  = addPartyForm.querySelector('[name="email"]');
+      const userIdInput = document.getElementById('add-party-user-id');
+      const roleSelect  = addPartyForm.querySelector('[name="role"]');
+      try {
+        const data = await sidebarPost(`/tickets/${TICKET_ID}/parties`, {
+          userId: userIdInput.value || '',
+          email:  emailInput.value  || '',
+          role:   roleSelect.value,
+        });
+        const list = document.getElementById('party-list');
+        list.insertAdjacentHTML('beforeend', renderPartyItem(data.party));
+        bindRemoveBtn(list.lastElementChild.querySelector('.remove-party-btn'));
+        emailInput.value  = '';
+        userIdInput.value = '';
+        addPartyForm.closest('details').open = false;
+      } catch (err) { alert('Could not add person: ' + err.message); }
+    });
+  }
+})();
 </script>
 
 <script>
