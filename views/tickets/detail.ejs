@@ -7,9 +7,10 @@
 
 <main class="container">
 
-  <!-- Back link -->
-  <div style="margin-bottom:1rem">
-    <a href="/tickets" class="btn btn-ghost btn-sm">← All Tickets</a>
+  <!-- Back link + New Ticket -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <a href="/tickets" class="btn btn-ghost btn-sm nav-guard">← All Tickets</a>
+    <a href="/tickets/new" class="btn btn-primary btn-sm nav-guard">+ New Ticket</a>
   </div>
 
   <!-- Ticket header -->
@@ -325,10 +326,47 @@
 
   document.getElementById('comment-form').addEventListener('submit', () => {
     document.getElementById('comment-body').value = quill.root.innerHTML;
+    _quillDirty = false; // submitting — no need to warn
   });
 
   // Focus the editor on load — desktop only (mobile focus triggers keyboard)
   if (!('ontouchstart' in window || navigator.maxTouchPoints > 0)) quill.focus();
+
+  // Track whether the Quill editor has unsaved content
+  let _quillDirty = false;
+  quill.on('text-change', () => {
+    _quillDirty = quill.getText().trim().length > 0;
+  });
+
+  // Warn before leaving the page if there are unsaved changes
+  function _hasUnsavedChanges() {
+    if (_quillDirty) return true;
+    const subj = document.getElementById('subject-input');
+    if (subj && subj.dataset.dirty === 'true') return true;
+    return false;
+  }
+
+  window.addEventListener('beforeunload', e => {
+    if (_hasUnsavedChanges()) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+
+  // Intercept nav-guard links so they show a friendly confirm dialog
+  document.querySelectorAll('a.nav-guard').forEach(a => {
+    a.addEventListener('click', e => {
+      if (_hasUnsavedChanges()) {
+        e.preventDefault();
+        if (confirm('You have unsaved changes. Leave anyway?')) {
+          _quillDirty = false; // suppress beforeunload
+          const subj = document.getElementById('subject-input');
+          if (subj) subj.dataset.dirty = '';
+          window.location.href = a.href;
+        }
+      }
+    });
+  });
 
 </script>
 <script>
@@ -342,6 +380,7 @@ if (_subjectInput) {
     const dirty = _subjectInput.value !== _original;
     _subjectSave.style.display   = dirty ? '' : 'none';
     _subjectCancel.style.display = dirty ? '' : 'none';
+    _subjectInput.dataset.dirty  = dirty ? 'true' : '';
   };
   _subjectInput.addEventListener('input', _setDirty);
   _subjectCancel.addEventListener('click', () => {
