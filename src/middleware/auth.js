@@ -50,7 +50,7 @@ function requireAuth(req, res, next) {
     }
     req.user = user;
     req.user.isGroupSuperuser = !!user.is_group_superuser;
-    req.user.techOrgIds = user.role === 'technician'
+    req.user.techOrgIds = (user.role === 'technician' || user.is_group_superuser)
       ? getTechnicianOrganizations(user.id).map(o => o.id)
       : [];
     res.locals.user = user;

@@ -37,6 +37,7 @@ const config = {
 
   dataDir: process.env.DATA_DIR || '/app/data',
   uploadsDir: process.env.UPLOADS_DIR || '/app/data/uploads',
+  emailLog: process.env.EMAIL_LOG || '',
 
   mailgun: {
     apiKey: process.env.MAILGUN_API_KEY || '',

@@ -509,8 +509,10 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
     conditions.push(`(t.organization_id IN (${ph}) OR EXISTS (SELECT 1 FROM ticket_parties tp2 WHERE tp2.ticket_id = t.id AND tp2.user_id = ?))`);
     params.push(...userTechOrgIds, userId);
   } else if (userIsSuperuser && userOrgId) {
-    conditions.push(`(t.organization_id = ? OR EXISTS (SELECT 1 FROM ticket_parties tp2 WHERE tp2.ticket_id = t.id AND tp2.user_id = ?))`);
-    params.push(userOrgId, userId);
+    const allOrgIds = [userOrgId, ...userTechOrgIds.filter(id => id !== userOrgId)];
+    const ph = allOrgIds.map(() => '?').join(',');
+    conditions.push(`(t.organization_id IN (${ph}) OR EXISTS (SELECT 1 FROM ticket_parties tp2 WHERE tp2.ticket_id = t.id AND tp2.user_id = ?))`);
+    params.push(...allOrgIds, userId);
   } else {
     query += ' JOIN ticket_parties tp ON t.id = tp.ticket_id';
     conditions.push('tp.user_id = ?');

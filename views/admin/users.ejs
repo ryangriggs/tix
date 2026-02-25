@@ -98,7 +98,7 @@
 
       <div class="form-group" id="dialog-superuser-row">
         <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:normal">
-          <input type="checkbox" id="dialog-superuser" name="is_group_superuser" value="1">
+          <input type="checkbox" id="dialog-superuser" name="is_group_superuser" value="1" onchange="updateDialogSections()">
           <span>Group Superuser — can view all tickets in their organization</span>
         </label>
       </div>
@@ -111,10 +111,10 @@
       </div>
     </form>
 
-    <!-- Tech Orgs section (technicians only) -->
+    <!-- Additional orgs section (technicians + superusers) -->
     <div id="dialog-tech-orgs" style="display:none">
       <hr class="dialog-section-divider">
-      <div class="sidebar-label" style="margin-bottom:.5rem">Assigned Organizations</div>
+      <div class="sidebar-label" style="margin-bottom:.5rem" id="dialog-tech-orgs-label">Additional Organizations</div>
       <div id="dialog-tech-orgs-list" style="display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.5rem"></div>
       <div class="inline-form">
         <div style="position:relative;flex:1">
@@ -178,17 +178,22 @@ function openEditDialog(btn) {
 
   updateDialogSections();
 
-  if (d.userRole === 'technician') loadTechOrgs();
-
   document.getElementById('edit-user-dialog').showModal();
 }
 
 function updateDialogSections() {
   const role = document.getElementById('dialog-role').value;
+  const isSuperuser = document.getElementById('dialog-superuser').checked;
   document.getElementById('dialog-superuser-row').style.display = role === 'user' ? '' : 'none';
+
+  const showOrgSection = role === 'technician' || (role === 'user' && isSuperuser);
   const techSection = document.getElementById('dialog-tech-orgs');
-  techSection.style.display = role === 'technician' ? '' : 'none';
-  if (role === 'technician' && _dialogUserId) loadTechOrgs();
+  techSection.style.display = showOrgSection ? '' : 'none';
+
+  const label = document.getElementById('dialog-tech-orgs-label');
+  label.textContent = role === 'technician' ? 'Assigned Organizations' : 'Additional Organizations';
+
+  if (showOrgSection && _dialogUserId) loadTechOrgs();
 }
 
 async function loadTechOrgs() {

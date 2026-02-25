@@ -1,9 +1,24 @@
 'use strict';
 
+const fs        = require('fs');
 const path      = require('path');
 const ejs       = require('ejs');
 const nodemailer = require('nodemailer');
 const config = require('../config');
+
+function logEmail(to, subject, error = null) {
+  if (!config.emailLog) return;
+  const ts = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const recipient = Array.isArray(to) ? to.join(', ') : to;
+  const line = error
+    ? `${ts} | [ERROR] ${recipient} | ${subject} | ${error}\n`
+    : `${ts} | ${recipient} | ${subject}\n`;
+  try {
+    fs.appendFileSync(config.emailLog, line, 'utf8');
+  } catch (err) {
+    console.error('[Mail] Failed to write email log:', err.message);
+  }
+}
 
 const TEMPLATE_DIR = path.join(__dirname, '../../views/emails');
 
@@ -114,26 +129,30 @@ async function send({ to, subject, html, text, messageId, inReplyTo, references,
   const from = `${config.mailFromName} <${config.ticketEmail}>`;
   const transport = getTransport();
 
-  if (config.mailTransport === 'mailgun') {
-    // Mailgun REST wrapper expects flat options; headers are passed as h:* keys
-    await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references, replyTo });
-  } else if (config.mailTransport === 'gmail') {
-    // Gmail transport handles all headers internally via raw RFC 2822 message
-    await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references, replyTo });
-  } else {
-    // nodemailer SMTP relay
-    await transport.sendMail({
-      from, to, subject, html, text,
-      messageId,
-      replyTo,
-      headers: {
-        'Auto-Submitted':           'auto-generated',
-        'Precedence':               'bulk',
-        'X-Auto-Response-Suppress': 'All',
-        ...(inReplyTo  && { 'In-Reply-To': inReplyTo }),
-        ...(references && { References: references }),
-      },
-    });
+  try {
+    if (config.mailTransport === 'mailgun') {
+      await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references, replyTo });
+    } else if (config.mailTransport === 'gmail') {
+      await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references, replyTo });
+    } else {
+      // nodemailer SMTP relay
+      await transport.sendMail({
+        from, to, subject, html, text,
+        messageId,
+        replyTo,
+        headers: {
+          'Auto-Submitted':           'auto-generated',
+          'Precedence':               'bulk',
+          'X-Auto-Response-Suppress': 'All',
+          ...(inReplyTo  && { 'In-Reply-To': inReplyTo }),
+          ...(references && { References: references }),
+        },
+      });
+    }
+    logEmail(to, subject);
+  } catch (err) {
+    logEmail(to, subject, err.message || String(err));
+    throw err;
   }
 }
 

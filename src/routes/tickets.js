@@ -58,8 +58,10 @@ function getTicketAccess(ticket, user) {
   if (user.role === 'admin') return 'admin';
   if (user.role === 'technician' && ticket.organization_id &&
       (user.techOrgIds || []).includes(ticket.organization_id)) return 'technician';
-  if (user.isGroupSuperuser && user.organization_id &&
-      ticket.organization_id === user.organization_id) return 'superuser';
+  if (user.isGroupSuperuser && user.organization_id && (
+      ticket.organization_id === user.organization_id ||
+      (user.techOrgIds || []).includes(ticket.organization_id)
+  )) return 'superuser';
   return db.getUserTicketRole(ticket.id, user.id); // 'submitter'|'owner'|'collaborator'|null
 }
 
