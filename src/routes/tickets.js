@@ -451,7 +451,7 @@ router.post('/:id/subject', async (req, res) => {
   }
 
   db.updateTicket(ticket.id, { subject });
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
+  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'subject', value: subject });
 
   if (req.accepts('json')) return res.json({ ok: true, subject });
   res.redirect(`/tickets/${ticket.id}`);
@@ -510,7 +510,7 @@ router.post('/:id/due-date', (req, res) => {
   const dueDate = req.body.due_date ? Math.floor(new Date(req.body.due_date).getTime() / 1000) : null;
   db.updateTicket(ticket.id, { due_date: dueDate });
 
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
+  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'due_date', value: dueDate });
 
   if (req.accepts('json')) {
     const formatted = dueDate ? new Date(dueDate * 1000).toLocaleDateString() : null;
@@ -533,7 +533,7 @@ router.post('/:id/organization', (req, res) => {
     resolvedOrgName = org ? org.name : null;
   }
   db.updateTicket(ticket.id, { organization_id: orgId });
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
+  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'org', value: resolvedOrgName });
   if (req.accepts('json')) return res.json({ ok: true, orgName: resolvedOrgName });
   res.redirect(`/tickets/${ticket.id}`);
 });
@@ -558,13 +558,13 @@ router.post('/:id/parties', async (req, res) => {
     }
     newUser = db.findOrCreateUser(email);
   }
-  const email = newUser.email;
-  db.addParty(ticket.id, newUser.id, role);
+  const full = db.getUserById(newUser.id); // includes organization_name via JOIN
+  db.addParty(ticket.id, full.id, role);
 
   // Notify the newly added party
   try {
     await sendTicketNotification({
-      to: email,
+      to: full.email,
       ticketSubject: ticket.subject,
       body: `<p>You have been added to ticket <strong>#${ticket.id}: ${ticket.subject}</strong> as a ${role}.</p>
              <p><a href="${config.appUrl}/tickets/${ticket.id}">View ticket</a></p>`,
@@ -572,18 +572,10 @@ router.post('/:id/parties', async (req, res) => {
     });
   } catch (err) { console.error('[Tickets] Notification error:', err); }
 
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
+  const partyPayload = { userId: full.id, name: full.name || null, email: full.email, orgName: full.organization_name || null, role };
+  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'party_added', party: partyPayload });
 
-  if (req.accepts('json')) {
-    const full = db.getUserById(newUser.id); // ensure org name is included
-    return res.json({ ok: true, party: {
-      userId:  full.id,
-      name:    full.name    || null,
-      email:   full.email,
-      orgName: full.organization_name || null,
-      role,
-    }});
-  }
+  if (req.accepts('json')) return res.json({ ok: true, party: partyPayload });
   res.redirect(`/tickets/${ticket.id}`);
 });
 
@@ -605,7 +597,7 @@ router.post('/:id/parties/remove', (req, res) => {
   }
 
   db.removeParty(ticket.id, userId);
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
+  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'party_removed', userId });
 
   if (req.accepts('json')) return res.json({ ok: true });
   res.redirect(`/tickets/${ticket.id}`);

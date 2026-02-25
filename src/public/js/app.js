@@ -51,13 +51,74 @@
     }
 
     if (event.type === 'ticket_updated' && path === `/tickets/${event.ticketId}`) {
-      // Status/priority changed — reload the page to reflect sidebar changes
-      // (lightweight: only reload if the user isn't mid-typing)
-      const editor = document.getElementById('comment-editor');
-      if (!editor || editor.textContent.trim() === '') {
-        window.location.reload();
-      } else {
-        showBanner('This ticket was updated. Refresh to see the latest.');
+      const f  = event.field;
+      const _e = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+      if (f === 'status' && event.value) {
+        const sv = event.value;
+        document.querySelectorAll('#status-pills .pill-btn').forEach(b =>
+          b.classList.toggle('pill-active', b.dataset.status === sv));
+        const badge = document.getElementById('badge-status');
+        if (badge) { badge.className = `badge badge-status-${sv}`; badge.textContent = sv.replace(/_/g, ' '); }
+
+      } else if (f === 'priority' && event.value) {
+        const pv = event.value;
+        document.querySelectorAll('#priority-pills .pill-btn').forEach(b =>
+          b.classList.toggle('pill-active', b.dataset.priority === pv));
+        const badge = document.getElementById('badge-priority');
+        if (badge) { badge.className = `badge badge-priority-${pv}`; badge.textContent = pv; }
+
+      } else if (f === 'subject' && event.value) {
+        document.title = document.title.replace(/—.*/, `\u2014 ${event.value}`);
+        const input = document.getElementById('subject-input');
+        // Don't clobber an in-progress edit
+        if (input && input.dataset.dirty !== 'true') input.value = event.value;
+        const h1 = document.querySelector('.ticket-title');
+        if (h1) h1.textContent = event.value;
+
+      } else if (f === 'due_date') {
+        const meta = document.getElementById('due-date-meta');
+        if (meta) {
+          if (event.value) {
+            const formatted = new Date(event.value * 1000).toLocaleDateString();
+            document.getElementById('due-date-text').textContent = formatted;
+            const overdue = event.value < Math.floor(Date.now() / 1000);
+            meta.className = 'meta-item' + (overdue ? ' overdue' : '');
+            meta.style.display = '';
+            const dateInput = document.querySelector('#due-date-form [name="due_date"]');
+            if (dateInput) dateInput.value = new Date(event.value * 1000).toISOString().slice(0, 10);
+          } else {
+            meta.style.display = 'none';
+          }
+        }
+
+      } else if (f === 'org') {
+        const input = document.getElementById('org-name-input');
+        if (input) input.value = event.value || '';
+
+      } else if (f === 'party_added' && event.party) {
+        const list = document.getElementById('party-list');
+        if (list && !list.querySelector(`[data-user-id="${event.party.userId}"]`)) {
+          const canManage     = list.dataset.canManage === 'true';
+          const currentUserId = parseInt(list.dataset.currentUserId || '0', 10);
+          const p = event.party;
+          const nameHtml = p.name
+            ? `<span class="party-name">${_e(p.name)}</span><a href="mailto:${_e(p.email)}" class="party-email-link">${_e(p.email)}</a>`
+            : `<span class="party-name">${_e(p.email)}</span>`;
+          const orgHtml    = p.orgName ? `<span class="party-org">[${_e(p.orgName)}]</span>` : '';
+          const removeHtml = canManage && p.userId !== currentUserId
+            ? `<button type="button" class="btn-icon remove-party-btn" data-user-id="${p.userId}" title="Remove">×</button>`
+            : '';
+          list.insertAdjacentHTML('beforeend',
+            `<li class="party-item" data-user-id="${p.userId}">
+               <div class="party-info">${nameHtml}${orgHtml}</div>
+               <span class="badge badge-role">${_e(p.role)}</span>
+               ${removeHtml}
+             </li>`);
+        }
+
+      } else if (f === 'party_removed' && event.userId) {
+        document.querySelector(`#party-list [data-user-id="${event.userId}"]`)?.remove();
       }
     }
   }

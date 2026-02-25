@@ -21,7 +21,7 @@
       <span class="badge badge-status-<%= ticket.status %>" id="badge-status"><%= ticket.status.replace('_',' ') %></span>
     </div>
     <% if (user && user.role === 'admin') { %>
-      <form method="POST" action="/tickets/<%= ticket.id %>/subject" id="subject-form" style="display:flex;align-items:center;gap:.5rem;margin:.25rem 0">
+      <form id="subject-form" style="display:flex;align-items:center;gap:.5rem;margin:.25rem 0">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input type="text" name="subject" id="subject-input"
                value="<%= ticket.subject %>"
@@ -220,7 +220,10 @@
       <!-- Parties -->
       <div class="sidebar-section">
         <div class="sidebar-label">People</div>
-        <ul class="party-list" id="party-list">
+        <ul class="party-list" id="party-list"
+            data-can-manage="<%= canManage ? 'true' : 'false' %>"
+            data-current-user-id="<%= user.id %>"
+            data-ticket-id="<%= ticket.id %>">
           <% for (const p of parties) { %>
             <li class="party-item" data-user-id="<%= p.user_id %>">
               <div class="party-info">
@@ -527,7 +530,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // --- Remove party ---
+  // --- Party list helpers ---
   function _esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   function renderPartyItem(p) {
@@ -545,16 +548,16 @@ document.addEventListener('DOMContentLoaded', () => {
     </li>`;
   }
 
-  function bindRemoveBtn(btn) {
-    btn.addEventListener('click', async () => {
-      const userId = btn.dataset.userId;
-      try {
-        await sidebarPost(`/tickets/${TICKET_ID}/parties/remove`, { userId });
-        document.querySelector(`#party-list [data-user-id="${userId}"]`)?.remove();
-      } catch (err) { alert('Could not remove person: ' + err.message); }
-    });
-  }
-  document.querySelectorAll('.remove-party-btn').forEach(bindRemoveBtn);
+  // Delegated remove listener — handles both server-rendered and dynamically added rows
+  document.getElementById('party-list')?.addEventListener('click', async e => {
+    const btn = e.target.closest('.remove-party-btn');
+    if (!btn) return;
+    const userId = btn.dataset.userId;
+    try {
+      await sidebarPost(`/tickets/${TICKET_ID}/parties/remove`, { userId });
+      document.querySelector(`#party-list [data-user-id="${userId}"]`)?.remove();
+    } catch (err) { alert('Could not remove person: ' + err.message); }
+  });
 
   // --- Add party form ---
   const addPartyForm = document.getElementById('add-party-form');
@@ -571,8 +574,8 @@ document.addEventListener('DOMContentLoaded', () => {
           role:   roleSelect.value,
         });
         const list = document.getElementById('party-list');
-        list.insertAdjacentHTML('beforeend', renderPartyItem(data.party));
-        bindRemoveBtn(list.lastElementChild.querySelector('.remove-party-btn'));
+        if (!list.querySelector(`[data-user-id="${data.party.userId}"]`))
+          list.insertAdjacentHTML('beforeend', renderPartyItem(data.party));
         emailInput.value  = '';
         userIdInput.value = '';
         addPartyForm.closest('details').open = false;
