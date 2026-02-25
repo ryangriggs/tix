@@ -32,12 +32,19 @@
       <input type="hidden" name="sort"  value="<%= filters.sort %>">
       <input type="hidden" name="order" value="<%= filters.order %>">
 
-      <select name="since" class="form-select" onchange="this.form.submit()">
-        <option value="1d"  <%= filters.since==='1d'  ? 'selected' : '' %>>Last 24 h</option>
-        <option value="7d"  <%= filters.since==='7d'  ? 'selected' : '' %>>Last 7 days</option>
-        <option value="30d" <%= filters.since==='30d' ? 'selected' : '' %>>Last 30 days</option>
-        <option value=""    <%= filters.since===''    ? 'selected' : '' %>>All time</option>
+      <select name="since" class="form-select" id="since-select" onchange="onSinceChange(this)">
+        <option value="1d"     <%= filters.since==='1d'     ? 'selected' : '' %>>Last 24 h</option>
+        <option value="7d"     <%= filters.since==='7d'     ? 'selected' : '' %>>Last 7 days</option>
+        <option value="30d"    <%= filters.since==='30d'    ? 'selected' : '' %>>Last 30 days</option>
+        <option value=""       <%= filters.since===''       ? 'selected' : '' %>>All time</option>
+        <option value="custom" <%= filters.since==='custom' ? 'selected' : '' %>>Custom range…</option>
       </select>
+      <div id="custom-range" style="display:<%= filters.since==='custom' ? 'flex' : 'none' %>;align-items:center;gap:.35rem;flex-wrap:wrap">
+        <input type="date" name="date_from" value="<%= filters.date_from %>" class="form-input form-input-sm" style="width:auto" title="From">
+        <span style="color:var(--text-muted);font-size:.8rem">to</span>
+        <input type="date" name="date_to"   value="<%= filters.date_to %>"   class="form-input form-input-sm" style="width:auto" title="To">
+        <button type="submit" class="btn btn-sm btn-secondary">Go</button>
+      </div>
 
       <% if (organizations && organizations.length) { %>
         <select name="org" class="form-select" onchange="this.form.submit()">
@@ -140,6 +147,16 @@
 <button class="scroll-top-btn" id="scroll-top-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top" aria-label="Back to top">↑</button>
 
 <script>
+function onSinceChange(sel) {
+  const custom = document.getElementById('custom-range');
+  if (sel.value === 'custom') {
+    custom.style.display = 'flex';
+  } else {
+    custom.style.display = 'none';
+    sel.form.submit();
+  }
+}
+
 function setFilter(key, value) {
   const form = document.getElementById('filter-form');
   form.querySelector(`[name="${key}"]`).value = value;

@@ -463,7 +463,7 @@ function updateTicket(id, fields) {
 
 function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgIds = [],
                       status, priority, sort = 'updated_at', order = 'desc', search = '',
-                      dateFrom = null, orgFilter = null, idSearch = null }) {
+                      dateFrom = null, dateTo = null, orgFilter = null, idSearch = null }) {
   const validSorts = {
     created_at:    't.created_at',
     updated_at:    't.updated_at',
@@ -521,6 +521,7 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
   if (status)    { conditions.push('t.status = ?');          params.push(status); }
   if (priority)  { conditions.push('t.priority = ?');        params.push(priority); }
   if (dateFrom)  { conditions.push('t.updated_at >= ?');     params.push(dateFrom); }
+  if (dateTo)    { conditions.push('t.updated_at <= ?');     params.push(dateTo); }
   if (idSearch)  { conditions.push('t.id = ?');              params.push(idSearch); }
   if (search && !idSearch) {
     // Build an FTS4 MATCH query: each whitespace-delimited token becomes a prefix search.

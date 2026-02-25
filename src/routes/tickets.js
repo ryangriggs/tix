@@ -135,7 +135,7 @@ router.get('/', (req, res) => {
     return res.redirect(`/tickets?${qs}`);
   }
 
-  const { status, priority, sort, order, q, since, org } = req.query;
+  const { status, priority, sort, order, q, since, org, date_from, date_to } = req.query;
 
   // Strip ticket prefix from search term; if remainder is a plain integer treat as ID lookup
   const prefix = config.ticketPrefix;
@@ -149,18 +149,29 @@ router.get('/', (req, res) => {
     search = '';
   }
 
-  // Persist filter choices (not the search query)
+  // Persist filter choices (not the search query).
+  // Use 'in' check so that an explicit empty string (e.g. since='') is saved correctly.
   db.setUserPrefs(req.user.id, {
-    status:   status   || '',
-    priority: priority || '',
-    sort:     sort     || DEFAULT_PREFS.sort,
-    order:    order    || DEFAULT_PREFS.order,
-    since:    since    || DEFAULT_PREFS.since,
-    org:      org      || '',
+    status:    'status'   in req.query ? (status   || '') : DEFAULT_PREFS.status,
+    priority:  'priority' in req.query ? (priority || '') : DEFAULT_PREFS.priority,
+    sort:      sort     || DEFAULT_PREFS.sort,
+    order:     order    || DEFAULT_PREFS.order,
+    since:     'since'  in req.query ? (since ?? '') : DEFAULT_PREFS.since,
+    org:       org      || '',
+    date_from: date_from || '',
+    date_to:   date_to   || '',
   });
 
-  const sinceSeconds = SINCE_SECONDS[since];
-  const dateFrom = sinceSeconds ? Math.floor(Date.now() / 1000) - sinceSeconds : null;
+  // Compute date window
+  let dateFrom = null;
+  let dateTo   = null;
+  if (since === 'custom') {
+    if (date_from) dateFrom = Math.floor(new Date(date_from).getTime() / 1000);
+    if (date_to)   dateTo   = Math.floor(new Date(date_to).getTime()   / 1000) + 86399; // end of day
+  } else {
+    const sinceSeconds = SINCE_SECONDS[since];
+    if (sinceSeconds) dateFrom = Math.floor(Date.now() / 1000) - sinceSeconds;
+  }
 
   const tickets = db.getTickets({
     userId:          req.user.id,
@@ -175,6 +186,7 @@ router.get('/', (req, res) => {
     search,
     idSearch,
     dateFrom,
+    dateTo,
     orgFilter:       org ? parseInt(org, 10) : null,
   });
 
@@ -187,13 +199,15 @@ router.get('/', (req, res) => {
     tickets,
     organizations,
     filters: {
-      status:   status   || '',
-      priority: priority || '',
-      sort:     sort     || DEFAULT_PREFS.sort,
-      order:    order    || DEFAULT_PREFS.order,
-      q:        q        || '',
-      since:    since    || DEFAULT_PREFS.since,
-      org:      org      || '',
+      status:    status    || '',
+      priority:  priority  || '',
+      sort:      sort      || DEFAULT_PREFS.sort,
+      order:     order     || DEFAULT_PREFS.order,
+      q:         q         || '',
+      since:     'since' in req.query ? (since ?? '') : DEFAULT_PREFS.since,
+      org:       org       || '',
+      date_from: date_from || '',
+      date_to:   date_to   || '',
     },
   });
 });
