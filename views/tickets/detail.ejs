@@ -37,7 +37,7 @@
       <span class="meta-item">Updated <%= formatDate(ticket.updated_at) %></span>
       <% if (ticket.due_date) { %>
         <span class="meta-item <%= ticket.due_date < (Date.now()/1000) ? 'overdue' : '' %>">
-          Due <%= formatDateFull(ticket.due_date) %>
+          Due <%= formatDateOnly(ticket.due_date) %>
         </span>
       <% } %>
     </div>
@@ -176,7 +176,7 @@
         <% if (ticket.due_date) { %>
           <div class="sidebar-section">
             <div class="sidebar-label">Due date</div>
-            <span class="<%= ticket.due_date < (Date.now()/1000) ? 'overdue' : '' %>"><%= formatDateFull(ticket.due_date) %></span>
+            <span class="<%= ticket.due_date < (Date.now()/1000) ? 'overdue' : '' %>"><%= formatDateOnly(ticket.due_date) %></span>
           </div>
         <% } %>
       <% } %>
@@ -242,7 +242,7 @@
                 <option value="collaborator">Collaborator</option>
                 <option value="owner">Owner</option>
               </select>
-              <button type="submit" class="btn btn-sm btn-secondary">Add</button>
+              <button type="submit" class="btn btn-sm btn-primary">Add</button>
             </form>
           </details>
         <% } %>
@@ -293,6 +293,9 @@
   document.getElementById('comment-form').addEventListener('submit', () => {
     document.getElementById('comment-body').value = quill.root.innerHTML;
   });
+
+  // Focus the editor on load
+  quill.focus();
 
 </script>
 <script>
@@ -348,6 +351,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('add-party-user-id').value = '';
       }
     });
+
+    // Auto-focus the input when the Add Person details panel opens
+    const addPartyDetails = document.querySelector('.add-party-details');
+    if (addPartyDetails) {
+      addPartyDetails.addEventListener('toggle', () => {
+        if (addPartyDetails.open) setTimeout(() => addPartyInput.focus(), 50);
+      });
+    }
   }
 });
 </script>

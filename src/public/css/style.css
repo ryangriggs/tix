@@ -274,16 +274,16 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
   white-space: nowrap;
 }
 
-.badge-priority-low    { background: #dcfce7; color: #15803d; }
-.badge-priority-medium { background: #fef9c3; color: #a16207; }
-.badge-priority-high   { background: #ffedd5; color: #c2410c; }
-.badge-priority-urgent { background: #fee2e2; color: #b91c1c; }
+.badge-priority-low    { background: transparent; color: #15803d; }
+.badge-priority-medium { background: transparent; color: #a16207; }
+.badge-priority-high   { background: transparent; color: #c2410c; }
+.badge-priority-urgent { background: transparent; color: #b91c1c; }
 
-.badge-status-open      { background: var(--accent-light); color: var(--accent); }
-.badge-status-pending   { background: var(--warn-light); color: var(--warn); }
-.badge-status-on_hold   { background: #f1f5f9; color: var(--text-muted); }
-.badge-status-completed { background: var(--success-light); color: var(--success); }
-.badge-status-cancelled { background: var(--danger-light); color: var(--danger); }
+.badge-status-open      { background: transparent; color: var(--accent); }
+.badge-status-pending   { background: transparent; color: var(--warn); }
+.badge-status-on_hold   { background: transparent; color: var(--text-muted); }
+.badge-status-completed { background: transparent; color: var(--success); }
+.badge-status-cancelled { background: transparent; color: var(--danger); }
 
 .badge-role  { background: #f1f5f9; color: var(--text-muted); font-size: .68rem; }
 .badge-email { background: #e0e7ff; color: #4338ca; font-size: .68rem; }
@@ -405,7 +405,7 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 .bulk-bar {
   display: none;
   position: fixed;
-  bottom: 1.5rem;
+  top: calc(var(--header-h) + 0.5rem);
   left: 50%;
   transform: translateX(-50%);
   z-index: 150;

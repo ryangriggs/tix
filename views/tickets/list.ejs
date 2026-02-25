@@ -208,6 +208,12 @@ window.addEventListener('scroll', () => {
   document.getElementById('scroll-top-btn').classList.toggle('visible', window.scrollY > 300);
 }, { passive: true });
 
+// Focus search box on load (unless user already has a selection or is mid-interaction)
+window.addEventListener('load', () => {
+  const si = document.getElementById('search-input');
+  if (si && !si.value) si.focus();
+});
+
 // Search clear button
 const _searchInput = document.getElementById('search-input');
 const _searchClear = document.getElementById('search-clear');

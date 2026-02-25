@@ -229,6 +229,20 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
 }
 
 // ============================================================
+// Global keyboard shortcuts
+// ============================================================
+document.addEventListener('keydown', e => {
+  // Ctrl+N (or Cmd+N on Mac) — new ticket, unless focus is in an editable field
+  if ((e.ctrlKey || e.metaKey) && e.key === 'n' && !e.shiftKey && !e.altKey) {
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (document.activeElement?.isContentEditable) return;
+    e.preventDefault();
+    window.location.href = '/tickets/new';
+  }
+});
+
+// ============================================================
 // PWA — register service worker
 // ============================================================
 if ('serviceWorker' in navigator) {
