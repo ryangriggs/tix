@@ -382,7 +382,11 @@ router.post('/:id/comments', upload.array('attachments'), async (req, res) => {
     await notifyParties(
       ticket,
       req.user.email,
-      `<p><strong>${req.user.email}</strong> commented:</p>${body}`,
+      `<p>Ticket #: <strong>${formatTicketId(ticket.id)}</strong></p>
+      <p>Status: <strong>${ticket.status}</strong></p>
+      <p>Subject: <strong>${ticket.subject}</strong></p>
+      <p><strong>${req.user.email}</strong> commented:</p>
+      ${body}`,
       comment.id
     );
   } catch (err) {
