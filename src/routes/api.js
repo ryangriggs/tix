@@ -25,9 +25,22 @@ router.get('/users/search', (req, res) => {
 
 // GET /api/organizations/search?q=
 router.get('/organizations/search', (req, res) => {
-  const q = (req.query.q || '').trim();
+  const q    = (req.query.q || '').trim();
+  const user = req.user;
 
-  const orgs = db.searchOrganizations(q);
+  let orgs = db.searchOrganizations(q);
+
+  if (user.role === 'technician') {
+    // Technicians only see their assigned orgs
+    const ids = new Set(user.techOrgIds || []);
+    orgs = orgs.filter(o => ids.has(o.id));
+  } else if (user.role !== 'admin') {
+    // Regular users only see their own org
+    orgs = user.organization_id
+      ? orgs.filter(o => o.id === user.organization_id)
+      : [];
+  }
+
   res.json(orgs.map(o => ({ id: o.id, name: o.name })));
 });
 
