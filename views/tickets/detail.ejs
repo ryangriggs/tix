@@ -57,7 +57,17 @@
           <strong>Attachments</strong>
           <ul class="attachment-list">
             <% for (const a of ticketAttachments) { %>
-              <li><a href="/tickets/attachments/<%= a.stored_name %>" class="attachment-link">📎 <%= a.original_name %></a> <span class="meta-item">(<%= (a.size/1024).toFixed(1) %> KB)</span></li>
+              <li>
+                <a href="/tickets/attachments/<%= a.stored_name %>" class="attachment-link">📎 <%= a.original_name %></a>
+                <span class="meta-item">(<%= (a.size/1024).toFixed(1) %> KB)</span>
+                <% if (user && user.role === 'admin') { %>
+                  <form method="POST" action="/tickets/attachments/<%= a.stored_name %>/delete" style="display:inline">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn-icon btn-icon-danger" title="Delete attachment"
+                      onclick="return confirm('Permanently delete this attachment?')">×</button>
+                  </form>
+                <% } %>
+              </li>
             <% } %>
           </ul>
         </div>
@@ -106,13 +116,29 @@
               </span>
               <% if (c.is_email) { %><span class="badge badge-email">via email</span><% } %>
               <span class="comment-time"><%= formatDateFull(c.created_at) %></span>
+              <% if (user && user.role === 'admin') { %>
+                <form method="POST" action="/tickets/<%= ticket.id %>/comments/<%= c.id %>/delete" style="display:inline;margin-left:.5rem">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button type="submit" class="btn-icon btn-icon-danger" title="Delete comment"
+                    onclick="return confirm('Permanently delete this comment?')">Delete</button>
+                </form>
+              <% } %>
             </div>
             <div class="comment-body rich-content"><%- c.body %></div>
             <% const cattachments = commentAttachmentsMap[c.id]; %>
             <% if (cattachments && cattachments.length) { %>
               <ul class="attachment-list">
                 <% for (const a of cattachments) { %>
-                  <li><a href="/tickets/attachments/<%= a.stored_name %>" class="attachment-link">📎 <%= a.original_name %></a></li>
+                  <li>
+                    <a href="/tickets/attachments/<%= a.stored_name %>" class="attachment-link">📎 <%= a.original_name %></a>
+                    <% if (user && user.role === 'admin') { %>
+                      <form method="POST" action="/tickets/attachments/<%= a.stored_name %>/delete" style="display:inline">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <button type="submit" class="btn-icon btn-icon-danger" title="Delete attachment"
+                          onclick="return confirm('Permanently delete this attachment?')">×</button>
+                      </form>
+                    <% } %>
+                  </li>
                 <% } %>
               </ul>
             <% } %>

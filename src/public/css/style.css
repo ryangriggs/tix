@@ -163,6 +163,8 @@ a:hover { text-decoration: underline; }
   line-height: 1;
 }
 .btn-icon:hover { color: var(--danger); }
+.btn-icon-danger { font-size: 0.75rem; color: var(--text-muted); }
+.btn-icon-danger:hover { color: var(--danger); }
 
 /* ============================================================
    Forms

@@ -615,6 +615,10 @@ function addComment(ticketId, userId, body, isEmail = false) {
   return prepare('SELECT * FROM comments WHERE id = ?').get(result.lastInsertRowid);
 }
 
+function deleteComment(id) {
+  prepare('DELETE FROM comments WHERE id = ?').run(id);
+}
+
 function getComments(ticketId) {
   return prepare(`
     SELECT c.*, u.email AS user_email, u.name AS user_name
@@ -647,6 +651,10 @@ function getAttachmentsByComment(commentId) {
 
 function getAttachmentByStoredName(storedName) {
   return prepare('SELECT * FROM attachments WHERE stored_name = ?').get(storedName);
+}
+
+function deleteAttachment(storedName) {
+  prepare('DELETE FROM attachments WHERE stored_name = ?').run(storedName);
 }
 
 // ============================================================
@@ -778,9 +786,9 @@ module.exports = {
   // Parties
   addParty, removeParty, getParties, getUserTicketRole, getPartyUserIds,
   // Comments
-  addComment, getComments,
+  addComment, getComments, deleteComment,
   // Attachments
-  addAttachment, getAttachments, getAttachmentsByComment, getAttachmentByStoredName,
+  addAttachment, getAttachments, getAttachmentsByComment, getAttachmentByStoredName, deleteAttachment,
   // Email threading
   recordEmailMessage, findTicketByMessageId, findTicketByReplyToken,
   // Settings

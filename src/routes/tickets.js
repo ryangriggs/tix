@@ -269,6 +269,19 @@ router.post('/', upload.array('attachments'), async (req, res) => {
   res.redirect(`/tickets/${ticket.id}`);
 });
 
+// POST /tickets/attachments/:storedName/delete — admin only; must be before /:id
+router.post('/attachments/:storedName/delete', (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).render('error', { title: '403', message: 'Forbidden.' });
+
+  const att = db.getAttachmentByStoredName(req.params.storedName);
+  if (!att) return res.status(404).render('error', { title: '404', message: 'Attachment not found.' });
+
+  db.deleteAttachment(att.stored_name);
+  try { fs.unlinkSync(path.join(config.uploadsDir, att.stored_name)); } catch (_) {}
+
+  res.redirect(`/tickets/${att.ticket_id}`);
+});
+
 // GET /tickets/attachments/:storedName — must be before /:id to avoid param collision
 // SVG is excluded from inline display to prevent script execution.
 const INLINE_MIME = /^(image\/(?!svg)|application\/pdf$|text\/plain$|video\/|audio\/)/;
@@ -399,6 +412,28 @@ router.post('/:id/comments', upload.array('attachments'), async (req, res) => {
   }
 
   res.redirect(`/tickets/${ticket.id}#comment-${comment.id}`);
+});
+
+// POST /tickets/:id/comments/:commentId/delete — admin only
+router.post('/:id/comments/:commentId/delete', (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).render('error', { title: '403', message: 'Forbidden.' });
+
+  const ticket = db.getTicketById(req.params.id);
+  if (!ticket) return res.status(404).render('error', { title: '404', message: 'Ticket not found.' });
+
+  const commentId = parseInt(req.params.commentId, 10);
+
+  // Delete any files attached to this comment
+  const atts = db.getAttachmentsByComment(commentId);
+  for (const att of atts) {
+    db.deleteAttachment(att.stored_name);
+    try { fs.unlinkSync(path.join(config.uploadsDir, att.stored_name)); } catch (_) {}
+  }
+
+  db.deleteComment(commentId);
+  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
+
+  res.redirect(`/tickets/${ticket.id}`);
 });
 
 // POST /tickets/:id/subject — rename ticket (admin only)

@@ -129,9 +129,16 @@ app.use((err, req, res, _next) => {
 async function start() {
   await initDb();
 
-  app.listen(config.port, '0.0.0.0', () => {
+  const server = app.listen(config.port, '0.0.0.0', () => {
     console.log(`[HTTP] Listening on port ${config.port} (${process.env.NODE_ENV || 'development'})`);
   });
+
+  // Prevent keep-alive race condition: mobile browsers reuse idle TCP connections
+  // more aggressively than desktop. If Node closes a connection (default 5s timeout)
+  // just as the browser reuses it, the request hangs until TCP timeout (~30-90s on
+  // mobile). Setting a long keepAliveTimeout avoids this entirely.
+  server.keepAliveTimeout = 65000; // ms — keep connections alive for 65s
+  server.headersTimeout   = 66000; // must be slightly > keepAliveTimeout
 
   startSMTPServer();
 
