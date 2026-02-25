@@ -301,8 +301,8 @@
     document.getElementById('comment-body').value = quill.root.innerHTML;
   });
 
-  // Focus the editor on load
-  quill.focus();
+  // Focus the editor on load — desktop only (mobile focus triggers keyboard)
+  if (!('ontouchstart' in window || navigator.maxTouchPoints > 0)) quill.focus();
 
 </script>
 <script>
@@ -363,7 +363,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const addPartyDetails = document.querySelector('.add-party-details');
     if (addPartyDetails) {
       addPartyDetails.addEventListener('toggle', () => {
-        if (addPartyDetails.open) setTimeout(() => addPartyInput.focus(), 50);
+        const _isTouch = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+        if (addPartyDetails.open && !_isTouch) setTimeout(() => addPartyInput.focus(), 50);
       });
     }
   }

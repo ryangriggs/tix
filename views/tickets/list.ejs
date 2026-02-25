@@ -208,10 +208,11 @@ window.addEventListener('scroll', () => {
   document.getElementById('scroll-top-btn').classList.toggle('visible', window.scrollY > 300);
 }, { passive: true });
 
-// Focus search box on load (unless user already has a selection or is mid-interaction)
+// Focus search box on load — desktop only (mobile focus triggers keyboard)
 window.addEventListener('load', () => {
   const si = document.getElementById('search-input');
-  if (si && !si.value) si.focus();
+  const isTouch = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+  if (si && !si.value && !isTouch) si.focus();
 });
 
 // Search clear button
