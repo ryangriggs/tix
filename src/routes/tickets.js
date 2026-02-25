@@ -123,15 +123,20 @@ async function notifyParties(ticket, actorEmail, messageBody, commentId, inReply
 // ============================================================
 
 const SINCE_SECONDS = { '1d': 86400, '7d': 7 * 86400, '30d': 30 * 86400 };
-const DEFAULT_PREFS  = { status: 'open', priority: '', sort: 'priority', order: 'desc', since: '1d', org: '' };
+const DEFAULT_PREFS  = { status: 'open', priority: '', sort: 'priority', order: 'desc', since: '1d', org: '', q: '' };
+const FILTER_COOKIE  = 'tix_filters';
+
+function readFilterCookie(req) {
+  try { return JSON.parse(req.cookies[FILTER_COOKIE] || '{}'); } catch (_) { return {}; }
+}
 
 // GET /tickets
 router.get('/', (req, res) => {
   // No query params → redirect to saved prefs (or defaults)
   if (Object.keys(req.query).length === 0) {
-    const saved = db.getUserPrefs(req.user.id);
+    const saved = readFilterCookie(req);
     const prefs = { ...DEFAULT_PREFS, ...saved };
-    const qs = new URLSearchParams({ ...prefs, q: '' }).toString();
+    const qs = new URLSearchParams(prefs).toString();
     return res.redirect(`/tickets?${qs}`);
   }
 
@@ -149,17 +154,22 @@ router.get('/', (req, res) => {
     search = '';
   }
 
-  // Persist filter choices (not the search query).
-  // Use 'in' check so that an explicit empty string (e.g. since='') is saved correctly.
-  db.setUserPrefs(req.user.id, {
+  // Persist filter choices to cookie (including search query).
+  const savedPrefs = {
     status:    'status'   in req.query ? (status   || '') : DEFAULT_PREFS.status,
     priority:  'priority' in req.query ? (priority || '') : DEFAULT_PREFS.priority,
     sort:      sort     || DEFAULT_PREFS.sort,
     order:     order    || DEFAULT_PREFS.order,
     since:     'since'  in req.query ? (since ?? '') : DEFAULT_PREFS.since,
     org:       org      || '',
+    q:         q        || '',
     date_from: date_from || '',
     date_to:   date_to   || '',
+  };
+  res.cookie(FILTER_COOKIE, JSON.stringify(savedPrefs), {
+    httpOnly: false,
+    maxAge: 365 * 24 * 60 * 60 * 1000,
+    sameSite: 'lax',
   });
 
   // Compute date window
@@ -198,17 +208,7 @@ router.get('/', (req, res) => {
     title: 'Tickets',
     tickets,
     organizations,
-    filters: {
-      status:    status    || '',
-      priority:  priority  || '',
-      sort:      sort      || DEFAULT_PREFS.sort,
-      order:     order     || DEFAULT_PREFS.order,
-      q:         q         || '',
-      since:     'since' in req.query ? (since ?? '') : DEFAULT_PREFS.since,
-      org:       org       || '',
-      date_from: date_from || '',
-      date_to:   date_to   || '',
-    },
+    filters: savedPrefs,
   });
 });
 
