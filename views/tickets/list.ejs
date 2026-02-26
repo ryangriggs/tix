@@ -9,28 +9,45 @@
 
   <!-- Filters & Search -->
   <form method="GET" action="/tickets" class="filter-bar" id="filter-form">
+    <% const activeStatuses   = (filters.status   || '').split(',').filter(Boolean); %>
+    <% const activePriorities = (filters.priority || '').split(',').filter(Boolean); %>
+
+    <!-- Status pills (multi-select) -->
     <div class="filter-tabs">
-      <% const statuses = ['', 'open', 'pending', 'on_hold', 'completed', 'cancelled']; %>
-      <% const statusLabels = { '': 'All', open: '<span class="flat-dot flat-dot-open"></span> Open', pending: '<span class="flat-dot flat-dot-pending"></span> Pending', on_hold: '<span class="flat-dot flat-dot-on_hold"></span> On Hold', completed: '<span class="flat-dot flat-dot-completed"></span> Completed', cancelled: '<span class="flat-dot flat-dot-cancelled"></span> Cancelled' }; %>
+      <span class="filter-row-label">Status</span>
+      <button type="button" class="filter-tab <%= !activeStatuses.length ? 'active' : '' %>"
+              onclick="toggleAll('status')">All</button>
+      <% const statuses = ['open','pending','on_hold','completed','cancelled']; %>
+      <% const statusDots = { open:'flat-dot-open', pending:'flat-dot-pending', on_hold:'flat-dot-on_hold', completed:'flat-dot-completed', cancelled:'flat-dot-cancelled' }; %>
+      <% const statusNames = { open:'Open', pending:'Pending', on_hold:'On Hold', completed:'Completed', cancelled:'Cancelled' }; %>
       <% for (const s of statuses) { %>
-        <button type="button" class="filter-tab <%= filters.status === s ? 'active' : '' %>"
-          onclick="setFilter('status','<%= s %>')">
-          <%- statusLabels[s] %>
+        <button type="button" class="filter-tab <%= activeStatuses.includes(s) ? 'active' : '' %>"
+                onclick="toggleFilter('status','<%= s %>')">
+          <span class="flat-dot <%= statusDots[s] %>"></span> <%= statusNames[s] %>
+        </button>
+      <% } %>
+    </div>
+
+    <!-- Priority pills (multi-select) -->
+    <div class="filter-tabs">
+      <span class="filter-row-label">Priority</span>
+      <button type="button" class="filter-tab <%= !activePriorities.length ? 'active' : '' %>"
+              onclick="toggleAll('priority')">All</button>
+      <% const priorities = ['urgent','high','medium','low']; %>
+      <% const priorityNames = { urgent:'Urgent', high:'High', medium:'Medium', low:'Low' }; %>
+      <% for (const p of priorities) { %>
+        <button type="button" class="filter-tab <%= activePriorities.includes(p) ? 'active' : '' %>"
+                onclick="toggleFilter('priority','<%= p %>')">
+          <span class="priority-dot priority-dot-<%= p %>"></span> <%= priorityNames[p] %>
         </button>
       <% } %>
     </div>
 
     <div class="filter-controls">
-      <select name="priority" class="form-select" onchange="this.form.submit()">
-        <option value="" <%= !filters.priority ? 'selected' : '' %>>Any priority</option>
-        <option value="urgent"  <%= filters.priority==='urgent'  ? 'selected' : '' %>>🔴 Urgent</option>
-        <option value="high"    <%= filters.priority==='high'    ? 'selected' : '' %>>🟠 High</option>
-        <option value="medium"  <%= filters.priority==='medium'  ? 'selected' : '' %>>🔵 Medium</option>
-        <option value="low"     <%= filters.priority==='low'     ? 'selected' : '' %>>⚫ Low</option>
-      </select>
-
-      <input type="hidden" name="sort"  value="<%= filters.sort %>">
-      <input type="hidden" name="order" value="<%= filters.order %>">
+      <input type="hidden" name="status"   id="filter-status"   value="<%= filters.status %>">
+      <input type="hidden" name="priority" id="filter-priority" value="<%= filters.priority %>">
+      <input type="hidden" name="sort"     value="<%= filters.sort %>">
+      <input type="hidden" name="order"    value="<%= filters.order %>">
 
       <select name="since" class="form-select" id="since-select" onchange="onSinceChange(this)">
         <option value="1d"     <%= filters.since==='1d'     ? 'selected' : '' %>>Last 24 h</option>
@@ -62,7 +79,8 @@
           style="<%= filters.q ? '' : 'display:none' %>">×</button>
       </div>
 
-      <input type="hidden" name="status" value="<%= filters.status %>">
+      <button type="button" class="btn btn-sm btn-ghost" onclick="resetFilters()" title="Reset all filters to defaults">↺ Reset</button>
+
       <% if (!organizations || !organizations.length) { %>
         <input type="hidden" name="org" value="">
       <% } %>
@@ -158,9 +176,36 @@ function onSinceChange(sel) {
   }
 }
 
-function setFilter(key, value) {
+function toggleFilter(name, value) {
+  const el = document.getElementById('filter-' + name);
+  const vals = el.value ? el.value.split(',') : [];
+  const idx = vals.indexOf(value);
+  if (idx >= 0) vals.splice(idx, 1); else vals.push(value);
+  el.value = vals.join(',');
+  document.getElementById('filter-form').submit();
+}
+
+function toggleAll(name) {
+  document.getElementById('filter-' + name).value = '';
+  document.getElementById('filter-form').submit();
+}
+
+function resetFilters() {
   const form = document.getElementById('filter-form');
-  form.querySelector(`[name="${key}"]`).value = value;
+  document.getElementById('filter-status').value = 'open';
+  document.getElementById('filter-priority').value = '';
+  form.querySelector('[name="sort"]').value = 'priority';
+  form.querySelector('[name="order"]').value = 'desc';
+  document.getElementById('since-select').value = '1d';
+  document.getElementById('custom-range').style.display = 'none';
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-clear').style.display = 'none';
+  const orgSel = form.querySelector('select[name="org"]');
+  if (orgSel) orgSel.value = '';
+  const df = form.querySelector('[name="date_from"]');
+  const dt = form.querySelector('[name="date_to"]');
+  if (df) df.value = '';
+  if (dt) dt.value = '';
   form.submit();
 }
 

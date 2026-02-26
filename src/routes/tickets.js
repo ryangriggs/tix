@@ -125,8 +125,10 @@ async function notifyParties(ticket, actorEmail, messageBody, commentId, inReply
 // Routes
 // ============================================================
 
-const SINCE_SECONDS = { '1d': 86400, '7d': 7 * 86400, '30d': 30 * 86400 };
-const DEFAULT_PREFS  = { status: 'open', priority: '', sort: 'priority', order: 'desc', since: '1d', org: '', q: '' };
+const SINCE_SECONDS    = { '1d': 86400, '7d': 7 * 86400, '30d': 30 * 86400 };
+const DEFAULT_PREFS    = { status: 'open', priority: '', sort: 'priority', order: 'desc', since: '1d', org: '', q: '' };
+const VALID_STATUSES   = ['open', 'pending', 'on_hold', 'completed', 'cancelled'];
+const VALID_PRIORITIES = ['urgent', 'high', 'medium', 'low'];
 const FILTER_COOKIE  = 'tix_filters';
 
 function readFilterCookie(req) {
@@ -186,14 +188,18 @@ router.get('/', (req, res) => {
     if (sinceSeconds) dateFrom = Math.floor(Date.now() / 1000) - sinceSeconds;
   }
 
+  // Parse comma-separated multi-select values, validating against known values
+  const statusValues   = (status   || '').split(',').filter(s => VALID_STATUSES.includes(s));
+  const priorityValues = (priority || '').split(',').filter(p => VALID_PRIORITIES.includes(p));
+
   const tickets = db.getTickets({
     userId:          req.user.id,
     userRole:        req.user.role,
     userOrgId:       req.user.organization_id || null,
     userIsSuperuser: req.user.isGroupSuperuser,
     userTechOrgIds:  req.user.techOrgIds || [],
-    status:          status   || '',
-    priority:        priority || '',
+    status:          statusValues,
+    priority:        priorityValues,
     sort:            sort     || DEFAULT_PREFS.sort,
     order:           order    || DEFAULT_PREFS.order,
     search,

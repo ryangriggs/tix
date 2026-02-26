@@ -389,6 +389,17 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
   gap: 0.25rem;
   margin-bottom: 0.75rem;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-row-label {
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  padding-right: .25rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
 }
 
 .filter-tab {
@@ -577,7 +588,7 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
-  cursor: help;
+  cursor: inherit;
 }
 .priority-dot-low    { background: #9ca3af; }
 .priority-dot-medium { background: #3b82f6; }

@@ -528,8 +528,16 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
 
   if (orgFilter === -1) { conditions.push('t.organization_id IS NULL'); }
   else if (orgFilter)  { conditions.push('t.organization_id = ?'); params.push(orgFilter); }
-  if (status)    { conditions.push('t.status = ?');          params.push(status); }
-  if (priority)  { conditions.push('t.priority = ?');        params.push(priority); }
+  if (status && status.length) {
+    const ph = status.map(() => '?').join(',');
+    conditions.push(`t.status IN (${ph})`);
+    params.push(...status);
+  }
+  if (priority && priority.length) {
+    const ph = priority.map(() => '?').join(',');
+    conditions.push(`t.priority IN (${ph})`);
+    params.push(...priority);
+  }
   if (dateFrom)  { conditions.push('t.updated_at >= ?');     params.push(dateFrom); }
   if (dateTo)    { conditions.push('t.updated_at <= ?');     params.push(dateTo); }
   if (idSearch)  { conditions.push('t.id = ?');              params.push(idSearch); }
