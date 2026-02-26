@@ -34,10 +34,10 @@
       <h1 class="ticket-title"><%= ticket.subject %></h1>
     <% } %>
     <div class="ticket-meta-row">
-      <span class="meta-item">Created <%= formatDateFull(ticket.created_at) %></span>
-      <span class="meta-item">Updated <%= formatDate(ticket.updated_at) %></span>
+      <span class="meta-item">Created <span data-ts="<%= ticket.created_at %>" data-fmt="full"><%= formatDateFull(ticket.created_at) %></span></span>
+      <span class="meta-item">Updated <span data-ts="<%= ticket.updated_at %>"><%= formatDate(ticket.updated_at) %></span></span>
       <span id="due-date-meta" class="meta-item<%= ticket.due_date && ticket.due_date < (Date.now()/1000) ? ' overdue' : '' %>"
-            style="<%= ticket.due_date ? '' : 'display:none' %>">Due <span id="due-date-text"><%= formatDateOnly(ticket.due_date) %></span></span>
+            style="<%= ticket.due_date ? '' : 'display:none' %>">Due <span id="due-date-text" data-ts="<%= ticket.due_date || '' %>" data-fmt="date"><%= formatDateOnly(ticket.due_date) %></span></span>
     </div>
   </div>
 
@@ -113,7 +113,7 @@
                 <% } %>
               </span>
               <% if (c.is_email) { %><span class="badge badge-email">via email</span><% } %>
-              <span class="comment-time"><%= formatDateFull(c.created_at) %></span>
+              <span class="comment-time" data-ts="<%= c.created_at %>" data-fmt="full"><%= formatDateFull(c.created_at) %></span>
               <% if (user && user.role === 'admin') { %>
                 <form method="POST" action="/tickets/<%= ticket.id %>/comments/<%= c.id %>/delete" style="display:inline;margin-left:.5rem">
                   <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -194,7 +194,7 @@
         <% if (ticket.due_date) { %>
           <div class="sidebar-section">
             <div class="sidebar-label">Due date</div>
-            <span class="<%= ticket.due_date < (Date.now()/1000) ? 'overdue' : '' %>"><%= formatDateOnly(ticket.due_date) %></span>
+            <span class="<%= ticket.due_date < (Date.now()/1000) ? 'overdue' : '' %>" data-ts="<%= ticket.due_date || '' %>" data-fmt="date"><%= formatDateOnly(ticket.due_date) %></span>
           </div>
         <% } %>
       <% } %>
@@ -502,9 +502,11 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const data = await sidebarPost(`/tickets/${TICKET_ID}/due-date`, { due_date: input.value });
         const meta = document.getElementById('due-date-meta');
-        if (data.formatted) {
-          document.getElementById('due-date-text').textContent = data.formatted;
-          const overdue = data.dueDate && data.dueDate < Math.floor(Date.now() / 1000);
+        if (data.dueDate) {
+          const dtEl = document.getElementById('due-date-text');
+          dtEl.textContent = fmtTs(data.dueDate, 'date');
+          dtEl.dataset.ts = data.dueDate;
+          const overdue = data.dueDate < Math.floor(Date.now() / 1000);
           meta.className = 'meta-item' + (overdue ? ' overdue' : '');
           meta.style.display = '';
         } else {

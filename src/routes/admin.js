@@ -236,8 +236,10 @@ router.get('/logs', (req, res) => {
     emailEntries = lines.map(line => {
       const parts = line.split(' | ');
       const isError = (parts[1] || '').startsWith('[ERROR] ');
+      const ts = Math.floor(Date.parse((parts[0] || '').replace(' ', 'T') + 'Z') / 1000) || 0;
       return {
         timestamp: parts[0] || '',
+        ts,
         isError,
         recipient: isError ? parts[1].slice(8) : (parts[1] || ''),
         subject:   parts[2] || '',
@@ -255,8 +257,10 @@ router.get('/logs', (req, res) => {
     userEntries = lines.map(line => {
       const parts = line.split(' | ');
       const isFailure = (parts[2] || '').startsWith('FAILED');
+      const ts = Math.floor(Date.parse((parts[0] || '').replace(' ', 'T') + 'Z') / 1000) || 0;
       return {
         timestamp: parts[0] || '',
+        ts,
         email:     parts[1] || '',
         status:    parts[2] || '',
         isFailure,

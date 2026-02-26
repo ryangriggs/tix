@@ -1,6 +1,38 @@
 'use strict';
 
 // ============================================================
+// Timestamp localisation — display in browser's local time/locale
+// ============================================================
+
+function fmtTs(ts, fmt) {
+  if (!ts) return '—';
+  const d = new Date(ts * 1000);
+  if (fmt === 'full') return d.toLocaleString();
+  if (fmt === 'date') return d.toLocaleDateString();
+  // default: relative for recent, date for older
+  const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (diff < 60)     return 'just now';
+  if (diff < 3600)   return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400)  return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  return d.toLocaleDateString();
+}
+
+function localiseTimestamps(root) {
+  (root || document).querySelectorAll('[data-ts]').forEach(el => {
+    const ts = parseInt(el.dataset.ts, 10);
+    if (!ts) return;
+    el.textContent = fmtTs(ts, el.dataset.fmt);
+    // For ticket-list rows: update the hover title with full date + optional actor
+    if ('actor' in el.dataset) {
+      el.title = fmtTs(ts, 'full') + (el.dataset.actor ? ` · by ${el.dataset.actor}` : '');
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => localiseTimestamps());
+
+// ============================================================
 // Server-Sent Events — real-time updates
 // ============================================================
 
@@ -80,8 +112,9 @@
         const meta = document.getElementById('due-date-meta');
         if (meta) {
           if (event.value) {
-            const formatted = new Date(event.value * 1000).toLocaleDateString();
-            document.getElementById('due-date-text').textContent = formatted;
+            const dtEl = document.getElementById('due-date-text');
+            dtEl.textContent = fmtTs(event.value, 'date');
+            dtEl.dataset.ts = event.value;
             const overdue = event.value < Math.floor(Date.now() / 1000);
             meta.className = 'meta-item' + (overdue ? ' overdue' : '');
             meta.style.display = '';
@@ -143,7 +176,7 @@
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
         const newList = doc.getElementById('ticket-list');
-        if (newList) list.replaceWith(newList);
+        if (newList) { list.replaceWith(newList); localiseTimestamps(newList); }
       })
       .catch(() => { /* network error — ignore */ })
       .finally(() => {
@@ -176,6 +209,7 @@
             comments.appendChild(newComment);
           }
           newComment.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          localiseTimestamps(newComment);
         }
       })
       .catch(() => { });

@@ -108,7 +108,7 @@
             <% } %>
             <span class="tc-subject"><%= t.subject %></span>
             <span class="tc-org"><%= t.organization_name || '' %></span>
-            <span class="tc-updated" title="<%= formatDateFull(t.updated_at) %><% if (t.last_actor) { %> · by <%= t.last_actor %><% } %>"><%= formatDate(t.updated_at) %></span>
+            <span class="tc-updated" data-ts="<%= t.updated_at %>" data-actor="<%= t.last_actor || '' %>" title="<%= formatDateFull(t.updated_at) %><% if (t.last_actor) { %> · by <%= t.last_actor %><% } %>"><%= formatDate(t.updated_at) %></span>
           </a>
           <% if (user && user.role === 'admin') { %>
             <label class="ticket-card-checkbox" title="Select ticket">

@@ -39,7 +39,7 @@
           <td><%= u.name || '—' %></td>
           <td><span class="badge badge-role"><%= u.role %></span></td>
           <td><%= u.organization_name || '—' %></td>
-          <td><%= formatDate(u.created_at) %></td>
+          <td><span data-ts="<%= u.created_at %>"><%= formatDate(u.created_at) %></span></td>
           <td><%= u.blocked_at ? '🚫 Blocked' : '✓ Active' %></td>
           <td class="actions-cell">
             <button type="button" class="btn btn-sm btn-secondary"
