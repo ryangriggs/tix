@@ -28,59 +28,67 @@
       <button type="button" class="btn btn-sm btn-ghost" onclick="resetFilters()" title="Reset all filters to defaults">↺ Reset</button>
     </div>
 
-    <!-- Status + Priority + Date + Org — single wrapping row -->
+    <!-- Status + Priority + Date + Org — groups wrap as whole units -->
     <div class="filter-row">
-      <% const statuses = ['new','open','on_hold','closed']; %>
-      <% const statusNames = { new:'New', open:'Open', on_hold:'On Hold', closed:'Closed' }; %>
-      <% const statusColors = { new:'#fbbf24', open:'#3b82f6', on_hold:'#f97316', closed:'#d1d5db' }; %>
-      <span class="filter-row-label">Status</span>
-      <button type="button" class="filter-tab <%= !activeStatuses.length ? 'active' : '' %>"
-              onclick="toggleAll('status')">All</button>
-      <% for (const s of statuses) { %>
-        <button type="button" class="filter-tab filter-tab-status filter-tab-s-<%= s %> <%= activeStatuses.includes(s) ? 'active' : '' %>"
-                style="border-left: 4px solid <%= statusColors[s] %>"
-                onclick="toggleFilter('status','<%= s %>')"><%= statusNames[s] %></button>
-      <% } %>
 
-      <span class="filter-sep"></span>
+      <!-- Status group -->
+      <div class="filter-group">
+        <% const statuses = ['new','open','on_hold','closed']; %>
+        <% const statusNames = { new:'New', open:'Open', on_hold:'On Hold', closed:'Closed' }; %>
+        <% const statusColors = { new:'#fbbf24', open:'#3b82f6', on_hold:'#f97316', closed:'#d1d5db' }; %>
+        <span class="filter-row-label">Status</span>
+        <button type="button" class="filter-tab <%= !activeStatuses.length ? 'active' : '' %>"
+                onclick="toggleAll('status')">All</button>
+        <% for (const s of statuses) { %>
+          <button type="button" class="filter-tab filter-tab-status filter-tab-s-<%= s %> <%= activeStatuses.includes(s) ? 'active' : '' %>"
+                  style="border-left: 4px solid <%= statusColors[s] %>"
+                  onclick="toggleFilter('status','<%= s %>')"><%= statusNames[s] %></button>
+        <% } %>
+      </div>
 
-      <% const priorities = ['urgent','high','medium','low']; %>
-      <% const priorityNames = { urgent:'Urgent', high:'High', medium:'Medium', low:'Low' }; %>
-      <span class="filter-row-label">Priority</span>
-      <button type="button" class="filter-tab <%= !activePriorities.length ? 'active' : '' %>"
-              onclick="toggleAll('priority')">All</button>
-      <% for (const p of priorities) { %>
-        <button type="button" class="filter-tab filter-tab-p-<%= p %> <%= activePriorities.includes(p) ? 'active' : '' %>"
-                onclick="toggleFilter('priority','<%= p %>')"><span class="priority-dot priority-dot-<%= p %>"></span> <%= priorityNames[p] %></button>
-      <% } %>
+      <!-- Priority group -->
+      <div class="filter-group">
+        <% const priorities = ['urgent','high','medium','low']; %>
+        <% const priorityNames = { urgent:'Urgent', high:'High', medium:'Medium', low:'Low' }; %>
+        <span class="filter-row-label">Priority</span>
+        <button type="button" class="filter-tab <%= !activePriorities.length ? 'active' : '' %>"
+                onclick="toggleAll('priority')">All</button>
+        <% for (const p of priorities) { %>
+          <button type="button" class="filter-tab filter-tab-p-<%= p %> <%= activePriorities.includes(p) ? 'active' : '' %>"
+                  onclick="toggleFilter('priority','<%= p %>')"><span class="priority-dot priority-dot-<%= p %>"></span> <%= priorityNames[p] %></button>
+        <% } %>
+      </div>
 
-      <span class="filter-sep"></span>
+      <!-- Date group -->
+      <div class="filter-group">
+        <input type="hidden" name="since" id="filter-since" value="<%= filters.since %>">
+        <span class="filter-row-label">Date</span>
+        <% const sinceOpts = [['1d','24h'],['7d','7d'],['30d','30d'],['','All'],['custom','Custom']]; %>
+        <% for (const [val, label] of sinceOpts) { %>
+          <button type="button" class="filter-tab <%= filters.since===val ? 'active' : '' %>"
+                  onclick="setSince('<%= val %>')"><%= label %></button>
+        <% } %>
+        <% if (filters.since === 'custom') { %>
+          <input type="date" name="date_from" value="<%= filters.date_from %>" class="form-input form-input-sm filter-date-input" title="From">
+          <span class="filter-date-sep">–</span>
+          <input type="date" name="date_to"   value="<%= filters.date_to %>"   class="form-input form-input-sm filter-date-input" title="To">
+          <button type="submit" class="btn btn-sm btn-secondary">Go</button>
+        <% } %>
+      </div>
 
-      <!-- Date pills -->
-      <span class="filter-row-label">Date</span>
-      <input type="hidden" name="since" id="filter-since" value="<%= filters.since %>">
-      <% const sinceOpts = [['1d','24h'],['7d','7d'],['30d','30d'],['','All'],['custom','Custom']]; %>
-      <% for (const [val, label] of sinceOpts) { %>
-        <button type="button" class="filter-tab <%= filters.since===val ? 'active' : '' %>"
-                onclick="setSince('<%= val %>')"><%= label %></button>
-      <% } %>
-      <% if (filters.since === 'custom') { %>
-        <input type="date" name="date_from" value="<%= filters.date_from %>" class="form-input form-input-sm filter-date-input" title="From">
-        <span class="filter-date-sep">–</span>
-        <input type="date" name="date_to"   value="<%= filters.date_to %>"   class="form-input form-input-sm filter-date-input" title="To">
-        <button type="submit" class="btn btn-sm btn-secondary">Go</button>
-      <% } %>
-
+      <!-- Org group -->
       <% if (organizations && organizations.length) { %>
-        <span class="filter-sep"></span>
-        <select name="org" class="form-select filter-org-select" onchange="this.form.submit()">
-          <option value="" <%= !filters.org ? 'selected' : '' %>>Any org</option>
-          <option value="unassigned" <%= filters.org === 'unassigned' ? 'selected' : '' %>>Not assigned</option>
-          <% for (const o of organizations) { %>
-            <option value="<%= o.id %>" <%= filters.org == o.id ? 'selected' : '' %>><%= o.name %></option>
-          <% } %>
-        </select>
+        <div class="filter-group">
+          <select name="org" class="form-select" onchange="this.form.submit()">
+            <option value="" <%= !filters.org ? 'selected' : '' %>>Any org</option>
+            <option value="unassigned" <%= filters.org === 'unassigned' ? 'selected' : '' %>>Not assigned</option>
+            <% for (const o of organizations) { %>
+              <option value="<%= o.id %>" <%= filters.org == o.id ? 'selected' : '' %>><%= o.name %></option>
+            <% } %>
+          </select>
+        </div>
       <% } %>
+
     </div>
   </form>
 
