@@ -516,7 +516,14 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 .tlh-sort-btn:hover { color: var(--accent); }
 .tlh-sort-btn.tlh-active { color: var(--text); }
 
-.tlh-checkbox-spacer { width: 3.5rem; flex-shrink: 0; }
+.tlh-ticket-count {
+  width: 3.5rem;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-align: center;
+}
 
 /* Ticket cards */
 .ticket-list {
