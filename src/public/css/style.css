@@ -885,6 +885,8 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 .rich-content code { font-size: 0.85em; background: var(--bg); padding: 0.1em 0.35em; border-radius: 3px; }
 .rich-content pre code { background: none; padding: 0; }
 .rich-content a { color: var(--accent); }
+.ticket-ref { color: var(--text-muted); font-size: 0.85em; font-family: var(--font-mono, monospace); text-decoration: none; border-bottom: 1px dashed var(--border); }
+.ticket-ref:hover { color: var(--accent); border-bottom-color: var(--accent); }
 .rich-content img { max-width: 100%; height: auto; border-radius: var(--radius); }
 .rich-content strong, .rich-content b { font-weight: 600; }
 .rich-content em, .rich-content i { font-style: italic; }

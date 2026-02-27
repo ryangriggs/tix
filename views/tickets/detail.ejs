@@ -55,6 +55,7 @@
           <div class="form-group">
             <div id="comment-editor" class="quill-editor quill-compact"></div>
             <input type="hidden" name="body" id="comment-body">
+            <p class="form-hint">Use [#x] (where x = ticket number) to insert links to other tickets.</p>
           </div>
           <div class="form-group">
             <input type="file" name="attachments" multiple class="form-file">
@@ -608,6 +609,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 })();
+</script>
+
+<script>
+// Ticket cross-references: replace [#N] with a link to that ticket
+document.querySelectorAll('.rich-content').forEach(el => {
+  el.innerHTML = el.innerHTML.replace(
+    /\[#(\d+)\]/g,
+    '<a href="/tickets/$1" class="ticket-ref">#$1</a>'
+  );
+});
 </script>
 
 <%- include('../partials/foot') %>
