@@ -49,28 +49,6 @@
       <!-- Ticket body -->
       <div class="ticket-body rich-content"><%- ticket.body %></div>
 
-      <!-- Ticket-level attachments -->
-      <% if (ticketAttachments.length) { %>
-        <div class="attachments-section">
-          <strong>Attachments</strong>
-          <ul class="attachment-list">
-            <% for (const a of ticketAttachments) { %>
-              <li>
-                <a href="/tickets/attachments/<%= a.stored_name %>" class="attachment-link">📎 <%= a.original_name %></a>
-                <span class="meta-item">(<%= (a.size/1024).toFixed(1) %> KB)</span>
-                <% if (user && user.role === 'admin') { %>
-                  <form method="POST" action="/tickets/attachments/<%= a.stored_name %>/delete" style="display:inline">
-                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                    <button type="submit" class="btn-icon btn-icon-danger" title="Delete attachment"
-                      onclick="return confirm('Permanently delete this attachment?')">×</button>
-                  </form>
-                <% } %>
-              </li>
-            <% } %>
-          </ul>
-        </div>
-      <% } %>
-
       <!-- Add comment (above activity) -->
       <div class="comment-form-section">
         <h3 class="section-title">Reply</h3>
@@ -86,17 +64,39 @@
             <% if (canManage) { %>
               <select name="status_change" class="form-select form-select-sm" style="width:auto">
                 <option value="">Keep status</option>
-                <option value="open"      <%= ticket.status==='open'      ? 'disabled':'' %>>Open</option>
-                <option value="pending"   <%= ticket.status==='pending'   ? 'disabled':'' %>>Pending</option>
-                <option value="on_hold"   <%= ticket.status==='on_hold'   ? 'disabled':'' %>>On Hold</option>
-                <option value="completed" <%= ticket.status==='completed' ? 'disabled':'' %>>Completed</option>
-                <option value="cancelled" <%= ticket.status==='cancelled' ? 'disabled':'' %>>Cancelled</option>
+                <option value="new"     <%= ticket.status==='new'     ? 'disabled':'' %>>New</option>
+                <option value="open"    <%= ticket.status==='open'    ? 'disabled':'' %>>Open</option>
+                <option value="on_hold" <%= ticket.status==='on_hold' ? 'disabled':'' %>>On Hold</option>
+                <option value="closed"  <%= ticket.status==='closed'  ? 'disabled':'' %>>Closed</option>
               </select>
             <% } %>
             <button type="submit" class="btn btn-primary">Post comment</button>
           </div>
         </form>
       </div>
+
+      <!-- All attachments (ticket + comments, grouped here) -->
+      <% if (attachments.length) { %>
+        <div class="attachments-section">
+          <h3 class="section-title">Attachments (<%= attachments.length %>)</h3>
+          <ul class="attachment-list">
+            <% for (const a of attachments) { %>
+              <li>
+                <a href="/tickets/attachments/<%= a.stored_name %>" class="attachment-link">📎 <%= a.original_name %></a>
+                <span class="meta-item" style="margin-left:.25rem">(<%= (a.size/1024).toFixed(1) %> KB)</span>
+                <% if (a.uploader_name) { %><span class="meta-item"> — <%= a.uploader_name %></span><% } %>
+                <% if (user && user.role === 'admin') { %>
+                  <form method="POST" action="/tickets/attachments/<%= a.stored_name %>/delete" style="display:inline;margin-left:.25rem">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn-icon btn-icon-danger" title="Delete attachment"
+                      onclick="return confirm('Permanently delete this attachment?')">×</button>
+                  </form>
+                <% } %>
+              </li>
+            <% } %>
+          </ul>
+        </div>
+      <% } %>
 
       <!-- Comments -->
       <div class="comments-section" id="comments">
@@ -123,23 +123,6 @@
               <% } %>
             </div>
             <div class="comment-body rich-content"><%- c.body %></div>
-            <% const cattachments = commentAttachmentsMap[c.id]; %>
-            <% if (cattachments && cattachments.length) { %>
-              <ul class="attachment-list">
-                <% for (const a of cattachments) { %>
-                  <li>
-                    <a href="/tickets/attachments/<%= a.stored_name %>" class="attachment-link">📎 <%= a.original_name %></a>
-                    <% if (user && user.role === 'admin') { %>
-                      <form method="POST" action="/tickets/attachments/<%= a.stored_name %>/delete" style="display:inline">
-                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                        <button type="submit" class="btn-icon btn-icon-danger" title="Delete attachment"
-                          onclick="return confirm('Permanently delete this attachment?')">×</button>
-                      </form>
-                    <% } %>
-                  </li>
-                <% } %>
-              </ul>
-            <% } %>
           </div>
         <% } %>
       </div>
@@ -154,7 +137,7 @@
         <div class="sidebar-section">
           <div class="sidebar-label">Status</div>
           <div class="pill-group" id="status-pills">
-            <% for (const [sv, sl] of [['open','Open'],['pending','Pending'],['on_hold','On Hold'],['completed','Completed'],['cancelled','Cancelled']]) { %>
+            <% for (const [sv, sl] of [['new','New'],['open','Open'],['on_hold','On Hold'],['closed','Closed']]) { %>
               <button type="button"
                 class="pill-btn pill-status-<%= sv %><%= ticket.status===sv ? ' pill-active' : '' %>"
                 data-status="<%= sv %>"><%= sl %></button>

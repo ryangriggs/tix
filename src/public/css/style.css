@@ -127,6 +127,29 @@ a:hover { text-decoration: underline; }
   white-space: nowrap;
 }
 
+.hamburger-btn {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  flex-shrink: 0;
+}
+.hamburger-btn span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--text);
+  border-radius: 2px;
+  transition: transform .2s, opacity .2s;
+}
+.hamburger-btn.hamburger-active span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.hamburger-btn.hamburger-active span:nth-child(2) { opacity: 0; }
+.hamburger-btn.hamburger-active span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
 /* ============================================================
    Buttons
    ============================================================ */
@@ -290,11 +313,10 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 .badge-priority-high   { background: transparent; color: #c2410c; border: 1px solid currentColor; }
 .badge-priority-urgent { background: transparent; color: #b91c1c; border: 1px solid currentColor; }
 
-.badge-status-open      { background: transparent; color: var(--accent);      border: 1px solid currentColor; }
-.badge-status-pending   { background: transparent; color: var(--warn);        border: 1px solid currentColor; }
-.badge-status-on_hold   { background: transparent; color: var(--text-muted);  border: 1px solid currentColor; }
-.badge-status-completed { background: transparent; color: var(--success);     border: 1px solid currentColor; }
-.badge-status-cancelled { background: transparent; color: var(--danger);      border: 1px solid currentColor; }
+.badge-status-new    { background: transparent; color: #d97706;           border: 1px solid currentColor; }
+.badge-status-open   { background: transparent; color: var(--accent);     border: 1px solid currentColor; }
+.badge-status-on_hold{ background: transparent; color: #f97316;           border: 1px solid currentColor; }
+.badge-status-closed { background: transparent; color: var(--text-muted); border: 1px solid currentColor; }
 
 /* ============================================================
    Pill button groups — status / priority selectors
@@ -321,17 +343,15 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 }
 
 /* Status pills */
-.pill-btn.pill-status-open      { border-color: #d97706; color: #d97706; }
-.pill-btn.pill-status-pending   { border-color: #2563eb; color: #2563eb; }
-.pill-btn.pill-status-on_hold   { border-color: #6b7280; color: #6b7280; }
-.pill-btn.pill-status-completed { border-color: #16a34a; color: #16a34a; }
-.pill-btn.pill-status-cancelled { border-color: #dc2626; color: #dc2626; }
+.pill-btn.pill-status-new    { border-color: #d97706; color: #d97706; }
+.pill-btn.pill-status-open   { border-color: #2563eb; color: #2563eb; }
+.pill-btn.pill-status-on_hold{ border-color: #f97316; color: #f97316; }
+.pill-btn.pill-status-closed { border-color: #9ca3af; color: #9ca3af; }
 
-.pill-btn.pill-status-open.pill-active      { background: #d97706; color: #fff; }
-.pill-btn.pill-status-pending.pill-active   { background: #2563eb; color: #fff; }
-.pill-btn.pill-status-on_hold.pill-active   { background: #6b7280; color: #fff; }
-.pill-btn.pill-status-completed.pill-active { background: #16a34a; color: #fff; }
-.pill-btn.pill-status-cancelled.pill-active { background: #dc2626; color: #fff; }
+.pill-btn.pill-status-new.pill-active    { background: #d97706; color: #fff; }
+.pill-btn.pill-status-open.pill-active   { background: #2563eb; color: #fff; }
+.pill-btn.pill-status-on_hold.pill-active{ background: #f97316; color: #fff; }
+.pill-btn.pill-status-closed.pill-active { background: #9ca3af; color: #fff; }
 
 /* Priority pills */
 .pill-btn.pill-priority-urgent { border-color: #dc2626; color: #dc2626; }
@@ -354,11 +374,10 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
   margin-bottom: 1px;
   flex-shrink: 0;
 }
-.flat-dot-open      { background: #fbbf24; }
-.flat-dot-pending   { background: #3b82f6; }
-.flat-dot-on_hold   { background: #6b7280; }
-.flat-dot-completed { background: #16a34a; }
-.flat-dot-cancelled { background: #dc2626; }
+.flat-dot-new    { background: #fbbf24; }
+.flat-dot-open   { background: #3b82f6; }
+.flat-dot-on_hold{ background: #f97316; }
+.flat-dot-closed { background: #9ca3af; }
 
 .badge-role  { background: #f1f5f9; color: var(--text-muted); font-size: .68rem; }
 .badge-email { background: #e0e7ff; color: #4338ca; font-size: .68rem; }
@@ -444,8 +463,8 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 
 .tlh-inner {
   display: grid;
-  grid-template-columns: 64px 140px 1fr 140px 80px;
-  grid-template-areas: "num creator subject org updated";
+  grid-template-columns: 90px 1fr 130px 80px 110px;
+  grid-template-areas: "num subject org updated actor";
   align-items: center;
   gap: 0.625rem;
   padding: 0 1rem 0 calc(1rem + 4px); /* +4px aligns with card content past border-left */
@@ -556,8 +575,8 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 /* Single-row grid inside the card link */
 .ticket-card-link {
   display: grid;
-  grid-template-columns: 64px 140px 1fr 140px 80px;
-  grid-template-areas: "num creator subject org updated";
+  grid-template-columns: 90px 1fr 130px 80px 110px;
+  grid-template-areas: "num subject org updated actor";
   align-items: center;
   gap: 0.625rem;
   padding: 0.6rem 1rem;
@@ -601,9 +620,9 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.tc-creator {
-  grid-area: creator;
-  font-size: 0.8rem;
+.tc-actor {
+  grid-area: actor;
+  font-size: 0.78rem;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -660,11 +679,24 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 }
 
 /* Left border = ticket status */
-.ticket-card.status-open      { border-left-color: #fbbf24; }
-.ticket-card.status-pending   { border-left-color: #3b82f6; }
-.ticket-card.status-on_hold   { border-left-color: #6b7280; }
-.ticket-card.status-completed { border-left-color: #16a34a; }
-.ticket-card.status-cancelled { border-left-color: #d1d5db; opacity: 0.65; }
+.ticket-card.status-new    { border-left-color: #fbbf24; background: #fefce8; }
+.ticket-card.status-open   { border-left-color: #3b82f6; }
+.ticket-card.status-on_hold{ border-left-color: #f97316; }
+.ticket-card.status-closed { border-left-color: #d1d5db; opacity: 0.7; }
+
+/* Status dot — small coloured circle in the ticket # column */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  cursor: inherit;
+}
+.status-dot-new    { background: #fbbf24; }
+.status-dot-open   { background: #3b82f6; }
+.status-dot-on_hold{ background: #f97316; }
+.status-dot-closed { background: #9ca3af; }
 
 .ticket-card-left {
   display: flex;
@@ -1086,6 +1118,15 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   border-top: 1px solid var(--border);
 }
 
+.mobile-sort-bar {
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
 /* ============================================================
    Responsive
    ============================================================ */
@@ -1101,23 +1142,41 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   .ticket-card-link {
     grid-template-columns: auto 1fr auto;
     grid-template-areas:
-      "num creator updated"
-      "subject subject org";
+      "num subject updated"
+      "org org actor";
     gap: 0.2rem 0.5rem;
     padding: 0.625rem 0.75rem;
   }
   .tc-subject { font-size: 0.85rem; }
   .tc-org     { font-size: 0.72rem; }
   .tc-updated { font-size: 0.72rem; text-align: right; }
+  .tc-actor   { font-size: 0.72rem; text-align: right; white-space: nowrap; }
 
   .ticket-list-header { display: none; }
+  .mobile-sort-bar    { display: flex; }
   .filter-controls { flex-direction: column; align-items: stretch; }
   .search-wrap { min-width: unset; }
 
   .form-row { flex-direction: column; gap: 0; }
 
-  .app-header-inner { gap: 0.75rem; }
+  .app-header-inner { gap: 0.5rem; }
   .user-email { display: none; }
+  .hamburger-btn { display: flex; }
+  .app-nav {
+    display: none;
+    position: absolute;
+    top: var(--header-h);
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    background: var(--surface);
+    border-bottom: 2px solid var(--border);
+    padding: 0.4rem 0.5rem;
+    z-index: 99;
+    box-shadow: var(--shadow-md);
+  }
+  .app-nav.nav-open { display: flex; }
+  .nav-link { padding: 0.6rem 0.75rem; font-size: 0.95rem; }
 
   .auth-card { padding: 1.5rem; }
   .page-toolbar { flex-wrap: wrap; }

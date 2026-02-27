@@ -86,14 +86,27 @@ function sanitize(html) {
 }
 
 // Helper: save uploaded files and create attachment records
+// Renames the stored file to {ticketId}-{uuid}.{ext} for easy manual recovery.
 function saveUploadedFiles(files, ticketId, commentId) {
   if (!files || !files.length) return;
   for (const file of files) {
+    const ext = path.extname(file.filename);
+    const newName = `${ticketId}-${path.basename(file.filename, ext)}${ext}`;
+    let storedName = file.filename;
+    try {
+      fs.renameSync(
+        path.join(config.uploadsDir, file.filename),
+        path.join(config.uploadsDir, newName)
+      );
+      storedName = newName;
+    } catch (err) {
+      console.error('[Upload] Could not rename file:', err.message);
+    }
     db.addAttachment({
       ticketId,
       commentId,
       originalName: file.originalname,
-      storedName: file.filename,
+      storedName,
       mimeType: file.mimetype,
       size: file.size,
     });
@@ -126,8 +139,8 @@ async function notifyParties(ticket, actorEmail, messageBody, commentId, inReply
 // ============================================================
 
 const SINCE_SECONDS    = { '1d': 86400, '7d': 7 * 86400, '30d': 30 * 86400 };
-const DEFAULT_PREFS    = { status: 'open', priority: '', sort: 'priority', order: 'desc', since: '1d', org: '', q: '' };
-const VALID_STATUSES   = ['open', 'pending', 'on_hold', 'completed', 'cancelled'];
+const DEFAULT_PREFS    = { status: 'new,open,on_hold', priority: '', sort: 'priority', order: 'desc', since: '1d', org: '', q: '' };
+const VALID_STATUSES   = ['new', 'open', 'on_hold', 'closed'];
 const VALID_PRIORITIES = ['urgent', 'high', 'medium', 'low'];
 const FILTER_COOKIE  = 'tix_filters';
 
@@ -326,7 +339,7 @@ router.post('/bulk', (req, res) => {
     db.bulkDeleteTickets(ids);
     sse.broadcastToAll({ type: 'tickets_deleted', ticketIds: ids });
   } else if (action === 'status') {
-    const validStatuses = ['open', 'pending', 'on_hold', 'completed', 'cancelled'];
+    const validStatuses = ['new', 'open', 'on_hold', 'closed'];
     if (validStatuses.includes(bulkStatus)) {
       db.bulkUpdateStatus(ids, bulkStatus);
       sse.broadcastToAll({ type: 'tickets_updated', ticketIds: ids });
@@ -353,22 +366,14 @@ router.get('/:id', (req, res) => {
   const comments = db.getComments(ticket.id);
   const parties = db.getParties(ticket.id);
 
-  // Fetch attachments grouped by comment (plus ticket-level attachments)
   const attachments = db.getAttachments(ticket.id);
-  const ticketAttachments = attachments.filter(a => !a.comment_id);
-  const commentAttachmentsMap = {};
-  for (const a of attachments.filter(a => a.comment_id)) {
-    if (!commentAttachmentsMap[a.comment_id]) commentAttachmentsMap[a.comment_id] = [];
-    commentAttachmentsMap[a.comment_id].push(a);
-  }
 
   res.render('tickets/detail', {
     title: `#${ticket.id} — ${ticket.subject}`,
     ticket,
     comments,
     parties,
-    ticketAttachments,
-    commentAttachmentsMap,
+    attachments,
     access,
     canManage: canManage(ticket, req.user),
     isSuperuser: req.user.isGroupSuperuser,
@@ -388,7 +393,7 @@ router.post('/:id/comments', upload.array('attachments'), async (req, res) => {
   if (!body.trim() && !req.files?.length) return res.redirect(`/tickets/${ticket.id}`);
 
   // Optional status change submitted alongside the comment
-  const validStatuses = ['open', 'pending', 'on_hold', 'completed', 'cancelled'];
+  const validStatuses = ['new', 'open', 'on_hold', 'closed'];
   const statusChange = req.body.status_change;
   const willChangeStatus = statusChange && validStatuses.includes(statusChange) &&
                            statusChange !== ticket.status && canManage(ticket, req.user);
@@ -470,7 +475,7 @@ router.post('/:id/status', async (req, res) => {
   if (!ticket) return res.status(404).json({ error: 'Not found' });
   if (!canManage(ticket, req.user)) return res.status(403).json({ error: 'Forbidden' });
 
-  const validStatuses = ['open', 'pending', 'on_hold', 'completed', 'cancelled'];
+  const validStatuses = ['new', 'open', 'on_hold', 'closed'];
   const status = req.body.status;
   if (!validStatuses.includes(status)) return res.status(400).json({ error: 'Invalid status' });
 

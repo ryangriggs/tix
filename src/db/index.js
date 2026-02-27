@@ -95,7 +95,7 @@ const SCHEMA = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     subject TEXT NOT NULL,
     body TEXT NOT NULL DEFAULT '',
-    status TEXT NOT NULL DEFAULT 'open',
+    status TEXT NOT NULL DEFAULT 'new',
     priority TEXT NOT NULL DEFAULT 'medium',
     due_date INTEGER,
     created_at INTEGER NOT NULL DEFAULT (unixepoch()),
@@ -476,6 +476,7 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
     updated_at:    't.updated_at',
     due_date:      't.due_date',
     priority:      "CASE t.priority WHEN 'urgent' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END",
+    status:        "CASE t.status WHEN 'new' THEN 4 WHEN 'open' THEN 3 WHEN 'on_hold' THEN 2 WHEN 'closed' THEN 1 ELSE 0 END",
     comment_count: 'comment_count',
     id:            't.id',
     subject:       't.subject',
@@ -497,12 +498,14 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
          JOIN users u ON u.id = tp2.user_id
          WHERE tp2.ticket_id = t.id AND tp2.role = 'submitter'
          LIMIT 1) AS submitter_name,
-      (SELECT CASE WHEN u.name IS NOT NULL AND u.name != ''
-                THEN u.name || ' <' || u.email || '>'
-                ELSE u.email END
+      (SELECT COALESCE(NULLIF(u.name, ''), u.email)
          FROM comments c JOIN users u ON u.id = c.user_id
          WHERE c.ticket_id = t.id
-         ORDER BY c.created_at DESC LIMIT 1) AS last_actor
+         ORDER BY c.created_at DESC LIMIT 1) AS last_actor,
+      (SELECT u.email
+         FROM comments c JOIN users u ON u.id = c.user_id
+         WHERE c.ticket_id = t.id
+         ORDER BY c.created_at DESC LIMIT 1) AS last_actor_email
     FROM tickets t
   `;
 
@@ -558,7 +561,7 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
   }
 
   if (conditions.length > 0) query += ' WHERE ' + conditions.join(' AND ');
-  query += ` ORDER BY ${sortCol} ${sortOrder}`;
+  query += ` ORDER BY CASE t.status WHEN 'new' THEN 0 ELSE 1 END ASC, ${sortCol} ${sortOrder}`;
 
   return prepare(query).all(...params);
 }
@@ -660,7 +663,15 @@ function addAttachment({ ticketId, commentId = null, originalName, storedName, m
 }
 
 function getAttachments(ticketId) {
-  return prepare('SELECT * FROM attachments WHERE ticket_id = ? ORDER BY created_at ASC').all(ticketId);
+  return prepare(`
+    SELECT a.*,
+      COALESCE(NULLIF(u.name, ''), u.email) AS uploader_name
+    FROM attachments a
+    LEFT JOIN comments c ON c.id = a.comment_id
+    LEFT JOIN users u ON u.id = c.user_id
+    WHERE a.ticket_id = ?
+    ORDER BY a.created_at ASC
+  `).all(ticketId);
 }
 
 function getAttachmentsByComment(commentId) {
@@ -783,7 +794,7 @@ function getTicketsDueSoon(withinHours = 24) {
     FROM tickets t
     JOIN ticket_parties tp ON tp.ticket_id = t.id
     JOIN users u ON u.id = tp.user_id
-    WHERE t.status NOT IN ('completed', 'cancelled')
+    WHERE t.status NOT IN ('closed')
       AND t.due_date IS NOT NULL
       AND t.due_date BETWEEN ? AND ?
       AND (tp.role = 'owner' OR tp.role = 'submitter')

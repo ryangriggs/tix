@@ -9,7 +9,7 @@
 <header class="app-header">
   <div class="app-header-inner">
     <a href="/" class="app-logo"><%= siteName %></a>
-    <nav class="app-nav">
+    <nav class="app-nav" id="app-nav">
       <a href="/tickets" class="nav-link">Tickets</a>
       <% if (user && user.role === 'admin') { %>
         <a href="/admin/users" class="nav-link">Users</a>
@@ -26,5 +26,27 @@
         </form>
       <% } %>
     </div>
+    <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
   </div>
 </header>
+<script>
+(function() {
+  var btn = document.getElementById('hamburger-btn');
+  var nav = document.getElementById('app-nav');
+  if (!btn || !nav) return;
+  btn.addEventListener('click', function() {
+    var open = nav.classList.toggle('nav-open');
+    btn.setAttribute('aria-expanded', open);
+    btn.classList.toggle('hamburger-active', open);
+  });
+  nav.addEventListener('click', function(e) {
+    if (e.target.closest('.nav-link')) {
+      nav.classList.remove('nav-open');
+      btn.classList.remove('hamburger-active');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+  });
+})();
+</script>
