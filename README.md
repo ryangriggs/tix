@@ -10,3 +10,6 @@ Email transports supported:
 Incoming message transports:
 - mailgun API endpoint
 - direct SMTP (listener)
+
+To set up auto-versioning:
+One-time setup note: The git config command is already done, but if you clone the repo fresh on another machine, run: git config core.hooksPath .githooks && chmod +x .githooks/pre-commit

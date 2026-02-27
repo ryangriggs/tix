@@ -60,6 +60,31 @@
       </table>
     <% } %>
   </div>
+
+  <!-- Browser cache -->
+  <div class="card" style="margin-top:1.5rem">
+    <h2 style="font-size:1rem;font-weight:600;margin-bottom:.25rem">Browser Cache</h2>
+    <p class="form-hint" style="margin-bottom:1.25rem">
+      If users report stale UI after an update, they can clear their local service-worker cache and reload.
+    </p>
+    <button type="button" class="btn btn-secondary" onclick="clearSWCache(this)">Clear cached files &amp; reload</button>
+  </div>
 </main>
+
+<script>
+async function clearSWCache(btn) {
+  btn.disabled = true;
+  btn.textContent = 'Clearing…';
+  if ('serviceWorker' in navigator) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    for (const r of regs) await r.unregister();
+  }
+  if ('caches' in window) {
+    const keys = await caches.keys();
+    for (const k of keys) await caches.delete(k);
+  }
+  window.location.reload();
+}
+</script>
 
 <%- include('../partials/foot') %>

@@ -1,0 +1,21 @@
+#!/bin/sh
+# Auto-bump patch version in package.json and sync the service-worker cache
+# name on every commit so deployed clients always pick up new assets.
+node - <<'JSEOF'
+const fs = require('fs');
+
+const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+const parts = pkg.version.split('.').map(Number);
+parts[2]++;
+pkg.version = parts.join('.');
+fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+
+const swPath = 'src/public/sw.js';
+let sw = fs.readFileSync(swPath, 'utf8');
+sw = sw.replace(/const CACHE = 'ticketing-v[^']+';/, `const CACHE = 'ticketing-v${pkg.version}';`);
+fs.writeFileSync(swPath, sw);
+
+process.stdout.write('[pre-commit] Version bumped to ' + pkg.version + '\n');
+JSEOF
+
+git add package.json src/public/sw.js
