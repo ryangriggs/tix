@@ -10,6 +10,7 @@
   <div class="app-header-inner">
     <a href="/" class="app-logo"><%= siteName %></a>
     <nav class="app-nav" id="app-nav">
+      <% if (user) { %><a href="/tickets/new" class="btn btn-primary btn-sm nav-new-ticket">+ New Ticket</a><% } %>
       <a href="/tickets" class="nav-link">Tickets</a>
       <% if (user && user.role === 'admin') { %>
         <a href="/admin/users" class="nav-link">Users</a>

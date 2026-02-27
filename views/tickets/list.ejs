@@ -4,7 +4,6 @@
 <main class="container">
   <div class="page-toolbar">
     <h1 class="page-title">Tickets</h1>
-    <a href="/tickets/new" class="btn btn-primary">+ New Ticket</a>
   </div>
 
   <!-- Filters & Search -->
@@ -21,7 +20,7 @@
       <% const statusNames = { new:'New', open:'Open', on_hold:'On Hold', closed:'Closed' }; %>
       <% const statusColors = { new:'#fbbf24', open:'#3b82f6', on_hold:'#f97316', closed:'#d1d5db' }; %>
       <% for (const s of statuses) { %>
-        <button type="button" class="filter-tab filter-tab-status <%= activeStatuses.includes(s) ? 'active' : '' %>"
+        <button type="button" class="filter-tab filter-tab-status filter-tab-s-<%= s %> <%= activeStatuses.includes(s) ? 'active' : '' %>"
                 style="border-left: 4px solid <%= statusColors[s] %>"
                 onclick="toggleFilter('status','<%= s %>')">
           <%= statusNames[s] %>
@@ -37,7 +36,7 @@
       <% const priorities = ['urgent','high','medium','low']; %>
       <% const priorityNames = { urgent:'Urgent', high:'High', medium:'Medium', low:'Low' }; %>
       <% for (const p of priorities) { %>
-        <button type="button" class="filter-tab <%= activePriorities.includes(p) ? 'active' : '' %>"
+        <button type="button" class="filter-tab filter-tab-p-<%= p %> <%= activePriorities.includes(p) ? 'active' : '' %>"
                 onclick="toggleFilter('priority','<%= p %>')">
           <span class="priority-dot priority-dot-<%= p %>"></span> <%= priorityNames[p] %>
         </button>
