@@ -13,3 +13,8 @@ Incoming message transports:
 
 To set up auto-versioning:
 One-time setup note: The git config command is already done, but if you clone the repo fresh on another machine, run: git config core.hooksPath .githooks && chmod +x .githooks/pre-commit
+
+Git commit steps:
+git add .
+git commit -m "comment"
+git push origin main
