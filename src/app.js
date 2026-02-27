@@ -120,6 +120,7 @@ app.get('/events', requireAuth, (req, res) => {
 // Error handlers
 // ============================================================
 app.use((req, res) => {
+  console.warn(`[404] ${req.method} ${req.originalUrl}`);
   res.status(404).render('error', { title: '404', message: 'Page not found.' });
 });
 

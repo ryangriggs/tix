@@ -1,4 +1,4 @@
-const CACHE = 'ticketing-v1.1.12';
+const CACHE = 'ticketing-v1.1.13';
 
 // Static assets to cache on install
 const PRECACHE = [
@@ -43,14 +43,6 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // HTML pages: network-first (always fresh), fall back to cache if offline
-  event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        const clone = response.clone();
-        caches.open(CACHE).then(c => c.put(event.request, clone));
-        return response;
-      })
-      .catch(() => caches.match(event.request))
-  );
+  // HTML pages: always fetch from network, never cache
+  // (data changes too frequently; offline mode isn't useful for a live ticketing app)
 });
