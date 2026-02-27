@@ -139,7 +139,6 @@
         <div class="ticket-card status-<%= t.status %>" data-ticket-id="<%= t.id %>">
           <a href="/tickets/<%= t.id %>" class="ticket-card-link">
             <span class="tc-num">
-              <span class="status-dot status-dot-<%= t.status %>" title="<%= t.status.replace(/_/g,' ') %>"></span>
               <span class="priority-dot priority-dot-<%= t.priority %>" title="<%= t.priority %> priority"></span>
               <%= formatTicketId(t.id) %>
             </span>

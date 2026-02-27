@@ -311,7 +311,7 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 .badge-priority-low    { background: transparent; color: #15803d; border: 1px solid currentColor; }
 .badge-priority-medium { background: transparent; color: #a16207; border: 1px solid currentColor; }
 .badge-priority-high   { background: transparent; color: #c2410c; border: 1px solid currentColor; }
-.badge-priority-urgent { background: transparent; color: #b91c1c; border: 1px solid currentColor; }
+.badge-priority-urgent { background: transparent; color: #6d28d9; border: 1px solid currentColor; }
 
 .badge-status-new    { background: transparent; color: #d97706;           border: 1px solid currentColor; }
 .badge-status-open   { background: transparent; color: var(--accent);     border: 1px solid currentColor; }
@@ -354,12 +354,12 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 .pill-btn.pill-status-closed.pill-active { background: #9ca3af; color: #fff; }
 
 /* Priority pills */
-.pill-btn.pill-priority-urgent { border-color: #dc2626; color: #dc2626; }
+.pill-btn.pill-priority-urgent { border-color: #6d28d9; color: #6d28d9; }
 .pill-btn.pill-priority-high   { border-color: #ea580c; color: #ea580c; }
 .pill-btn.pill-priority-medium { border-color: #2563eb; color: #2563eb; }
 .pill-btn.pill-priority-low    { border-color: #6b7280; color: #6b7280; }
 
-.pill-btn.pill-priority-urgent.pill-active { background: #dc2626; color: #fff; }
+.pill-btn.pill-priority-urgent.pill-active { background: #6d28d9; color: #fff; }
 .pill-btn.pill-priority-high.pill-active   { background: #ea580c; color: #fff; }
 .pill-btn.pill-priority-medium.pill-active { background: #2563eb; color: #fff; }
 .pill-btn.pill-priority-low.pill-active    { background: #6b7280; color: #fff; }
@@ -612,11 +612,11 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 .priority-dot-low    { background: #9ca3af; }
 .priority-dot-medium { background: #3b82f6; }
 .priority-dot-high   { background: #f97316; }
-.priority-dot-urgent { background: #ef4444; animation: urgent-pulse 1s ease-in-out infinite; }
+.priority-dot-urgent { background: #6d28d9; animation: urgent-pulse 1s ease-in-out infinite; }
 
 @keyframes urgent-pulse {
-  0%, 100% { background: #ef4444; }
-  50%       { background: #fca5a5; }
+  0%, 100% { background: #6d28d9; }
+  50%       { background: #c4b5fd; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 

@@ -83,7 +83,7 @@
 <script>
   const quill = new Quill('#editor', {
     theme: 'snow',
-    placeholder: 'Describe the issue…',
+    placeholder: 'Describe the issue… (Ctrl+Enter to submit)',
     modules: {
       toolbar: [
         ['bold', 'italic', 'underline', 'strike'],
@@ -91,7 +91,19 @@
         [{ list: 'ordered' }, { list: 'bullet' }],
         ['link'],
         ['clean'],
-      ]
+      ],
+      keyboard: {
+        bindings: {
+          submitTicket: {
+            key: 'Enter',
+            ctrlKey: true,
+            handler() {
+              document.getElementById('body').value = quill.root.innerHTML;
+              document.getElementById('ticket-form').submit();
+            }
+          }
+        }
+      }
     }
   });
 
