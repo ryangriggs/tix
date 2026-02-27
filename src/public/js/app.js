@@ -1,6 +1,17 @@
 'use strict';
 
 // ============================================================
+// Auto-select text on focus — all inputs and textareas
+// ============================================================
+document.addEventListener('focusin', e => {
+  const el = e.target;
+  if (el.tagName === 'TEXTAREA' ||
+      (el.tagName === 'INPUT' && /^(text|email|number|url|search|date|time)$/.test(el.type || 'text'))) {
+    el.select();
+  }
+});
+
+// ============================================================
 // Timestamp localisation — display in browser's local time/locale
 // ============================================================
 
