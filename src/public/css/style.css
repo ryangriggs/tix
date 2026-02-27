@@ -435,6 +435,9 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 .filter-tab:hover  { background: var(--bg); color: var(--text); }
 .filter-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
+/* Status filter tabs: square left corners so the 4px left border reads clearly */
+.filter-tab-status { border-radius: 0 999px 999px 0; }
+
 .filter-controls {
   display: flex;
   gap: 0.5rem;

@@ -18,12 +18,13 @@
       <button type="button" class="filter-tab <%= !activeStatuses.length ? 'active' : '' %>"
               onclick="toggleAll('status')">All</button>
       <% const statuses = ['new','open','on_hold','closed']; %>
-      <% const statusDots = { new:'flat-dot-new', open:'flat-dot-open', on_hold:'flat-dot-on_hold', closed:'flat-dot-closed' }; %>
       <% const statusNames = { new:'New', open:'Open', on_hold:'On Hold', closed:'Closed' }; %>
+      <% const statusColors = { new:'#fbbf24', open:'#3b82f6', on_hold:'#f97316', closed:'#d1d5db' }; %>
       <% for (const s of statuses) { %>
-        <button type="button" class="filter-tab <%= activeStatuses.includes(s) ? 'active' : '' %>"
+        <button type="button" class="filter-tab filter-tab-status <%= activeStatuses.includes(s) ? 'active' : '' %>"
+                style="border-left: 4px solid <%= statusColors[s] %>"
                 onclick="toggleFilter('status','<%= s %>')">
-          <span class="flat-dot <%= statusDots[s] %>"></span> <%= statusNames[s] %>
+          <%= statusNames[s] %>
         </button>
       <% } %>
     </div>
