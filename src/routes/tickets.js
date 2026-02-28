@@ -587,7 +587,7 @@ router.post('/:id/organization', (req, res) => {
   }
   db.updateTicket(ticket.id, { organization_id: orgId });
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'org', value: resolvedOrgName });
-  if (req.accepts('json')) return res.json({ ok: true, orgName: resolvedOrgName });
+  if (req.accepts('json')) return res.json({ ok: true, orgName: resolvedOrgName, orgId: orgId || null });
   res.redirect(`/tickets/${ticket.id}`);
 });
 

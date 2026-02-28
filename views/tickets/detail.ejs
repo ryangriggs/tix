@@ -335,14 +335,16 @@
     _quillDirty = false;
   });
 
-  // Location autocomplete (admin/tech only, when ticket has an org)
-  const locInput = document.getElementById('location-input');
-  if (locInput && !locInput.disabled) {
-    const orgId = locInput.dataset.orgId;
+  // Location autocomplete — init after app.js loads (app.js is in foot.ejs, after this block)
+  document.addEventListener('DOMContentLoaded', function () {
+    const locInput = document.getElementById('location-input');
+    if (!locInput) return;
+
+    // fetchUrl reads orgId dynamically so re-init isn't needed when org changes
     createAutocomplete(locInput, {
-      fetchUrl:   '/api/organizations/' + orgId + '/locations',
-      formatItem: l => l.name + (l.distance_miles > 0 ? ' (' + l.distance_miles + ' mi)' : ''),
-      onSelect:   l => {
+      fetchUrl:    q => `/api/organizations/${locInput.dataset.orgId}/locations?q=${encodeURIComponent(q)}`,
+      formatItem:  l => l.name + (l.distance_miles > 0 ? ' (' + l.distance_miles + ' mi)' : ''),
+      onSelect:    l => {
         document.getElementById('location-id').value = l.id;
         locInput.value = l.name;
       },
@@ -351,7 +353,7 @@
     locInput.addEventListener('input', () => {
       document.getElementById('location-id').value = '';
     });
-  }
+  });
 
   // Focus the editor on load — desktop only (mobile focus triggers keyboard)
   if (!('ontouchstart' in window || navigator.maxTouchPoints > 0)) quill.focus();
@@ -567,12 +569,23 @@ document.addEventListener('DOMContentLoaded', () => {
   if (orgForm) {
     orgForm.addEventListener('submit', async e => {
       e.preventDefault();
-      const input = orgForm.querySelector('[name="organization_name"]');
+      const input  = orgForm.querySelector('[name="organization_name"]');
       const setBtn = orgForm.querySelector('[type="submit"]');
       try {
         const data = await sidebarPost(`/tickets/${TICKET_ID}/organization`, { organization_name: input.value });
         if (data.orgName) input.value = data.orgName; // normalise capitalisation
         flashBtn(setBtn, true);
+
+        // Sync location input with new org
+        const locInput = document.getElementById('location-input');
+        if (locInput) {
+          locInput.dataset.orgId = data.orgId || '';
+          locInput.value = '';
+          document.getElementById('location-id').value = '';
+          const hasOrg = !!data.orgId;
+          locInput.disabled = !hasOrg || '<%= ticket.status %>' === 'closed';
+          locInput.placeholder = hasOrg ? 'Type or select a location…' : 'No organization assigned';
+        }
       } catch (err) { alert('Could not update organization: ' + err.message); }
     });
   }
