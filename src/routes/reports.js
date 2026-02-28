@@ -4,6 +4,7 @@ const express = require('express');
 const router  = express.Router();
 const { requireAdmin } = require('../middleware/auth');
 const db = require('../db');
+const { ticketPrefix } = require('../config');
 
 // GET /reports
 router.get('/', (req, res) => {
@@ -25,8 +26,9 @@ router.get('/billing.csv', requireAdmin, (req, res) => {
   const escape  = v => `"${String(v || '').replace(/"/g, '""')}"`;
   const fmtDate = ts => ts ? new Date(ts * 1000).toISOString().slice(0, 10) : '';
 
-  const header = 'Ticket Title,Creation Date,Close Date,Organization,Total Billable Hours';
+  const header = 'Ticket ID,Ticket Title,Creation Date,Close Date,Organization,Total Billable Hours';
   const lines  = rows.map(r => [
+    escape(`${ticketPrefix}${r.id}`),
     escape(r.subject),
     escape(fmtDate(r.created_at)),
     escape(fmtDate(r.close_date)),
