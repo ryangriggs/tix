@@ -289,8 +289,10 @@ router.get('/settings', (req, res) => {
   };
   res.render('admin/settings', {
     title: 'Settings',
-    siteName:       db.getSetting('site_name') ?? config.siteName,
-    defaultAssignee: db.getSetting('default_assignee_email') ?? config.defaultAssigneeEmail ?? '',
+    siteName:            db.getSetting('site_name') ?? config.siteName,
+    defaultAssignee:     db.getSetting('default_assignee_email') ?? config.defaultAssigneeEmail ?? '',
+    reminderCount:       db.getSetting('reminder_count') ?? '1',
+    reminderFreqHours:   db.getSetting('reminder_frequency_hours') ?? '24',
     configDisplay,
     message: req.query.message || null,
   });
@@ -303,8 +305,15 @@ router.post('/settings', (req, res) => {
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.redirect('/admin/settings?message=Invalid+email+address');
   }
+  const reminderCount = parseInt(req.body.reminder_count || '1', 10);
+  const reminderFreq  = parseFloat(req.body.reminder_frequency_hours || '24');
+  if (reminderCount < 0 || !isFinite(reminderCount)) return res.redirect('/admin/settings?message=Invalid+reminder+count');
+  if (reminderFreq  <= 0 || !isFinite(reminderFreq))  return res.redirect('/admin/settings?message=Invalid+reminder+frequency');
+
   if (siteName) db.setSetting('site_name', siteName);
   db.setSetting('default_assignee_email', email);
+  db.setSetting('reminder_count', String(reminderCount));
+  db.setSetting('reminder_frequency_hours', String(reminderFreq));
   res.redirect('/admin/settings?message=Settings+saved');
 });
 

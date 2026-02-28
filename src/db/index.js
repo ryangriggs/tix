@@ -254,9 +254,12 @@ async function initDb() {
   try { _db.exec('ALTER TABLE users   ADD COLUMN organization_id    INTEGER REFERENCES organizations(id) ON DELETE SET NULL'); } catch (_) {}
   try { _db.exec('ALTER TABLE users   ADD COLUMN is_group_superuser INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   try { _db.exec('ALTER TABLE tickets ADD COLUMN organization_id    INTEGER REFERENCES organizations(id) ON DELETE SET NULL'); } catch (_) {}
-  try { _db.exec('ALTER TABLE tickets  ADD COLUMN close_date     INTEGER'); } catch (_) {}
-  try { _db.exec('ALTER TABLE comments ADD COLUMN billable_hours REAL'); } catch (_) {}
-  try { _db.exec('ALTER TABLE comments ADD COLUMN work_type      TEXT'); } catch (_) {}
+  try { _db.exec('ALTER TABLE tickets  ADD COLUMN close_date      INTEGER'); } catch (_) {}
+  try { _db.exec('ALTER TABLE comments ADD COLUMN billable_hours  REAL'); } catch (_) {}
+  try { _db.exec('ALTER TABLE comments ADD COLUMN work_type       TEXT'); } catch (_) {}
+  try { _db.exec('ALTER TABLE tickets  ADD COLUMN reminders_sent  INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
+  // Back-fill close_date for tickets closed before this column existed
+  _db.exec(`UPDATE tickets SET close_date = updated_at WHERE status = 'closed' AND close_date IS NULL`);
   _db.exec('CREATE INDEX IF NOT EXISTS idx_tickets_org ON tickets(organization_id)');
   _db.exec('CREATE INDEX IF NOT EXISTS idx_users_org   ON users(organization_id)');
   // Back-fill reply tokens for any existing tickets that pre-date this migration
@@ -814,11 +817,29 @@ function getBillingReport(fromTs, toTs) {
     LEFT JOIN organizations o ON o.id = t.organization_id
     LEFT JOIN comments c ON c.ticket_id = t.id
     WHERE t.status = 'closed'
+      AND t.close_date IS NOT NULL
       AND t.close_date >= ? AND t.close_date <= ?
     GROUP BY t.id
-    HAVING total_hours > 0
+    HAVING COALESCE(SUM(c.billable_hours), 0) > 0
     ORDER BY t.close_date ASC
   `).all(fromTs, toTs);
+}
+
+function getTicketsForReminders() {
+  return prepare(`
+    SELECT t.id, t.subject, t.due_date, t.reply_token, t.reminders_sent,
+           u.email AS party_email
+    FROM tickets t
+    JOIN ticket_parties tp ON tp.ticket_id = t.id AND (tp.role = 'owner' OR tp.role = 'submitter')
+    JOIN users u ON u.id = tp.user_id AND (u.role = 'admin' OR u.role = 'technician')
+    WHERE t.status NOT IN ('closed')
+      AND t.due_date IS NOT NULL
+    ORDER BY t.id ASC
+  `).all();
+}
+
+function setTicketRemindersSent(ticketId, count) {
+  prepare('UPDATE tickets SET reminders_sent = ? WHERE id = ?').run(count, ticketId);
 }
 
 module.exports = {
@@ -843,7 +864,7 @@ module.exports = {
   // Settings
   getSetting, setSetting, getUserPrefs, setUserPrefs,
   // Reminders
-  getTicketsDueSoon,
+  getTicketsDueSoon, getTicketsForReminders, setTicketRemindersSent,
   // Reports
   getBillingReport,
   // Organizations

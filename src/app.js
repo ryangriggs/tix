@@ -9,7 +9,7 @@ const config = require('./config');
 const { requireAuth, requireAdmin, optionalAuth, verifyCsrf } = require('./middleware/auth');
 const { startSMTPServer } = require('./smtp');
 const sse = require('./services/sse');
-const { initDb, getTicketsDueSoon, getSetting } = require('./db');
+const { initDb, getTicketsForReminders, setTicketRemindersSent, getSetting } = require('./db');
 const { sendDueReminder } = require('./services/mail');
 
 const app = express();
@@ -155,12 +155,43 @@ async function start() {
 
   startSMTPServer();
 
-  // Due-date reminder — check every hour
+  // Due-date reminders — check every hour
   setInterval(async () => {
     try {
-      const due = getTicketsDueSoon(24);
-      for (const row of due) {
-        await sendDueReminder(row.party_email, row).catch(console.error);
+      const reminderCount = parseInt(getSetting('reminder_count') || '1', 10);
+      const freqHours     = parseFloat(getSetting('reminder_frequency_hours') || '24');
+      if (reminderCount < 1 || !(freqHours > 0)) return;
+
+      const freqSecs   = Math.round(freqHours * 3600);
+      const cronWindow = 3600; // 1-hour window matches cron interval
+      const now        = Math.floor(Date.now() / 1000);
+
+      // Group rows by ticket (one row per admin/tech party)
+      const rowMap = new Map();
+      for (const row of getTicketsForReminders()) {
+        if (!rowMap.has(row.id)) rowMap.set(row.id, { ...row, emails: [] });
+        rowMap.get(row.id).emails.push(row.party_email);
+      }
+
+      for (const t of rowMap.values()) {
+        for (let slot = t.reminders_sent; slot < reminderCount; slot++) {
+          const sendTime  = t.due_date - (reminderCount - slot) * freqSecs;
+          if (sendTime > now) break; // this and all later slots are in the future
+
+          const overdueBy = now - sendTime;
+          if (overdueBy <= cronWindow && t.emails.length > 0) {
+            // Within the cron window — send reminder to all admin/tech parties
+            for (const email of t.emails) {
+              await sendDueReminder(email, t).catch(console.error);
+            }
+            setTicketRemindersSent(t.id, slot + 1);
+            break; // only one reminder per ticket per run
+          } else {
+            // Slot is in the past (or no eligible parties) — skip it, advance
+            setTicketRemindersSent(t.id, slot + 1);
+            t.reminders_sent = slot + 1;
+          }
+        }
       }
     } catch (err) {
       console.error('[Reminders] Error:', err);

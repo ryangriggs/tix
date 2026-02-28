@@ -549,6 +549,7 @@ router.post('/:id/due-date', (req, res) => {
 
   const dueDate = req.body.due_date ? Math.floor(new Date(req.body.due_date).getTime() / 1000) : null;
   db.updateTicket(ticket.id, { due_date: dueDate });
+  if (dueDate !== ticket.due_date) db.setTicketRemindersSent(ticket.id, 0);
 
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'due_date', value: dueDate });
 

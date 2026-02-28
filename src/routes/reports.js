@@ -20,6 +20,7 @@ router.get('/billing.csv', requireAdmin, (req, res) => {
   if (isNaN(fromTs) || isNaN(toTs)) return res.status(400).send('Invalid date format');
 
   const rows = db.getBillingReport(fromTs, toTs);
+  console.log(`[Reports] Billing: from=${from}(${fromTs}) to=${to}(${toTs}), rows=${rows.length}`);
 
   const escape  = v => `"${String(v || '').replace(/"/g, '""')}"`;
   const fmtDate = ts => ts ? new Date(ts * 1000).toISOString().slice(0, 10) : '';
