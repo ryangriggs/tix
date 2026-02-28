@@ -8,86 +8,273 @@
     <div class="alert alert-info"><%= message %></div>
   <% } %>
 
-  <!-- Editable settings -->
-  <div class="card" style="margin-bottom:1.5rem">
-    <h2 style="font-size:1rem;font-weight:600;margin-bottom:1.25rem">Application Settings</h2>
-    <form method="POST" action="/admin/settings" class="ticket-form">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <form method="POST" action="/admin/settings" class="ticket-form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+    <!-- ── General ─────────────────────────────────────────── -->
+    <div class="card" style="margin-bottom:1.5rem">
+      <h2 class="settings-section-title">General</h2>
 
       <div class="form-group">
         <label for="site_name">Site name</label>
         <input type="text" id="site_name" name="site_name"
-               value="<%= siteName %>"
-               placeholder="✅ Tix"
-               class="form-input">
+               value="<%= s.site_name || '' %>" placeholder="✅ Tix" class="form-input">
         <p class="form-hint">Displayed in the navigation bar and on login pages.</p>
       </div>
 
       <div class="form-group">
-        <label for="default_assignee_email">Default assignee email</label>
-        <input type="email" id="default_assignee_email" name="default_assignee_email"
-               value="<%= defaultAssignee %>"
-               placeholder="assignee@example.com"
-               class="form-input">
-        <p class="form-hint">
-          Tickets created via inbound email or web (by others) are automatically assigned to this person.
-          Leave blank to disable.
-        </p>
+        <label for="app_url">Application URL</label>
+        <input type="url" id="app_url" name="app_url"
+               value="<%= s.app_url || '' %>" placeholder="https://tickets.example.com" class="form-input">
+        <p class="form-hint">Public base URL used in outbound email links. No trailing slash.</p>
       </div>
 
       <div class="form-group">
-        <label>Due-date reminders</label>
-        <div class="form-row" style="gap:.75rem;flex-wrap:wrap;align-items:flex-end">
-          <div style="flex:0 0 auto">
-            <label for="reminder_count" style="font-size:.85rem;font-weight:normal">Number of reminders</label>
-            <input type="number" id="reminder_count" name="reminder_count"
-                   value="<%= reminderCount %>" min="0" step="1"
-                   class="form-input form-input-sm" style="width:5rem">
-          </div>
-          <div style="flex:0 0 auto">
-            <label for="reminder_frequency_hours" style="font-size:.85rem;font-weight:normal">Frequency (hours apart)</label>
-            <input type="number" id="reminder_frequency_hours" name="reminder_frequency_hours"
-                   value="<%= reminderFreqHours %>" min="0.5" step="0.5"
+        <label for="ticket_email">Ticket email address</label>
+        <input type="email" id="ticket_email" name="ticket_email"
+               value="<%= s.ticket_email || '' %>" placeholder="tickets@example.com" class="form-input">
+        <p class="form-hint">Inbound address for new tickets and replies. The SMTP server's domain filter reflects this at startup — changes here require a restart to affect inbound routing.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="ticket_silent_email">Silent ticket email <span class="optional">(optional)</span></label>
+        <input type="email" id="ticket_silent_email" name="ticket_silent_email"
+               value="<%= s.ticket_silent_email || '' %>" placeholder="noreply@example.com" class="form-input">
+        <p class="form-hint">If set, emails to this address create tickets silently (no confirmation sent to sender).</p>
+      </div>
+
+      <div class="form-group">
+        <label for="ticket_prefix">Ticket ID prefix <span class="optional">(optional)</span></label>
+        <input type="text" id="ticket_prefix" name="ticket_prefix"
+               value="<%= s.ticket_prefix || '' %>" placeholder="TKT-" class="form-input" style="width:10rem">
+        <p class="form-hint">Prepended to ticket numbers in subject lines, e.g. <code>TKT-42</code>. Leave blank for plain numbers.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="mail_from_name">Mail from name</label>
+        <input type="text" id="mail_from_name" name="mail_from_name"
+               value="<%= s.mail_from_name || '' %>" placeholder="Ticketing" class="form-input">
+        <p class="form-hint">Display name used in the From header of outbound emails.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="admin_email">Admin email <span class="optional">(optional)</span></label>
+        <input type="email" id="admin_email" name="admin_email"
+               value="<%= s.admin_email || '' %>" placeholder="admin@example.com" class="form-input">
+        <p class="form-hint">First user created with this email is automatically given the admin role.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="default_assignee_email">Default assignee email <span class="optional">(optional)</span></label>
+        <input type="email" id="default_assignee_email" name="default_assignee_email"
+               value="<%= s.default_assignee_email || '' %>" placeholder="assignee@example.com" class="form-input">
+        <p class="form-hint">Tickets created via inbound email or web (by others) are automatically assigned to this person.</p>
+      </div>
+    </div>
+
+    <!-- ── Security ──────────────────────────────────────────── -->
+    <div class="card" style="margin-bottom:1.5rem">
+      <h2 class="settings-section-title">Security</h2>
+
+      <div class="form-group">
+        <label for="jwt_secret">JWT secret</label>
+        <input type="password" id="jwt_secret" name="jwt_secret"
+               value="<%= s.jwt_secret || '' %>" autocomplete="new-password" class="form-input">
+        <p class="form-hint">Signs session cookies. Changing this logs out all users. Use a long random string in production.</p>
+      </div>
+
+      <div class="form-group">
+        <label>Secure session cookie</label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="secure_session" value="1"
+                 <%= s.secure_session === 'true' ? 'checked' : '' %>>
+          Require HTTPS for session cookie (enable in production behind TLS)
+        </label>
+      </div>
+
+      <div class="form-row" style="gap:.75rem;flex-wrap:wrap">
+        <div class="form-group" style="flex:0 0 auto">
+          <label for="otp_max_tries">OTP max tries</label>
+          <input type="number" id="otp_max_tries" name="otp_max_tries"
+                 value="<%= s.otp_max_tries || '5' %>" min="1" step="1"
+                 class="form-input form-input-sm" style="width:5rem">
+        </div>
+        <div class="form-group" style="flex:0 0 auto">
+          <label for="otp_lockout_seconds">OTP lockout (seconds)</label>
+          <input type="number" id="otp_lockout_seconds" name="otp_lockout_seconds"
+                 value="<%= s.otp_lockout_seconds || '300' %>" min="0" step="1"
+                 class="form-input form-input-sm" style="width:6rem">
+        </div>
+      </div>
+      <p class="form-hint">After this many failed OTP attempts, the account is locked for the specified number of seconds.</p>
+    </div>
+
+    <!-- ── Due-date reminders ─────────────────────────────────── -->
+    <div class="card" style="margin-bottom:1.5rem">
+      <h2 class="settings-section-title">Due-date reminders</h2>
+
+      <div class="form-row" style="gap:.75rem;flex-wrap:wrap;align-items:flex-end">
+        <div style="flex:0 0 auto">
+          <label for="reminder_count" style="font-size:.85rem;font-weight:normal">Number of reminders</label>
+          <input type="number" id="reminder_count" name="reminder_count"
+                 value="<%= s.reminder_count || '1' %>" min="0" step="1"
+                 class="form-input form-input-sm" style="width:5rem">
+        </div>
+        <div style="flex:0 0 auto">
+          <label for="reminder_frequency_hours" style="font-size:.85rem;font-weight:normal">Frequency (hours apart)</label>
+          <input type="number" id="reminder_frequency_hours" name="reminder_frequency_hours"
+                 value="<%= s.reminder_frequency_hours || '24' %>" min="0.5" step="0.5"
+                 class="form-input form-input-sm" style="width:6rem">
+        </div>
+      </div>
+      <p class="form-hint">
+        Reminders are sent only to ticket owners with admin or technician roles.
+        Example: 3 reminders, 24 hours apart → sent 72h, 48h, and 24h before the due date.
+        Past reminder slots are skipped if the due date was set less than <em>count × frequency</em> hours in advance.
+        Set to 0 reminders to disable.
+      </p>
+    </div>
+
+    <!-- ── Email transport ──────────────────────────────────── -->
+    <div class="card" style="margin-bottom:1.5rem">
+      <h2 class="settings-section-title">Email Transport</h2>
+
+      <div class="form-group">
+        <label for="mail_transport">Transport</label>
+        <select id="mail_transport" name="mail_transport" class="form-select" style="width:auto">
+          <option value="mailgun" <%= (s.mail_transport||'mailgun')==='mailgun' ? 'selected':'' %>>Mailgun</option>
+          <option value="smtp"    <%= s.mail_transport==='smtp'    ? 'selected':'' %>>SMTP Relay</option>
+          <option value="gmail"   <%= s.mail_transport==='gmail'   ? 'selected':'' %>>Gmail API</option>
+        </select>
+      </div>
+
+      <!-- Mailgun -->
+      <div class="settings-transport-section" id="transport-mailgun">
+        <h3 class="settings-sub-title">Mailgun</h3>
+        <div class="form-group">
+          <label for="mailgun_api_key">API key</label>
+          <input type="password" id="mailgun_api_key" name="mailgun_api_key"
+                 value="<%= s.mailgun_api_key || '' %>" autocomplete="new-password" class="form-input">
+        </div>
+        <div class="form-group">
+          <label for="mailgun_domain">Domain</label>
+          <input type="text" id="mailgun_domain" name="mailgun_domain"
+                 value="<%= s.mailgun_domain || '' %>" placeholder="mg.example.com" class="form-input">
+        </div>
+      </div>
+
+      <!-- SMTP Relay -->
+      <div class="settings-transport-section" id="transport-smtp">
+        <h3 class="settings-sub-title">SMTP Relay</h3>
+        <div class="form-group">
+          <label for="smtp_relay_host">Host</label>
+          <input type="text" id="smtp_relay_host" name="smtp_relay_host"
+                 value="<%= s.smtp_relay_host || '' %>" placeholder="smtp.example.com" class="form-input">
+        </div>
+        <div class="form-row" style="gap:.75rem;flex-wrap:wrap">
+          <div class="form-group" style="flex:0 0 auto">
+            <label for="smtp_relay_port">Port</label>
+            <input type="number" id="smtp_relay_port" name="smtp_relay_port"
+                   value="<%= s.smtp_relay_port || '587' %>" min="1" max="65535" step="1"
                    class="form-input form-input-sm" style="width:6rem">
           </div>
         </div>
-        <p class="form-hint">
-          Reminders are sent only to ticket owners with admin or technician roles.
-          Example: 3 reminders, 24 hours apart → sent 72h, 48h, and 24h before the due date.
-          Past reminder slots are skipped if the due date was set less than <em>count × frequency</em> hours in advance.
-          Set to 0 reminders to disable.
-        </p>
+        <div class="form-group">
+          <label for="smtp_relay_user">Username</label>
+          <input type="text" id="smtp_relay_user" name="smtp_relay_user"
+                 value="<%= s.smtp_relay_user || '' %>" class="form-input">
+        </div>
+        <div class="form-group">
+          <label for="smtp_relay_pass">Password</label>
+          <input type="password" id="smtp_relay_pass" name="smtp_relay_pass"
+                 value="<%= s.smtp_relay_pass || '' %>" autocomplete="new-password" class="form-input">
+        </div>
       </div>
 
-      <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Save settings</button>
+      <!-- Gmail API -->
+      <div class="settings-transport-section" id="transport-gmail">
+        <h3 class="settings-sub-title">Gmail API</h3>
+        <p class="form-hint">Run <code>npm run gmail-setup</code> to obtain a refresh token.</p>
+        <div class="form-group">
+          <label for="gmail_client_id">Client ID</label>
+          <input type="text" id="gmail_client_id" name="gmail_client_id"
+                 value="<%= s.gmail_client_id || '' %>" class="form-input">
+        </div>
+        <div class="form-group">
+          <label for="gmail_client_secret">Client secret</label>
+          <input type="password" id="gmail_client_secret" name="gmail_client_secret"
+                 value="<%= s.gmail_client_secret || '' %>" autocomplete="new-password" class="form-input">
+        </div>
+        <div class="form-group">
+          <label for="gmail_refresh_token">Refresh token</label>
+          <input type="password" id="gmail_refresh_token" name="gmail_refresh_token"
+                 value="<%= s.gmail_refresh_token || '' %>" autocomplete="new-password" class="form-input">
+        </div>
+        <div class="form-group">
+          <label for="gmail_user">Gmail user (email)</label>
+          <input type="email" id="gmail_user" name="gmail_user"
+                 value="<%= s.gmail_user || '' %>" placeholder="you@gmail.com" class="form-input">
+        </div>
       </div>
-    </form>
-  </div>
+    </div>
 
-  <!-- Read-only system config -->
-  <div class="card">
-    <h2 style="font-size:1rem;font-weight:600;margin-bottom:.25rem">System Configuration</h2>
-    <p class="form-hint" style="margin-bottom:1.25rem">These values come from your <code>.env</code> file and require a server restart to change.</p>
+    <!-- ── Uploads & Rate Limits ─────────────────────────────── -->
+    <div class="card" style="margin-bottom:1.5rem">
+      <h2 class="settings-section-title">Uploads &amp; Rate Limits</h2>
 
-    <% const sections = Object.entries(configDisplay); %>
-    <% for (const [sectionKey, fields] of sections) { %>
-      <% const sectionTitle = { application:'Application', security:'Security', email:'Email Transport', mailgun:'Mailgun', smtp:'SMTP Relay', gmail:'Gmail API', uploads:'Uploads & Rate Limits' }[sectionKey] || sectionKey; %>
-      <h3 style="font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin:.75rem 0 .4rem"><%= sectionTitle %></h3>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:.75rem">
-        <% for (const [key, val] of Object.entries(fields)) { %>
-          <tr style="border-bottom:1px solid var(--border)">
-            <td style="padding:.35rem .5rem .35rem 0;font-size:.8rem;color:var(--text-muted);white-space:nowrap;width:55%"><%= key %></td>
-            <td style="padding:.35rem 0;font-size:.85rem;font-family:monospace;word-break:break-all"><%= val %></td>
-          </tr>
-        <% } %>
-      </table>
-    <% } %>
-  </div>
+      <div class="form-group">
+        <label for="upload_allowed_extensions">Allowed file extensions</label>
+        <input type="text" id="upload_allowed_extensions" name="upload_allowed_extensions"
+               value="<%= s.upload_allowed_extensions || '' %>" class="form-input">
+        <p class="form-hint">Comma-separated, no dots, case-insensitive. Leave blank to allow all (subject to blocked list).</p>
+      </div>
 
-  <!-- Browser cache -->
+      <div class="form-group">
+        <label for="upload_blocked_extensions">Blocked file extensions</label>
+        <input type="text" id="upload_blocked_extensions" name="upload_blocked_extensions"
+               value="<%= s.upload_blocked_extensions || '' %>" class="form-input">
+        <p class="form-hint">Always rejected even if in the allowed list. Leave blank to block nothing.</p>
+      </div>
+
+      <div class="form-row" style="gap:.75rem;flex-wrap:wrap">
+        <div class="form-group" style="flex:0 0 auto">
+          <label for="email_rate_limit_per_ticket">Rate limit per ticket (msgs/min)</label>
+          <input type="number" id="email_rate_limit_per_ticket" name="email_rate_limit_per_ticket"
+                 value="<%= s.email_rate_limit_per_ticket || '10' %>" min="0" step="1"
+                 class="form-input form-input-sm" style="width:6rem">
+        </div>
+        <div class="form-group" style="flex:0 0 auto">
+          <label for="email_rate_limit_new_tickets">Rate limit new tickets (msgs/min)</label>
+          <input type="number" id="email_rate_limit_new_tickets" name="email_rate_limit_new_tickets"
+                 value="<%= s.email_rate_limit_new_tickets || '3' %>" min="0" step="1"
+                 class="form-input form-input-sm" style="width:6rem">
+        </div>
+      </div>
+      <p class="form-hint">Maximum inbound email messages per minute. 0 disables the limit.</p>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Save settings</button>
+    </div>
+  </form>
+
+  <!-- ── Infrastructure (read-only) ──────────────────────────── -->
   <div class="card" style="margin-top:1.5rem">
-    <h2 style="font-size:1rem;font-weight:600;margin-bottom:.25rem">Browser Cache</h2>
+    <h2 class="settings-section-title">Infrastructure</h2>
+    <p class="form-hint" style="margin-bottom:1rem">These values come from your <code>.env</code> file and require a server restart to change.</p>
+    <table style="width:100%;border-collapse:collapse">
+      <% for (const [key, val] of Object.entries(infra)) { %>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:.35rem .5rem .35rem 0;font-size:.8rem;color:var(--text-muted);white-space:nowrap;width:40%"><%= key %></td>
+          <td style="padding:.35rem 0;font-size:.85rem;font-family:monospace;word-break:break-all"><%= val %></td>
+        </tr>
+      <% } %>
+    </table>
+  </div>
+
+  <!-- ── Browser cache ─────────────────────────────────────── -->
+  <div class="card" style="margin-top:1.5rem">
+    <h2 class="settings-section-title">Browser Cache</h2>
     <p class="form-hint" style="margin-bottom:1.25rem">
       If users report stale UI after an update, they can clear their local service-worker cache and reload.
     </p>
@@ -96,6 +283,18 @@
 </main>
 
 <script>
+// Show only the active transport section
+(function () {
+  const sel = document.getElementById('mail_transport');
+  function update() {
+    document.querySelectorAll('.settings-transport-section').forEach(el => {
+      el.style.display = el.id === 'transport-' + sel.value ? '' : 'none';
+    });
+  }
+  sel.addEventListener('change', update);
+  update();
+})();
+
 async function clearSWCache(btn) {
   btn.disabled = true;
   btn.textContent = 'Clearing…';

@@ -7,6 +7,7 @@ const router  = express.Router();
 const db = require('../db');
 const config = require('../config');
 const { issueSessionCookie } = require('../middleware/auth');
+const { resetMailTransport } = require('../services/mail');
 
 function maskSecret(val) {
   if (!val) return '(not set)';
@@ -278,42 +279,101 @@ router.get('/logs', (req, res) => {
 
 // GET /admin/settings
 router.get('/settings', (req, res) => {
-  const configDisplay = {
-    application: { APP_URL: config.appUrl, TICKET_EMAIL: config.ticketEmail, PORT: config.port, SMTP_PORT: config.smtpPort, ADMIN_EMAIL: config.adminEmail || '(not set)' },
-    security:    { JWT_SECRET: maskSecret(config.jwtSecret), OTP_MAX_TRIES: config.otpMaxTries, OTP_LOCKOUT_SECONDS: config.otpLockoutSeconds, SECURE_SESSION: config.secureSession },
-    email:       { MAIL_TRANSPORT: config.mailTransport },
-    mailgun:     { MAILGUN_API_KEY: maskSecret(config.mailgun.apiKey), MAILGUN_DOMAIN: config.mailgun.domain || '(not set)' },
-    smtp:        { SMTP_RELAY_HOST: config.smtpRelay.host || '(not set)', SMTP_RELAY_PORT: config.smtpRelay.port, SMTP_RELAY_USER: config.smtpRelay.user || '(not set)', SMTP_RELAY_PASS: config.smtpRelay.pass ? '***' : '(not set)' },
-    gmail:       { GMAIL_CLIENT_ID: maskSecret(config.gmail.clientId), GMAIL_CLIENT_SECRET: maskSecret(config.gmail.clientSecret), GMAIL_REFRESH_TOKEN: config.gmail.refreshToken ? 'Set ✓' : '(not set)', GMAIL_USER: config.gmail.user || '(not set)' },
-    uploads:     { UPLOAD_ALLOWED_EXTENSIONS: config.uploadAllowedExtensions, UPLOAD_BLOCKED_EXTENSIONS: config.uploadBlockedExtensions || '(none)', EMAIL_RATE_LIMIT_PER_TICKET: config.emailRateLimitPerTicket, EMAIL_RATE_LIMIT_NEW_TICKETS: config.emailRateLimitNewTickets },
-  };
+  const s = db.getAllSettings();
   res.render('admin/settings', {
-    title: 'Settings',
-    siteName:            db.getSetting('site_name') ?? config.siteName,
-    defaultAssignee:     db.getSetting('default_assignee_email') ?? config.defaultAssigneeEmail ?? '',
-    reminderCount:       db.getSetting('reminder_count') ?? '1',
-    reminderFreqHours:   db.getSetting('reminder_frequency_hours') ?? '24',
-    configDisplay,
+    title:   'Settings',
+    s,
+    // Infrastructure (restart-required) — read-only display
+    infra: {
+      PORT:       config.port,
+      SMTP_PORT:  config.smtpPort,
+      DATA_DIR:   config.dataDir,
+      UPLOADS_DIR: config.uploadsDir,
+      EMAIL_LOG:  config.emailLog  || '(not set)',
+      USER_LOG:   config.userLog   || '(not set)',
+    },
     message: req.query.message || null,
   });
 });
 
 // POST /admin/settings
 router.post('/settings', (req, res) => {
-  const siteName = (req.body.site_name || '').trim();
-  const email = (req.body.default_assignee_email || '').trim().toLowerCase();
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.redirect('/admin/settings?message=Invalid+email+address');
-  }
-  const reminderCount = parseInt(req.body.reminder_count || '1', 10);
-  const reminderFreq  = parseFloat(req.body.reminder_frequency_hours || '24');
-  if (reminderCount < 0 || !isFinite(reminderCount)) return res.redirect('/admin/settings?message=Invalid+reminder+count');
-  if (reminderFreq  <= 0 || !isFinite(reminderFreq))  return res.redirect('/admin/settings?message=Invalid+reminder+frequency');
+  const trim = k => (req.body[k] || '').trim();
+  const int  = (k, def) => { const v = parseInt(req.body[k], 10); return isFinite(v) ? v : def; };
+  const flt  = (k, def) => { const v = parseFloat(req.body[k]);   return isFinite(v) ? v : def; };
 
-  if (siteName) db.setSetting('site_name', siteName);
-  db.setSetting('default_assignee_email', email);
-  db.setSetting('reminder_count', String(reminderCount));
-  db.setSetting('reminder_frequency_hours', String(reminderFreq));
+  // Validate emails
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const defaultAssignee = trim('default_assignee_email').toLowerCase();
+  if (defaultAssignee && !emailRe.test(defaultAssignee))
+    return res.redirect('/admin/settings?message=Invalid+default+assignee+email');
+  const adminEmail = trim('admin_email').toLowerCase();
+  if (adminEmail && !emailRe.test(adminEmail))
+    return res.redirect('/admin/settings?message=Invalid+admin+email');
+  const ticketEmail = trim('ticket_email').toLowerCase();
+  if (ticketEmail && !emailRe.test(ticketEmail))
+    return res.redirect('/admin/settings?message=Invalid+ticket+email');
+  const gmailUser = trim('gmail_user').toLowerCase();
+  if (gmailUser && !emailRe.test(gmailUser))
+    return res.redirect('/admin/settings?message=Invalid+Gmail+user+email');
+
+  // Validate numerics
+  const reminderCount = int('reminder_count', 1);
+  const reminderFreq  = flt('reminder_frequency_hours', 24);
+  if (reminderCount < 0) return res.redirect('/admin/settings?message=Invalid+reminder+count');
+  if (reminderFreq  <= 0) return res.redirect('/admin/settings?message=Invalid+reminder+frequency');
+  const otpMaxTries       = int('otp_max_tries', 5);
+  const otpLockout        = int('otp_lockout_seconds', 300);
+  const rateLimitPerTicket = int('email_rate_limit_per_ticket', 10);
+  const rateLimitNew      = int('email_rate_limit_new_tickets', 3);
+  const smtpRelayPort     = int('smtp_relay_port', 587);
+
+  const mailTransport = trim('mail_transport');
+  if (mailTransport && !['mailgun', 'smtp', 'gmail'].includes(mailTransport))
+    return res.redirect('/admin/settings?message=Invalid+mail+transport');
+
+  const updates = {
+    app_url:                        trim('app_url').replace(/\/$/, ''),
+    ticket_email:                   ticketEmail,
+    ticket_silent_email:            trim('ticket_silent_email').toLowerCase(),
+    ticket_prefix:                  trim('ticket_prefix'),
+    mail_from_name:                 trim('mail_from_name'),
+    admin_email:                    adminEmail,
+    site_name:                      trim('site_name'),
+    default_assignee_email:         defaultAssignee,
+    jwt_secret:                     trim('jwt_secret'),
+    secure_session:                 req.body.secure_session === '1' ? 'true' : 'false',
+    otp_max_tries:                  String(otpMaxTries),
+    otp_lockout_seconds:            String(otpLockout),
+    mail_transport:                 mailTransport,
+    mailgun_api_key:                trim('mailgun_api_key'),
+    mailgun_domain:                 trim('mailgun_domain'),
+    smtp_relay_host:                trim('smtp_relay_host'),
+    smtp_relay_port:                String(smtpRelayPort),
+    smtp_relay_user:                trim('smtp_relay_user'),
+    smtp_relay_pass:                trim('smtp_relay_pass'),
+    gmail_client_id:                trim('gmail_client_id'),
+    gmail_client_secret:            trim('gmail_client_secret'),
+    gmail_refresh_token:            trim('gmail_refresh_token'),
+    gmail_user:                     gmailUser,
+    upload_allowed_extensions:      trim('upload_allowed_extensions'),
+    upload_blocked_extensions:      trim('upload_blocked_extensions'),
+    email_rate_limit_per_ticket:    String(rateLimitPerTicket),
+    email_rate_limit_new_tickets:   String(rateLimitNew),
+    reminder_count:                 String(reminderCount),
+    reminder_frequency_hours:       String(reminderFreq),
+  };
+
+  for (const [key, val] of Object.entries(updates)) {
+    if (val !== null && val !== undefined) db.setSetting(key, val);
+  }
+
+  // Apply new settings to live config
+  config.applySettings(updates);
+
+  // Reset cached mail transport so new credentials take effect
+  resetMailTransport();
+
   res.redirect('/admin/settings?message=Settings+saved');
 });
 

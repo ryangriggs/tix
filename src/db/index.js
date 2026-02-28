@@ -729,6 +729,20 @@ function setSetting(key, value) {
   prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, value);
 }
 
+function seedSetting(key, value) {
+  if (value === null || value === undefined) return;
+  prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run(key, String(value));
+}
+
+function getAllSettings() {
+  const rows = prepare(
+    "SELECT key, value FROM settings WHERE key NOT LIKE 'user_prefs_%' AND key != 'fts_migrated'"
+  ).all();
+  const map = {};
+  for (const row of rows) map[row.key] = row.value;
+  return map;
+}
+
 function getUserPrefs(userId) {
   const raw = getSetting(`user_prefs_${userId}`);
   try { return raw ? JSON.parse(raw) : {}; } catch (_) { return {}; }
@@ -862,7 +876,7 @@ module.exports = {
   // Email threading
   recordEmailMessage, findTicketByMessageId, findTicketByReplyToken,
   // Settings
-  getSetting, setSetting, getUserPrefs, setUserPrefs,
+  getSetting, setSetting, seedSetting, getAllSettings, getUserPrefs, setUserPrefs,
   // Reminders
   getTicketsDueSoon, getTicketsForReminders, setTicketRemindersSent,
   // Reports

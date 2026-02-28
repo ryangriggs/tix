@@ -214,4 +214,6 @@ async function sendDueReminder(email, ticket) {
   });
 }
 
-module.exports = { send, sendMagicLink, sendTicketNotification, sendDueReminder };
+function resetMailTransport() { _transport = null; }
+
+module.exports = { send, sendMagicLink, sendTicketNotification, sendDueReminder, resetMailTransport };

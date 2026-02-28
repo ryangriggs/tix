@@ -9,7 +9,7 @@ const config = require('./config');
 const { requireAuth, requireAdmin, optionalAuth, verifyCsrf } = require('./middleware/auth');
 const { startSMTPServer } = require('./smtp');
 const sse = require('./services/sse');
-const { initDb, getTicketsForReminders, setTicketRemindersSent, getSetting } = require('./db');
+const { initDb, getTicketsForReminders, setTicketRemindersSent, getSetting, seedSetting, getAllSettings } = require('./db');
 const { sendDueReminder } = require('./services/mail');
 
 const app = express();
@@ -141,6 +141,46 @@ app.use((err, req, res, _next) => {
 // ============================================================
 async function start() {
   await initDb();
+
+  // Seed configurable settings from .env defaults (INSERT OR IGNORE — won't overwrite DB values).
+  // This runs once on first boot, migrating .env values into the DB.
+  const seedDefaults = {
+    app_url:                        config.appUrl,
+    ticket_email:                   config.ticketEmail,
+    ticket_silent_email:            config.ticketSilentEmail,
+    ticket_prefix:                  config.ticketPrefix,
+    mail_from_name:                 config.mailFromName,
+    admin_email:                    config.adminEmail,
+    site_name:                      config.siteName,
+    default_assignee_email:         config.defaultAssigneeEmail,
+    jwt_secret:                     config.jwtSecret,
+    secure_session:                 String(config.secureSession),
+    otp_max_tries:                  String(config.otpMaxTries),
+    otp_lockout_seconds:            String(config.otpLockoutSeconds),
+    mail_transport:                 config.mailTransport,
+    mailgun_api_key:                config.mailgun.apiKey,
+    mailgun_domain:                 config.mailgun.domain,
+    smtp_relay_host:                config.smtpRelay.host,
+    smtp_relay_port:                String(config.smtpRelay.port),
+    smtp_relay_user:                config.smtpRelay.user,
+    smtp_relay_pass:                config.smtpRelay.pass,
+    gmail_client_id:                config.gmail.clientId,
+    gmail_client_secret:            config.gmail.clientSecret,
+    gmail_refresh_token:            config.gmail.refreshToken,
+    gmail_user:                     config.gmail.user,
+    upload_allowed_extensions:      config.uploadAllowedExtensions,
+    upload_blocked_extensions:      config.uploadBlockedExtensions,
+    email_rate_limit_per_ticket:    String(config.emailRateLimitPerTicket),
+    email_rate_limit_new_tickets:   String(config.emailRateLimitNewTickets),
+    reminder_count:                 '1',
+    reminder_frequency_hours:       '24',
+  };
+  for (const [key, val] of Object.entries(seedDefaults)) {
+    if (val !== null && val !== undefined) seedSetting(key, val);
+  }
+
+  // Apply DB settings on top of config (DB values win over .env).
+  config.applySettings(getAllSettings());
 
   const server = app.listen(config.port, '0.0.0.0', () => {
     console.log(`[HTTP] Listening on port ${config.port} (${process.env.NODE_ENV || 'development'})`);

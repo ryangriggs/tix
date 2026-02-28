@@ -1257,3 +1257,8 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 }
 .report-card-title { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.35rem; }
 .report-card-desc  { font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem; }
+
+/* Settings page */
+.settings-section-title { font-size: 1rem; font-weight: 600; margin-bottom: 1.25rem; }
+.settings-sub-title { font-size: .875rem; font-weight: 600; margin: 1rem 0 .5rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.settings-transport-section { border-top: 1px solid var(--border); margin-top: 1rem; padding-top: .75rem; }

@@ -67,4 +67,43 @@ const config = {
 
 };
 
+// Apply DB-stored settings on top of config (called after DB is ready).
+// Uses INSERT OR IGNORE seeding so .env values serve as one-time defaults.
+function applySettings(map) {
+  if ('app_url'                in map) config.appUrl                = (map.app_url || '').replace(/\/$/, '') || config.appUrl;
+  if ('ticket_email'           in map) config.ticketEmail           = map.ticket_email           || config.ticketEmail;
+  if ('ticket_silent_email'    in map) config.ticketSilentEmail     = map.ticket_silent_email    || '';
+  if ('ticket_prefix'          in map) config.ticketPrefix          = map.ticket_prefix          || '';
+  if ('mail_from_name'         in map) config.mailFromName          = map.mail_from_name         || config.mailFromName;
+  if ('admin_email'            in map) config.adminEmail            = map.admin_email            || null;
+  if ('site_name'              in map) config.siteName              = map.site_name              || config.siteName;
+  if ('default_assignee_email' in map) config.defaultAssigneeEmail  = map.default_assignee_email || null;
+
+  if ('jwt_secret'          in map) config.jwtSecret         = map.jwt_secret          || config.jwtSecret;
+  if ('secure_session'      in map) config.secureSession      = map.secure_session      === 'true';
+  if ('otp_max_tries'       in map) config.otpMaxTries        = parseInt(map.otp_max_tries,       10) || config.otpMaxTries;
+  if ('otp_lockout_seconds' in map) config.otpLockoutSeconds  = parseInt(map.otp_lockout_seconds, 10) || config.otpLockoutSeconds;
+
+  if ('mail_transport' in map) config.mailTransport = map.mail_transport || config.mailTransport;
+
+  if ('mailgun_api_key' in map) config.mailgun.apiKey  = map.mailgun_api_key || '';
+  if ('mailgun_domain'  in map) config.mailgun.domain  = map.mailgun_domain  || '';
+
+  if ('smtp_relay_host' in map) config.smtpRelay.host = map.smtp_relay_host || '';
+  if ('smtp_relay_port' in map) config.smtpRelay.port = parseInt(map.smtp_relay_port, 10) || 587;
+  if ('smtp_relay_user' in map) config.smtpRelay.user = map.smtp_relay_user || '';
+  if ('smtp_relay_pass' in map) config.smtpRelay.pass = map.smtp_relay_pass || '';
+
+  if ('gmail_client_id'     in map) config.gmail.clientId     = map.gmail_client_id     || '';
+  if ('gmail_client_secret' in map) config.gmail.clientSecret = map.gmail_client_secret || '';
+  if ('gmail_refresh_token' in map) config.gmail.refreshToken = map.gmail_refresh_token || '';
+  if ('gmail_user'          in map) config.gmail.user         = map.gmail_user          || '';
+
+  if ('upload_allowed_extensions'   in map) config.uploadAllowedExtensions  = map.upload_allowed_extensions   || config.uploadAllowedExtensions;
+  if ('upload_blocked_extensions'   in map) config.uploadBlockedExtensions   = map.upload_blocked_extensions   || '';
+  if ('email_rate_limit_per_ticket'  in map) config.emailRateLimitPerTicket  = parseInt(map.email_rate_limit_per_ticket,  10) || 0;
+  if ('email_rate_limit_new_tickets' in map) config.emailRateLimitNewTickets = parseInt(map.email_rate_limit_new_tickets, 10) || 0;
+}
+
 module.exports = config;
+module.exports.applySettings = applySettings;
