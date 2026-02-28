@@ -44,4 +44,15 @@ router.get('/organizations/search', (req, res) => {
   res.json(orgs.map(o => ({ id: o.id, name: o.name })));
 });
 
+// GET /api/organizations/:id/locations?q= — admin/tech only (used by reply form autocomplete)
+router.get('/organizations/:id/locations', (req, res) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'technician')
+    return res.json([]);
+  const id = parseInt(req.params.id, 10);
+  const q  = (req.query.q || '').toLowerCase();
+  let locs = db.getLocationsByOrg(id);
+  if (q) locs = locs.filter(l => l.name.toLowerCase().includes(q));
+  res.json(locs);
+});
+
 module.exports = router;

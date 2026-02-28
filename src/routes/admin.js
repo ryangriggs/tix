@@ -197,6 +197,14 @@ router.get('/organizations', (req, res) => {
   });
 });
 
+// GET /admin/organizations/:id/json — org + locations for dialog
+router.get('/organizations/:id/json', (req, res) => {
+  const id  = parseInt(req.params.id, 10);
+  const org = db.getOrganizationById(id);
+  if (!org) return res.status(404).json({ error: 'Not found' });
+  res.json({ org, locations: db.getLocationsByOrg(id) });
+});
+
 // POST /admin/organizations/:id/rename
 router.post('/organizations/:id/rename', (req, res) => {
   const id   = parseInt(req.params.id, 10);
@@ -211,6 +219,38 @@ router.post('/organizations/:id/delete', (req, res) => {
   const id = parseInt(req.params.id, 10);
   db.deleteOrganization(id);
   res.redirect('/admin/organizations?message=Organization+deleted');
+});
+
+// POST /admin/organizations/:id/locations/add
+router.post('/organizations/:id/locations/add', (req, res) => {
+  const orgId = parseInt(req.params.id, 10);
+  const name  = (req.body.name || '').trim();
+  const dist  = parseFloat(req.body.distance_miles) || 0;
+  if (!name) return res.json({ error: 'Name is required' });
+  const loc = db.createLocation(orgId, name, dist);
+  if (!loc) return res.json({ error: 'Could not create location' });
+  res.json(loc);
+});
+
+// POST /admin/organizations/:id/locations/:locId/update
+router.post('/organizations/:id/locations/:locId/update', (req, res) => {
+  const locId = parseInt(req.params.locId, 10);
+  const name  = (req.body.name || '').trim();
+  const dist  = parseFloat(req.body.distance_miles);
+  db.updateLocation(locId, {
+    ...(name                 ? { name }                          : {}),
+    ...(!isNaN(dist)         ? { distance_miles: dist }          : {}),
+  });
+  res.json({ ok: true });
+});
+
+// POST /admin/organizations/:id/locations/:locId/delete
+router.post('/organizations/:id/locations/:locId/delete', (req, res) => {
+  const locId = parseInt(req.params.locId, 10);
+  if (db.isLocationReferenced(locId))
+    return res.json({ error: 'This location is used in one or more comments and cannot be deleted.' });
+  db.deleteLocation(locId);
+  res.json({ ok: true });
 });
 
 // Helper — read last N lines of a log file, newest first

@@ -29,6 +29,26 @@
         <p class="form-hint" id="billing-error" style="color:var(--danger,#dc2626);display:none"></p>
       </div>
 
+      <!-- Travel Report -->
+      <div class="report-card">
+        <div class="report-card-title">Travel Report</div>
+        <p class="report-card-desc">Generate a report of locations visited, grouped by organization and location, for the specified date range. Based on reply dates.</p>
+        <div class="form-row" style="align-items:flex-end;gap:.75rem;flex-wrap:wrap">
+          <div class="form-group" style="flex:0 0 auto;margin-bottom:0">
+            <label for="travel-from">Start Date</label>
+            <input type="date" id="travel-from" class="form-input form-input-sm">
+          </div>
+          <div class="form-group" style="flex:0 0 auto;margin-bottom:0">
+            <label for="travel-to">End Date</label>
+            <input type="date" id="travel-to" class="form-input form-input-sm">
+          </div>
+          <div class="form-group" style="flex:0 0 auto;margin-bottom:0;padding-top:1.5rem">
+            <button type="button" class="btn btn-primary" onclick="runTravelReport()">Run</button>
+          </div>
+        </div>
+        <p class="form-hint" id="travel-error" style="color:var(--danger,#dc2626);display:none"></p>
+      </div>
+
     </div>
   <% } else { %>
     <p class="text-muted">No reports are available for your account.</p>
@@ -44,6 +64,16 @@ function runBillingReport() {
   if (!from || !to) { err.textContent = 'Please select both a start and end date.'; err.style.display = ''; return; }
   if (from > to)    { err.textContent = 'Start date must be on or before the end date.'; err.style.display = ''; return; }
   window.location = `/reports/billing.csv?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+}
+
+function runTravelReport() {
+  const from = document.getElementById('travel-from').value;
+  const to   = document.getElementById('travel-to').value;
+  const err  = document.getElementById('travel-error');
+  err.style.display = 'none';
+  if (!from || !to) { err.textContent = 'Please select both a start and end date.'; err.style.display = ''; return; }
+  if (from > to)    { err.textContent = 'Start date must be on or before the end date.'; err.style.display = ''; return; }
+  window.location = `/reports/travel.csv?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
 }
 </script>
 

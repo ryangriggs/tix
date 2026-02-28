@@ -15,23 +15,18 @@
       <thead>
         <tr>
           <th>Name</th>
-          <th>Actions</th>
+          <th style="width:1%">Actions</th>
         </tr>
       </thead>
       <tbody>
         <% for (const o of organizations) { %>
           <tr>
-            <td>
-              <form method="POST" action="/admin/organizations/<%= o.id %>/rename" class="inline-form">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <input type="text" name="name" value="<%= o.name %>"
-                       class="form-input form-input-sm" style="width:260px" required>
-                <button type="submit" class="btn btn-sm btn-secondary">Rename</button>
-              </form>
-            </td>
-            <td>
-              <form method="POST" action="/admin/organizations/<%= o.id %>/delete"
-                    onsubmit="return confirm('Delete organization &quot;<%= o.name %>&quot;?\nUsers and tickets will lose this org assignment.')">
+            <td><%= o.name %></td>
+            <td style="white-space:nowrap;display:flex;gap:.4rem">
+              <button class="btn btn-sm btn-secondary"
+                      onclick="openOrgDialog(<%= o.id %>, <%= JSON.stringify(o.name) %>)">Edit</button>
+              <form method="POST" action="/admin/organizations/<%= o.id %>/delete" style="display:inline"
+                    onsubmit="return confirm('Delete organization «<%= o.name %>»?\nUsers and tickets will lose this org assignment.')">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <button type="submit" class="btn btn-sm btn-danger">Delete</button>
               </form>
@@ -42,5 +37,143 @@
     </table>
   <% } %>
 </main>
+
+<!-- Org Edit Dialog -->
+<dialog id="org-dialog" class="modal-dialog">
+  <div class="modal-header">
+    <h2 id="org-dialog-title" style="font-size:1.1rem;font-weight:600;margin:0"></h2>
+    <button class="btn-icon" onclick="document.getElementById('org-dialog').close()" title="Close">✕</button>
+  </div>
+
+  <div class="modal-body">
+    <!-- Rename -->
+    <div class="form-group">
+      <label style="font-size:.85rem;font-weight:600">Organization Name</label>
+      <div style="display:flex;gap:.5rem">
+        <input type="text" id="org-name-input" class="form-input" style="flex:1">
+        <button class="btn btn-secondary btn-sm" onclick="saveOrgName()">Save</button>
+      </div>
+      <p id="org-name-error" class="form-hint" style="color:var(--danger);display:none"></p>
+    </div>
+
+    <!-- Locations list -->
+    <div style="margin-top:1.25rem">
+      <h3 style="font-size:.85rem;font-weight:600;margin-bottom:.6rem">Locations</h3>
+      <div id="org-locations-list"></div>
+
+      <!-- Add location form -->
+      <div style="display:flex;gap:.5rem;align-items:flex-end;margin-top:.75rem;flex-wrap:wrap">
+        <div style="flex:1 1 160px">
+          <label style="font-size:.8rem;color:var(--text-muted)">Name</label>
+          <input type="text" id="new-loc-name" class="form-input form-input-sm" placeholder="Location name">
+        </div>
+        <div style="flex:0 0 100px">
+          <label style="font-size:.8rem;color:var(--text-muted)">Distance (mi)</label>
+          <input type="number" id="new-loc-dist" class="form-input form-input-sm"
+                 min="0" step="0.1" placeholder="0" style="width:100%">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="addLocation()">Add</button>
+      </div>
+      <p id="loc-add-error" class="form-hint" style="color:var(--danger);display:none"></p>
+    </div>
+  </div>
+</dialog>
+
+<script>
+let _orgDialogId  = null;
+let _csrfToken    = '<%= csrfToken %>';
+
+function openOrgDialog(orgId, orgName) {
+  _orgDialogId = orgId;
+  document.getElementById('org-dialog-title').textContent = 'Edit: ' + orgName;
+  document.getElementById('org-name-input').value = orgName;
+  document.getElementById('org-name-error').style.display = 'none';
+  document.getElementById('loc-add-error').style.display  = 'none';
+  document.getElementById('new-loc-name').value = '';
+  document.getElementById('new-loc-dist').value = '';
+  loadLocations();
+  document.getElementById('org-dialog').showModal();
+}
+
+async function loadLocations() {
+  const res  = await fetch('/admin/organizations/' + _orgDialogId + '/json');
+  const data = await res.json();
+  renderLocations(data.locations);
+}
+
+function renderLocations(locs) {
+  const el = document.getElementById('org-locations-list');
+  if (!locs.length) {
+    el.innerHTML = '<p style="font-size:.85rem;color:var(--text-muted)">No locations yet.</p>';
+    return;
+  }
+  el.innerHTML = locs.map(l => `
+    <div class="loc-row" id="loc-row-${l.id}" style="display:flex;align-items:center;gap:.5rem;padding:.35rem 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
+      <input type="text" value="${escHtml(l.name)}" data-id="${l.id}" data-field="name"
+             class="form-input form-input-sm loc-name-input" style="flex:1 1 140px">
+      <input type="number" value="${l.distance_miles}" data-id="${l.id}" data-field="dist"
+             class="form-input form-input-sm loc-dist-input" min="0" step="0.1" style="width:80px"
+             title="Distance (mi)">
+      <button class="btn btn-sm btn-secondary" onclick="saveLocation(${l.id})">Save</button>
+      <button class="btn btn-sm btn-danger"    onclick="deleteLocation(${l.id})">Delete</button>
+    </div>
+  `).join('');
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function saveOrgName() {
+  const name = document.getElementById('org-name-input').value.trim();
+  const errEl = document.getElementById('org-name-error');
+  if (!name) { errEl.textContent = 'Name is required.'; errEl.style.display = ''; return; }
+  errEl.style.display = 'none';
+  const body = new URLSearchParams({ _csrf: _csrfToken, name });
+  const res  = await fetch('/admin/organizations/' + _orgDialogId + '/rename', { method: 'POST', body });
+  if (res.redirected || res.ok) {
+    document.getElementById('org-dialog-title').textContent = 'Edit: ' + name;
+    // Update the row in the table
+    const rows = document.querySelectorAll('.data-table tbody td:first-child');
+    rows.forEach(td => { if (td.textContent.trim() === document.getElementById('org-dialog-title').textContent.replace('Edit: ','')) td.textContent = name; });
+    location.reload();
+  }
+}
+
+async function addLocation() {
+  const name  = document.getElementById('new-loc-name').value.trim();
+  const dist  = parseFloat(document.getElementById('new-loc-dist').value) || 0;
+  const errEl = document.getElementById('loc-add-error');
+  if (!name) { errEl.textContent = 'Name is required.'; errEl.style.display = ''; return; }
+  errEl.style.display = 'none';
+  const body = new URLSearchParams({ _csrf: _csrfToken, name, distance_miles: dist });
+  const res  = await fetch('/admin/organizations/' + _orgDialogId + '/locations/add', { method: 'POST', body });
+  const data = await res.json();
+  if (data.error) { errEl.textContent = data.error; errEl.style.display = ''; return; }
+  document.getElementById('new-loc-name').value = '';
+  document.getElementById('new-loc-dist').value = '';
+  loadLocations();
+}
+
+async function saveLocation(locId) {
+  const row  = document.getElementById('loc-row-' + locId);
+  const name = row.querySelector('.loc-name-input').value.trim();
+  const dist = parseFloat(row.querySelector('.loc-dist-input').value) || 0;
+  const body = new URLSearchParams({ _csrf: _csrfToken, name, distance_miles: dist });
+  const res  = await fetch('/admin/organizations/' + _orgDialogId + '/locations/' + locId + '/update', { method: 'POST', body });
+  const data = await res.json();
+  if (data.error) { alert(data.error); return; }
+  loadLocations();
+}
+
+async function deleteLocation(locId) {
+  if (!confirm('Delete this location?')) return;
+  const body = new URLSearchParams({ _csrf: _csrfToken });
+  const res  = await fetch('/admin/organizations/' + _orgDialogId + '/locations/' + locId + '/delete', { method: 'POST', body });
+  const data = await res.json();
+  if (data.error) { alert(data.error); return; }
+  loadLocations();
+}
+</script>
 
 <%- include('../partials/foot') %>

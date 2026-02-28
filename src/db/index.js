@@ -155,6 +155,14 @@ const SCHEMA = `
     PRIMARY KEY (technician_id, organization_id)
   );
 
+  CREATE TABLE IF NOT EXISTS locations (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    name            TEXT    NOT NULL,
+    distance_miles  REAL    NOT NULL DEFAULT 0,
+    UNIQUE(organization_id, name COLLATE NOCASE)
+  );
+
   CREATE INDEX IF NOT EXISTS idx_tech_orgs_tech ON technician_organizations(technician_id);
   CREATE INDEX IF NOT EXISTS idx_tech_orgs_org  ON technician_organizations(organization_id);
   CREATE INDEX IF NOT EXISTS idx_ticket_parties_ticket ON ticket_parties(ticket_id);
@@ -256,8 +264,10 @@ async function initDb() {
   try { _db.exec('ALTER TABLE tickets ADD COLUMN organization_id    INTEGER REFERENCES organizations(id) ON DELETE SET NULL'); } catch (_) {}
   try { _db.exec('ALTER TABLE tickets  ADD COLUMN close_date      INTEGER'); } catch (_) {}
   try { _db.exec('ALTER TABLE comments ADD COLUMN billable_hours  REAL'); } catch (_) {}
-  try { _db.exec('ALTER TABLE comments ADD COLUMN work_type       TEXT'); } catch (_) {}
+  try { _db.exec('ALTER TABLE comments DROP COLUMN work_type'); } catch (_) {}
   try { _db.exec('ALTER TABLE tickets  ADD COLUMN reminders_sent  INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
+  try { _db.exec('ALTER TABLE comments ADD COLUMN location_id     INTEGER REFERENCES locations(id)'); } catch (_) {}
+  _db.exec('CREATE INDEX IF NOT EXISTS idx_comments_location ON comments(location_id)');
   // Back-fill close_date for tickets closed before this column existed
   _db.exec(`UPDATE tickets SET close_date = updated_at WHERE status = 'closed' AND close_date IS NULL`);
   _db.exec('CREATE INDEX IF NOT EXISTS idx_tickets_org ON tickets(organization_id)');
@@ -635,10 +645,10 @@ function getPartyUserIds(ticketId) {
 // Comments
 // ============================================================
 
-function addComment(ticketId, userId, body, isEmail = false, billableHours = null, workType = null) {
+function addComment(ticketId, userId, body, isEmail = false, billableHours = null, locationId = null) {
   const result = prepare(`
-    INSERT INTO comments (ticket_id, user_id, body, is_email, billable_hours, work_type) VALUES (?, ?, ?, ?, ?, ?)
-  `).run(ticketId, userId, body, isEmail ? 1 : 0, billableHours || null, workType || null);
+    INSERT INTO comments (ticket_id, user_id, body, is_email, billable_hours, location_id) VALUES (?, ?, ?, ?, ?, ?)
+  `).run(ticketId, userId, body, isEmail ? 1 : 0, billableHours || null, locationId || null);
   prepare('UPDATE tickets SET updated_at = unixepoch() WHERE id = ?').run(ticketId);
   return prepare('SELECT * FROM comments WHERE id = ?').get(result.lastInsertRowid);
 }
@@ -649,9 +659,11 @@ function deleteComment(id) {
 
 function getComments(ticketId) {
   return prepare(`
-    SELECT c.*, u.email AS user_email, u.name AS user_name
+    SELECT c.*, u.email AS user_email, u.name AS user_name,
+           l.name AS location_name, l.distance_miles AS location_distance
     FROM comments c
     LEFT JOIN users u ON c.user_id = u.id
+    LEFT JOIN locations l ON l.id = c.location_id
     WHERE c.ticket_id = ?
     ORDER BY c.created_at DESC
   `).all(ticketId);
@@ -783,6 +795,71 @@ function deleteOrganization(id) {
   prepare('DELETE FROM organizations WHERE id = ?').run(id);
 }
 
+function getOrganizationById(id) {
+  return prepare('SELECT * FROM organizations WHERE id = ?').get(id);
+}
+
+// ============================================================
+// Locations
+// ============================================================
+
+function getLocationsByOrg(orgId) {
+  return prepare('SELECT * FROM locations WHERE organization_id = ? ORDER BY name ASC').all(orgId);
+}
+
+function getLocationById(id) {
+  return prepare('SELECT * FROM locations WHERE id = ?').get(id);
+}
+
+function createLocation(orgId, name, distance_miles = 0) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return null;
+  try {
+    const r = prepare(
+      'INSERT INTO locations (organization_id, name, distance_miles) VALUES (?, ?, ?)'
+    ).run(orgId, trimmed, distance_miles || 0);
+    return prepare('SELECT * FROM locations WHERE id = ?').get(r.lastInsertRowid);
+  } catch (_) {
+    return prepare(
+      'SELECT * FROM locations WHERE organization_id = ? AND name = ? COLLATE NOCASE'
+    ).get(orgId, trimmed);
+  }
+}
+
+function findOrCreateLocation(orgId, name) {
+  return createLocation(orgId, name, 0);
+}
+
+function updateLocation(id, { name, distance_miles } = {}) {
+  if (name !== undefined) prepare('UPDATE locations SET name = ? WHERE id = ?').run((name || '').trim(), id);
+  if (distance_miles !== undefined) prepare('UPDATE locations SET distance_miles = ? WHERE id = ?').run(distance_miles, id);
+}
+
+function isLocationReferenced(id) {
+  return prepare('SELECT COUNT(*) AS cnt FROM comments WHERE location_id = ?').get(id).cnt > 0;
+}
+
+function deleteLocation(id) {
+  prepare('DELETE FROM locations WHERE id = ?').run(id);
+}
+
+function getTravelReport(fromTs, toTs) {
+  return prepare(`
+    SELECT o.name AS organization_name,
+           l.name AS location_name,
+           l.distance_miles,
+           COUNT(*) AS visit_count
+    FROM comments c
+    JOIN locations l ON l.id = c.location_id
+    JOIN tickets t ON t.id = c.ticket_id
+    LEFT JOIN organizations o ON o.id = l.organization_id
+    WHERE c.location_id IS NOT NULL
+      AND c.created_at >= ? AND c.created_at <= ?
+    GROUP BY l.id
+    ORDER BY o.name ASC, l.name ASC
+  `).all(fromTs, toTs);
+}
+
 // ============================================================
 // Technician org assignments
 // ============================================================
@@ -883,7 +960,10 @@ module.exports = {
   getBillingReport,
   // Organizations
   findOrCreateOrganization, getAllOrganizations, searchOrganizations,
-  renameOrganization, deleteOrganization,
+  renameOrganization, deleteOrganization, getOrganizationById,
+  // Locations
+  getLocationsByOrg, getLocationById, createLocation, findOrCreateLocation,
+  updateLocation, isLocationReferenced, deleteLocation, getTravelReport,
   // Technician orgs
   getTechnicianOrganizations, addTechnicianOrganization, removeTechnicianOrganization,
 };

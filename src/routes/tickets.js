@@ -409,13 +409,25 @@ router.post('/:id/comments', upload.array('attachments'), async (req, res) => {
   if (willChangeStatus && statusChange === 'closed' && !canCloseTicket(req.user)) willChangeStatus = false;
   if (willChangeStatus && ticket.status === 'closed' && !canReopenTicket(req.user)) willChangeStatus = false;
 
-  // Billable hours (admin/tech only, disabled on closed tickets)
+  // Billable hours and location (admin/tech only, disabled on closed tickets)
   const isTechOrAdmin = req.user.role === 'admin' || req.user.role === 'technician';
   const rawHours = parseFloat(req.body.billable_hours);
   const billableHours = isTechOrAdmin && ticket.status !== 'closed' && rawHours > 0 ? rawHours : null;
-  const workType = billableHours ? (req.body.work_type || null) : null;
 
-  const comment = db.addComment(ticket.id, req.user.id, body, false, billableHours, workType);
+  let locationId = null;
+  if (isTechOrAdmin && ticket.organization_id) {
+    const submittedId   = parseInt(req.body.location_id, 10);
+    const submittedName = (req.body.location_name || '').trim();
+    if (submittedId) {
+      const loc = db.getLocationById(submittedId);
+      if (loc && loc.organization_id === ticket.organization_id) locationId = loc.id;
+    } else if (submittedName) {
+      const loc = db.findOrCreateLocation(ticket.organization_id, submittedName);
+      if (loc) locationId = loc.id;
+    }
+  }
+
+  const comment = db.addComment(ticket.id, req.user.id, body, false, billableHours, locationId);
   saveUploadedFiles(req.files, ticket.id, comment.id);
 
   if (willChangeStatus) {
