@@ -60,6 +60,28 @@
           <div class="form-group">
             <input type="file" name="attachments" multiple class="form-file">
           </div>
+          <% if (isTechOrAdmin) { %>
+          <div class="form-row" style="align-items:flex-end;gap:.75rem;flex-wrap:wrap;margin-bottom:.5rem">
+            <div class="form-group" style="flex:0 0 auto;margin-bottom:0">
+              <label for="billable-hours">Billable Hours <span class="optional">(optional)</span></label>
+              <input type="number" id="billable-hours" name="billable_hours"
+                     min="0" step="0.25" placeholder="0.00" class="form-input form-input-sm"
+                     style="width:6rem" <%= ticket.status === 'closed' ? 'disabled' : '' %>>
+            </div>
+            <div class="form-group" style="flex:0 0 auto;margin-bottom:0">
+              <label for="work-type">Work Type</label>
+              <select id="work-type" name="work_type" class="form-select form-select-sm"
+                      <%= ticket.status === 'closed' ? 'disabled' : '' %>>
+                <option value="">— select —</option>
+                <option value="onsite">Onsite</option>
+                <option value="offsite">Offsite</option>
+              </select>
+            </div>
+          </div>
+          <% if (ticket.status === 'closed') { %>
+            <p class="form-hint">Billable hours cannot be added to a closed ticket.</p>
+          <% } %>
+          <% } %>
           <div class="form-actions" style="flex-wrap:wrap;gap:.5rem">
             <% if (canManage) { %>
               <select name="status_change" class="form-select form-select-sm" style="width:auto">
@@ -67,7 +89,9 @@
                 <option value="new"     <%= ticket.status==='new'     ? 'disabled':'' %>>New</option>
                 <option value="open"    <%= ticket.status==='open'    ? 'disabled':'' %>>Open</option>
                 <option value="on_hold" <%= ticket.status==='on_hold' ? 'disabled':'' %>>On Hold</option>
+                <% if (canClose) { %>
                 <option value="closed"  <%= ticket.status==='closed'  ? 'disabled':'' %>>Closed</option>
+                <% } %>
               </select>
             <% } %>
             <button type="submit" class="btn btn-primary">Post comment</button>
@@ -113,6 +137,7 @@
                 <% } %>
               </span>
               <% if (c.is_email) { %><span class="badge badge-email">via email</span><% } %>
+              <% if (isTechOrAdmin && c.billable_hours) { %><span class="badge badge-billing"><%= c.billable_hours %>h &bull; <%= c.work_type || '—' %></span><% } %>
               <span class="comment-time" data-ts="<%= c.created_at %>" data-fmt="full"><%= formatDateFull(c.created_at) %></span>
               <% if (user && user.role === 'admin') { %>
                 <form method="POST" action="/tickets/<%= ticket.id %>/comments/<%= c.id %>/delete" style="display:inline;margin-left:.5rem">
@@ -199,6 +224,14 @@
           <span><%= ticket.organization_name || '—' %></span>
         <% } %>
       </div>
+
+      <!-- Billable Hours total (admin only) -->
+      <% if (user && user.role === 'admin' && ticket.total_billable_hours > 0) { %>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Billable Hours</div>
+        <span class="billing-total"><%= ticket.total_billable_hours.toFixed(2) %> hrs</span>
+      </div>
+      <% } %>
 
       <!-- Parties -->
       <div class="sidebar-section">
@@ -289,9 +322,22 @@
     }
   });
 
-  document.getElementById('comment-form').addEventListener('submit', () => {
+  document.getElementById('comment-form').addEventListener('submit', e => {
+    const sc  = document.querySelector('[name="status_change"]');
+    const hrs = document.getElementById('billable-hours');
+    const wt  = document.getElementById('work-type');
+
+    if (sc && sc.value === 'closed') {
+      if (!confirm('Once closed, no further billable hours can be added. Close this ticket?')) {
+        e.preventDefault(); return;
+      }
+    }
+    if (hrs && parseFloat(hrs.value) > 0 && wt && !wt.value) {
+      alert('Please select a work type (Onsite or Offsite) when entering billable hours.');
+      e.preventDefault(); return;
+    }
     document.getElementById('comment-body').value = quill.root.innerHTML;
-    _quillDirty = false; // submitting — no need to warn
+    _quillDirty = false;
   });
 
   // Focus the editor on load — desktop only (mobile focus triggers keyboard)
@@ -448,9 +494,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- Status pills ---
+  const _currentStatus = '<%= ticket.status %>';
   document.querySelectorAll('#status-pills .pill-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const sv = btn.dataset.status;
+      if (sv === 'closed' && !confirm('Once closed, no further billable hours can be added. Close this ticket?')) return;
+      if (_currentStatus === 'closed' && sv !== 'closed' && !confirm('Warning: Reopening a closed ticket may cause missed or double-billed hours. Reopen anyway?')) return;
       try {
         await sidebarPost(`/tickets/${TICKET_ID}/status`, { status: sv });
         document.querySelectorAll('#status-pills .pill-btn').forEach(b => b.classList.remove('pill-active'));

@@ -12,6 +12,7 @@
     <nav class="app-nav" id="app-nav">
       <% if (user) { %><a href="/tickets/new" class="btn btn-primary btn-sm nav-new-ticket">+ New Ticket</a><% } %>
       <a href="/tickets" class="nav-link">Tickets</a>
+      <% if (user) { %><a href="/reports" class="nav-link">Reports</a><% } %>
       <% if (user && user.role === 'admin') { %>
         <a href="/admin/users" class="nav-link">Users</a>
         <a href="/admin/organizations" class="nav-link">Organizations</a>

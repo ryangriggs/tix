@@ -85,6 +85,7 @@ app.use('/auth', optionalAuth, require('./routes/auth'));
 app.use('/tickets', requireAuth, verifyCsrf, require('./routes/tickets'));
 app.use('/admin', requireAuth, requireAdmin, verifyCsrf, require('./routes/admin'));
 app.use('/api', requireAuth, require('./routes/api'));
+app.use('/reports', requireAuth, require('./routes/reports'));
 app.use('/inbound', require('./routes/inbound'));
 
 // Root

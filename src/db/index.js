@@ -254,6 +254,9 @@ async function initDb() {
   try { _db.exec('ALTER TABLE users   ADD COLUMN organization_id    INTEGER REFERENCES organizations(id) ON DELETE SET NULL'); } catch (_) {}
   try { _db.exec('ALTER TABLE users   ADD COLUMN is_group_superuser INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   try { _db.exec('ALTER TABLE tickets ADD COLUMN organization_id    INTEGER REFERENCES organizations(id) ON DELETE SET NULL'); } catch (_) {}
+  try { _db.exec('ALTER TABLE tickets  ADD COLUMN close_date     INTEGER'); } catch (_) {}
+  try { _db.exec('ALTER TABLE comments ADD COLUMN billable_hours REAL'); } catch (_) {}
+  try { _db.exec('ALTER TABLE comments ADD COLUMN work_type      TEXT'); } catch (_) {}
   _db.exec('CREATE INDEX IF NOT EXISTS idx_tickets_org ON tickets(organization_id)');
   _db.exec('CREATE INDEX IF NOT EXISTS idx_users_org   ON users(organization_id)');
   // Back-fill reply tokens for any existing tickets that pre-date this migration
@@ -452,14 +455,15 @@ function createTicket({ subject, body, priority = 'medium', dueDate = null, orga
 
 function getTicketById(id) {
   return prepare(`
-    SELECT t.*, o.name AS organization_name
+    SELECT t.*, o.name AS organization_name,
+      (SELECT COALESCE(SUM(c.billable_hours), 0) FROM comments c WHERE c.ticket_id = t.id) AS total_billable_hours
     FROM tickets t LEFT JOIN organizations o ON o.id = t.organization_id
     WHERE t.id = ?
   `).get(id);
 }
 
 function updateTicket(id, fields) {
-  const allowed = ['subject', 'body', 'status', 'priority', 'due_date', 'organization_id'];
+  const allowed = ['subject', 'body', 'status', 'priority', 'due_date', 'organization_id', 'close_date'];
   const keys = Object.keys(fields).filter(k => allowed.includes(k));
   if (keys.length === 0) return;
 
@@ -628,10 +632,10 @@ function getPartyUserIds(ticketId) {
 // Comments
 // ============================================================
 
-function addComment(ticketId, userId, body, isEmail = false) {
+function addComment(ticketId, userId, body, isEmail = false, billableHours = null, workType = null) {
   const result = prepare(`
-    INSERT INTO comments (ticket_id, user_id, body, is_email) VALUES (?, ?, ?, ?)
-  `).run(ticketId, userId, body, isEmail ? 1 : 0);
+    INSERT INTO comments (ticket_id, user_id, body, is_email, billable_hours, work_type) VALUES (?, ?, ?, ?, ?, ?)
+  `).run(ticketId, userId, body, isEmail ? 1 : 0, billableHours || null, workType || null);
   prepare('UPDATE tickets SET updated_at = unixepoch() WHERE id = ?').run(ticketId);
   return prepare('SELECT * FROM comments WHERE id = ?').get(result.lastInsertRowid);
 }
@@ -801,6 +805,22 @@ function getTicketsDueSoon(withinHours = 24) {
   `).all(now, cutoff);
 }
 
+function getBillingReport(fromTs, toTs) {
+  return prepare(`
+    SELECT t.id, t.subject, t.created_at, t.close_date,
+           o.name AS organization_name,
+           COALESCE(SUM(c.billable_hours), 0) AS total_hours
+    FROM tickets t
+    LEFT JOIN organizations o ON o.id = t.organization_id
+    LEFT JOIN comments c ON c.ticket_id = t.id
+    WHERE t.status = 'closed'
+      AND t.close_date >= ? AND t.close_date <= ?
+    GROUP BY t.id
+    HAVING total_hours > 0
+    ORDER BY t.close_date ASC
+  `).all(fromTs, toTs);
+}
+
 module.exports = {
   initDb,
   // Users
@@ -824,6 +844,8 @@ module.exports = {
   getSetting, setSetting, getUserPrefs, setUserPrefs,
   // Reminders
   getTicketsDueSoon,
+  // Reports
+  getBillingReport,
   // Organizations
   findOrCreateOrganization, getAllOrganizations, searchOrganizations,
   renameOrganization, deleteOrganization,

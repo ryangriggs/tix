@@ -1227,3 +1227,33 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   .app-logo { font-size: 1rem; }
   .page-title { font-size: 1.2rem; }
 }
+
+/* ============================================================
+   Billable hours
+   ============================================================ */
+.badge-billing {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  color: #166534;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.billing-total { font-weight: 600; }
+
+/* ============================================================
+   Reports page
+   ============================================================ */
+.reports-grid { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 1rem; }
+.report-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  max-width: 480px;
+  width: 100%;
+}
+.report-card-title { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.35rem; }
+.report-card-desc  { font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem; }

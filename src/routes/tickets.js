@@ -70,6 +70,9 @@ function canManage(ticket, user) {
   return ['admin', 'submitter', 'owner', 'technician'].includes(access);
 }
 
+function canCloseTicket(user)  { return user.role === 'admin' || user.role === 'technician'; }
+function canReopenTicket(user) { return user.role === 'admin'; }
+
 // Sanitize Quill-generated HTML (trusted tags only)
 const ALLOWED_TAGS = [
   'p', 'br', 'b', 'i', 'u', 's', 'strong', 'em', 'del',
@@ -368,6 +371,7 @@ router.get('/:id', (req, res) => {
 
   const attachments = db.getAttachments(ticket.id);
 
+  const isTechOrAdmin = req.user.role === 'admin' || req.user.role === 'technician';
   res.render('tickets/detail', {
     title: `#${ticket.id} — ${ticket.subject}`,
     ticket,
@@ -378,6 +382,9 @@ router.get('/:id', (req, res) => {
     canManage: canManage(ticket, req.user),
     isSuperuser: req.user.isGroupSuperuser,
     organizations: db.getAllOrganizations(),
+    isTechOrAdmin,
+    canClose:  canCloseTicket(req.user),
+    canReopen: canReopenTicket(req.user),
   });
 });
 
@@ -395,14 +402,27 @@ router.post('/:id/comments', upload.array('attachments'), async (req, res) => {
   // Optional status change submitted alongside the comment
   const validStatuses = ['new', 'open', 'on_hold', 'closed'];
   const statusChange = req.body.status_change;
-  const willChangeStatus = statusChange && validStatuses.includes(statusChange) &&
-                           statusChange !== ticket.status && canManage(ticket, req.user);
+  let willChangeStatus = statusChange && validStatuses.includes(statusChange) &&
+                         statusChange !== ticket.status && canManage(ticket, req.user);
 
-  const comment = db.addComment(ticket.id, req.user.id, body);
+  // Restrict closing/reopening via comment form
+  if (willChangeStatus && statusChange === 'closed' && !canCloseTicket(req.user)) willChangeStatus = false;
+  if (willChangeStatus && ticket.status === 'closed' && !canReopenTicket(req.user)) willChangeStatus = false;
+
+  // Billable hours (admin/tech only, disabled on closed tickets)
+  const isTechOrAdmin = req.user.role === 'admin' || req.user.role === 'technician';
+  const rawHours = parseFloat(req.body.billable_hours);
+  const billableHours = isTechOrAdmin && ticket.status !== 'closed' && rawHours > 0 ? rawHours : null;
+  const workType = billableHours ? (req.body.work_type || null) : null;
+
+  const comment = db.addComment(ticket.id, req.user.id, body, false, billableHours, workType);
   saveUploadedFiles(req.files, ticket.id, comment.id);
 
   if (willChangeStatus) {
-    db.updateTicket(ticket.id, { status: statusChange });
+    const closeFields = { status: statusChange };
+    if (statusChange === 'closed') closeFields.close_date = Math.floor(Date.now() / 1000);
+    if (ticket.status === 'closed' && statusChange !== 'closed') closeFields.close_date = null;
+    db.updateTicket(ticket.id, closeFields);
   }
 
   try {
@@ -479,7 +499,15 @@ router.post('/:id/status', async (req, res) => {
   const status = req.body.status;
   if (!validStatuses.includes(status)) return res.status(400).json({ error: 'Invalid status' });
 
-  db.updateTicket(ticket.id, { status });
+  const isClosing   = status === 'closed';
+  const isReopening = ticket.status === 'closed' && status !== 'closed';
+  if (isClosing   && !canCloseTicket(req.user))  return res.status(403).json({ error: 'Only admins and technicians can close tickets.' });
+  if (isReopening && !canReopenTicket(req.user)) return res.status(403).json({ error: 'Only admins can reopen closed tickets.' });
+
+  const statusFields = { status };
+  if (isClosing)   statusFields.close_date = Math.floor(Date.now() / 1000);
+  if (isReopening) statusFields.close_date = null;
+  db.updateTicket(ticket.id, statusFields);
 
   const comment = db.addComment(ticket.id, req.user.id, `<em>Status changed to <strong>${status}</strong></em>`);
 
