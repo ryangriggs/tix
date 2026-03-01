@@ -287,18 +287,20 @@ router.post('/', upload.array('attachments'), async (req, res) => {
   const ticket = db.createTicket({ subject: subject.trim(), body: cleanBody, priority: priority || 'medium', dueDate, organizationId: orgId });
   db.addParty(ticket.id, req.user.id, 'submitter');
 
-  // Add collaborators specified at creation time
+  // Add collaborators specified at creation time — collect emails for notification
   const collabIds    = [].concat(req.body['collaboratorIds[]']    || req.body.collaboratorIds    || []).filter(Boolean);
   const collabEmails = [].concat(req.body['collaboratorEmails[]'] || req.body.collaboratorEmails || []).filter(Boolean);
+  const notifyCollabEmails = [];
   for (const id of collabIds) {
     const u = db.getUserById(parseInt(id, 10));
-    if (u && u.id !== req.user.id) db.addParty(ticket.id, u.id, 'collaborator');
+    if (u && u.id !== req.user.id) { db.addParty(ticket.id, u.id, 'collaborator'); notifyCollabEmails.push(u.email); }
   }
   for (const email of collabEmails) {
     const e = email.trim().toLowerCase();
     if (e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e !== req.user.email) {
       const u = db.findOrCreateUser(e);
       db.addParty(ticket.id, u.id, 'collaborator');
+      notifyCollabEmails.push(e);
     }
   }
 
@@ -312,6 +314,36 @@ router.post('/', upload.array('attachments'), async (req, res) => {
   }
 
   sse.broadcastToAll({ type: 'ticket_created', ticketId: ticket.id });
+
+  // Notify default assignee and collaborators (creator is excluded — they just submitted it)
+  const ticketUrl = `${config.appUrl}/tickets/${ticket.id}`;
+  const notifyErrors = [];
+  if (defaultEmail && defaultEmail.toLowerCase() !== req.user.email) {
+    try {
+      await sendTicketNotification({
+        to: defaultEmail,
+        ticketSubject: ticket.subject,
+        body: `<p>A new ticket has been assigned to you: <strong>#${config.ticketPrefix}${ticket.id} — ${ticket.subject}</strong></p>
+               <p>Submitted by: <strong>${req.user.email}</strong></p>
+               <p><a href="${ticketUrl}">View ticket</a></p>`,
+        ticketId: ticket.id,
+        replyToken: ticket.reply_token,
+      });
+    } catch (err) { notifyErrors.push(err); }
+  }
+  for (const email of notifyCollabEmails) {
+    try {
+      await sendTicketNotification({
+        to: email,
+        ticketSubject: ticket.subject,
+        body: `<p>You have been added to ticket <strong>#${config.ticketPrefix}${ticket.id} — ${ticket.subject}</strong> as a collaborator.</p>
+               <p><a href="${ticketUrl}">View ticket</a></p>`,
+        ticketId: ticket.id,
+        replyToken: ticket.reply_token,
+      });
+    } catch (err) { notifyErrors.push(err); }
+  }
+  if (notifyErrors.length) console.error('[Tickets] Notification error(s) on ticket creation:', notifyErrors);
 
   res.redirect(`/tickets/${ticket.id}`);
 });
@@ -667,7 +699,7 @@ router.post('/:id/parties', async (req, res) => {
 });
 
 // POST /tickets/:id/parties/role — change a party's role (admin only)
-router.post('/:id/parties/role', (req, res) => {
+router.post('/:id/parties/role', async (req, res) => {
   const ticket = db.getTicketById(req.params.id);
   if (!ticket) return res.status(404).json({ error: 'Not found' });
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
@@ -679,8 +711,23 @@ router.post('/:id/parties/role', (req, res) => {
   if (!db.getUserTicketRole(ticket.id, userId))
     return res.status(404).json({ error: 'User is not a party to this ticket' });
 
+  const affected = db.getUserById(userId);
   db.addParty(ticket.id, userId, role);
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'party_updated', userId, role });
+
+  // Notify the affected user (skip if they made the change themselves)
+  if (affected && affected.email !== req.user.email) {
+    try {
+      await sendTicketNotification({
+        to: affected.email,
+        ticketSubject: ticket.subject,
+        body: `<p>Your role on ticket <strong>#${config.ticketPrefix}${ticket.id} — ${ticket.subject}</strong> has been changed to <strong>${role}</strong>.</p>
+               <p><a href="${config.appUrl}/tickets/${ticket.id}">View ticket</a></p>`,
+        ticketId: ticket.id,
+        replyToken: ticket.reply_token,
+      });
+    } catch (err) { console.error('[Tickets] Role-change notification error:', err); }
+  }
 
   if (req.accepts('json')) return res.json({ ok: true, role });
   res.redirect(`/tickets/${ticket.id}`);
