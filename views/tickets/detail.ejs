@@ -253,7 +253,15 @@
                 <% } %>
                 <% if (p.organization_name) { %><span class="party-org">[<%= p.organization_name %>]</span><% } %>
               </div>
-              <span class="badge badge-role"><%= p.role %></span>
+              <% if (user && user.role === 'admin') { %>
+                <select class="badge badge-role role-select" data-user-id="<%= p.user_id %>" title="Change role">
+                  <option value="submitter"    <%= p.role === 'submitter'    ? 'selected' : '' %>>submitter</option>
+                  <option value="owner"        <%= p.role === 'owner'        ? 'selected' : '' %>>owner</option>
+                  <option value="collaborator" <%= p.role === 'collaborator' ? 'selected' : '' %>>collaborator</option>
+                </select>
+              <% } else { %>
+                <span class="badge badge-role"><%= p.role %></span>
+              <% } %>
               <% if (canManage && p.user_id !== user.id) { %>
                 <button type="button" class="btn-icon remove-party-btn" data-user-id="<%= p.user_id %>" title="Remove">×</button>
               <% } %>
@@ -485,10 +493,11 @@ document.addEventListener('DOMContentLoaded', () => {
 // Sidebar AJAX actions — no page reload for sidebar changes
 // ============================================================
 (function() {
-  const TICKET_ID = '<%= ticket.id %>';
-  const CSRF      = '<%= csrfToken %>';
-  const CAN_MANAGE     = <%= canManage ? 'true' : 'false' %>;
+  const TICKET_ID       = '<%= ticket.id %>';
+  const CSRF            = '<%= csrfToken %>';
+  const CAN_MANAGE      = <%= canManage ? 'true' : 'false' %>;
   const CURRENT_USER_ID = <%= user.id %>;
+  const IS_ADMIN        = <%= user.role === 'admin' ? 'true' : 'false' %>;
 
   async function sidebarPost(path, data) {
     const body = new URLSearchParams({ _csrf: CSRF, ...data });
@@ -601,9 +610,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const removeHtml = CAN_MANAGE && p.userId !== CURRENT_USER_ID
       ? `<button type="button" class="btn-icon remove-party-btn" data-user-id="${p.userId}" title="Remove">×</button>`
       : '';
+    const roleBadge = IS_ADMIN
+      ? `<select class="badge badge-role role-select" data-user-id="${p.userId}" title="Change role">
+          <option value="submitter"    ${p.role === 'submitter'    ? 'selected' : ''}>submitter</option>
+          <option value="owner"        ${p.role === 'owner'        ? 'selected' : ''}>owner</option>
+          <option value="collaborator" ${p.role === 'collaborator' ? 'selected' : ''}>collaborator</option>
+        </select>`
+      : `<span class="badge badge-role">${_esc(p.role)}</span>`;
     return `<li class="party-item" data-user-id="${p.userId}">
       <div class="party-info">${nameHtml}${orgHtml}</div>
-      <span class="badge badge-role">${_esc(p.role)}</span>
+      ${roleBadge}
       ${removeHtml}
     </li>`;
   }
@@ -617,6 +633,25 @@ document.addEventListener('DOMContentLoaded', () => {
       await sidebarPost(`/tickets/${TICKET_ID}/parties/remove`, { userId });
       document.querySelector(`#party-list [data-user-id="${userId}"]`)?.remove();
     } catch (err) { alert('Could not remove person: ' + err.message); }
+  });
+
+  // Delegated role-change listener
+  document.getElementById('party-list')?.addEventListener('change', async e => {
+    const sel = e.target.closest('.role-select');
+    if (!sel) return;
+    const userId  = sel.dataset.userId;
+    const newRole = sel.value;
+    const prev    = sel.querySelector('[selected]')?.value || sel.dataset.prev;
+    sel.dataset.prev = newRole;
+    try {
+      await sidebarPost(`/tickets/${TICKET_ID}/parties/role`, { userId, role: newRole });
+      // update the [selected] attribute so prev tracks correctly on next change
+      for (const opt of sel.options) opt.removeAttribute('selected');
+      sel.querySelector(`[value="${newRole}"]`)?.setAttribute('selected', '');
+    } catch (err) {
+      alert('Could not change role: ' + err.message);
+      sel.value = prev || sel.querySelector('[selected]')?.value;
+    }
   });
 
   // --- Add party form ---

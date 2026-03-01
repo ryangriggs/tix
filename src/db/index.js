@@ -346,9 +346,11 @@ function getAllUsers() {
 
 function getAssignableUsers() {
   return prepare(`
-    SELECT id, email, name FROM users
-    WHERE role IN ('admin', 'technician') AND blocked_at IS NULL
-    ORDER BY COALESCE(NULLIF(name, ''), email) ASC
+    SELECT u.id, u.email, u.name, o.name AS organization_name
+    FROM users u
+    LEFT JOIN organizations o ON o.id = u.organization_id
+    WHERE u.role IN ('admin', 'technician') AND u.blocked_at IS NULL
+    ORDER BY COALESCE(NULLIF(u.name, ''), u.email) ASC
   `).all();
 }
 
@@ -495,9 +497,10 @@ function updateTicket(id, fields) {
 
 function getDistinctOwners({ userRole, userId, userTechOrgIds = [] }) {
   let query = `
-    SELECT DISTINCT u.id, u.email, u.name
+    SELECT DISTINCT u.id, u.email, u.name, o.name AS organization_name
     FROM ticket_parties tp
     JOIN users u ON u.id = tp.user_id
+    LEFT JOIN organizations o ON o.id = u.organization_id
     JOIN tickets t ON t.id = tp.ticket_id
     WHERE tp.role = 'owner'
   `;

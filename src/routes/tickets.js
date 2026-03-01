@@ -666,6 +666,26 @@ router.post('/:id/parties', async (req, res) => {
   res.redirect(`/tickets/${ticket.id}`);
 });
 
+// POST /tickets/:id/parties/role — change a party's role (admin only)
+router.post('/:id/parties/role', (req, res) => {
+  const ticket = db.getTicketById(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Not found' });
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+
+  const userId = parseInt(req.body.userId, 10);
+  const role   = req.body.role;
+  if (!userId || !['submitter', 'owner', 'collaborator'].includes(role))
+    return res.status(400).json({ error: 'Invalid' });
+  if (!db.getUserTicketRole(ticket.id, userId))
+    return res.status(404).json({ error: 'User is not a party to this ticket' });
+
+  db.addParty(ticket.id, userId, role);
+  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'party_updated', userId });
+
+  if (req.accepts('json')) return res.json({ ok: true, role });
+  res.redirect(`/tickets/${ticket.id}`);
+});
+
 // POST /tickets/:id/parties/remove — remove a party
 router.post('/:id/parties/remove', (req, res) => {
   const ticket = db.getTicketById(req.params.id);

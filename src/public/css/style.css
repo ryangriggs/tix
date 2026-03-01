@@ -384,6 +384,7 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 .flat-dot-closed { background: #9ca3af; }
 
 .badge-role  { background: #f1f5f9; color: var(--text-muted); font-size: .68rem; }
+select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1px 2px; }
 .badge-email { background: #e0e7ff; color: #4338ca; font-size: .68rem; }
 
 /* ============================================================
