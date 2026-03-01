@@ -240,7 +240,19 @@ router.get('/', (req, res) => {
 
   // Org filter dropdown — visible to admins, technicians, and superusers
   const canFilterOrg = req.user.role === 'admin' || req.user.role === 'technician' || req.user.isGroupSuperuser;
-  const organizations = canFilterOrg ? db.getAllOrganizations() : [];
+  let organizations = [];
+  if (canFilterOrg) {
+    if (req.user.role === 'admin') {
+      organizations = db.getAllOrganizations();
+    } else {
+      // Technicians and superusers only see their assigned orgs
+      const scopedIds = [...new Set([
+        ...(req.user.techOrgIds || []),
+        ...(req.user.organization_id ? [req.user.organization_id] : []),
+      ])];
+      organizations = db.getOrganizationsByIds(scopedIds);
+    }
+  }
 
   const distinctOwners = canFilterOwner
     ? db.getDistinctOwners({ userRole: req.user.role, userId: req.user.id, userTechOrgIds: req.user.techOrgIds || [] })

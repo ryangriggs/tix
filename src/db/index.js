@@ -824,6 +824,12 @@ function getAllOrganizations() {
   return prepare('SELECT * FROM organizations ORDER BY name ASC').all();
 }
 
+function getOrganizationsByIds(ids) {
+  if (!ids || !ids.length) return [];
+  const ph = ids.map(() => '?').join(',');
+  return prepare(`SELECT * FROM organizations WHERE id IN (${ph}) ORDER BY name ASC`).all(...ids);
+}
+
 function searchOrganizations(q) {
   return prepare('SELECT * FROM organizations WHERE name LIKE ? ORDER BY name ASC LIMIT 20').all(`%${q}%`);
 }
@@ -1001,7 +1007,7 @@ module.exports = {
   // Reports
   getBillingReport,
   // Organizations
-  findOrCreateOrganization, getAllOrganizations, searchOrganizations,
+  findOrCreateOrganization, getAllOrganizations, getOrganizationsByIds, searchOrganizations,
   renameOrganization, deleteOrganization, getOrganizationById,
   // Locations
   getLocationsByOrg, getLocationById, createLocation, findOrCreateLocation,
