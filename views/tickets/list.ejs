@@ -197,6 +197,14 @@
           <option value="medium">🔵 Medium</option>
           <option value="low">⚫ Low</option>
         </select>
+        <% if (assignableUsers && assignableUsers.length) { %>
+        <select id="bulk-assignee" name="bulkAssignee" class="form-select form-select-sm" onchange="bulkSubmit('assign')">
+          <option value="">Assign to…</option>
+          <% for (const u of assignableUsers) { %>
+            <option value="<%= u.id %>"><%= u.name || u.email %></option>
+          <% } %>
+        </select>
+        <% } %>
         <button type="button" class="btn btn-sm btn-danger" onclick="bulkDelete()">Delete</button>
       </div>
     </div>
@@ -273,11 +281,15 @@ function updateBulkBar() {
 function bulkSubmit(type) {
   const checked = document.querySelectorAll('.ticket-checkbox:checked');
   if (!checked.length) return;
-  const select = document.getElementById(type === 'status' ? 'bulk-status' : 'bulk-priority');
+  const selectId = type === 'status' ? 'bulk-status' : type === 'priority' ? 'bulk-priority' : 'bulk-assignee';
+  const select = document.getElementById(selectId);
   const value = select.value;
   if (!value) return;
-  const label = type === 'status' ? value.replace('_', ' ') : value;
-  if (confirm(`Change ${type} of ${checked.length} ticket${checked.length !== 1 ? 's' : ''} to "${label}"?`)) {
+  const label = type === 'assign'
+    ? select.options[select.selectedIndex].text
+    : type === 'status' ? value.replace('_', ' ') : value;
+  const noun = type === 'assign' ? 'assignee' : type;
+  if (confirm(`Change ${noun} of ${checked.length} ticket${checked.length !== 1 ? 's' : ''} to "${label}"?`)) {
     document.getElementById('bulk-action').value = type;
     document.getElementById('bulk-form').submit();
   } else {

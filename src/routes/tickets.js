@@ -246,12 +246,15 @@ router.get('/', (req, res) => {
     ? db.getDistinctOwners({ userRole: req.user.role, userId: req.user.id, userTechOrgIds: req.user.techOrgIds || [] })
     : [];
 
+  const assignableUsers = req.user.role === 'admin' ? db.getAssignableUsers() : [];
+
   res.render('tickets/list', {
     title: 'Tickets',
     tickets,
     organizations,
     distinctOwners,
     canFilterOwner,
+    assignableUsers,
     filters: savedPrefs,
   });
 });
@@ -301,9 +304,9 @@ router.post('/', upload.array('attachments'), async (req, res) => {
 
   saveUploadedFiles(req.files, ticket.id, null);
 
-  // Notify the default assignee if different from creator
+  // Assign to default assignee (always owner, even if they are also the creator)
   const defaultEmail = config.defaultAssigneeEmail || db.getSetting('default_assignee_email');
-  if (defaultEmail && defaultEmail.toLowerCase() !== req.user.email) {
+  if (defaultEmail) {
     const assignee = db.findOrCreateUser(defaultEmail);
     db.addParty(ticket.id, assignee.id, 'owner');
   }
@@ -356,7 +359,7 @@ router.post('/bulk', (req, res) => {
   const ids = [].concat(req.body.ticketIds || []).map(Number).filter(Boolean);
   if (!ids.length) return res.redirect('/tickets');
 
-  const { action, bulkStatus, bulkPriority } = req.body;
+  const { action, bulkStatus, bulkPriority, bulkAssignee } = req.body;
   if (action === 'delete') {
     db.bulkDeleteTickets(ids);
     sse.broadcastToAll({ type: 'tickets_deleted', ticketIds: ids });
@@ -371,6 +374,17 @@ router.post('/bulk', (req, res) => {
     if (validPriorities.includes(bulkPriority)) {
       db.bulkUpdatePriority(ids, bulkPriority);
       sse.broadcastToAll({ type: 'tickets_updated', ticketIds: ids });
+    }
+  } else if (action === 'assign') {
+    const assigneeId = parseInt(bulkAssignee, 10);
+    if (assigneeId) {
+      const assignee = db.getUserById(assigneeId);
+      if (assignee && ['admin', 'technician'].includes(assignee.role)) {
+        for (const id of ids) {
+          db.addParty(id, assignee.id, 'owner');
+        }
+        sse.broadcastToAll({ type: 'tickets_updated', ticketIds: ids });
+      }
     }
   }
 

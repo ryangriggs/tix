@@ -397,13 +397,12 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
     }
   }
 
-  // Assign to default assignee if configured
+  // Assign to default assignee as owner — always, regardless of whether they
+  // appear in From/To/CC (overrides submitter or collaborator role if needed).
   const defaultEmail = config.defaultAssigneeEmail || db.getSetting('default_assignee_email');
   if (defaultEmail) {
     const assignee = db.findOrCreateUser(defaultEmail);
-    if (!db.getUserTicketRole(ticket.id, assignee.id)) {
-      db.addParty(ticket.id, assignee.id, 'owner');
-    }
+    db.addParty(ticket.id, assignee.id, 'owner');
   }
 
   commitAttachments(prepared, ticket.id, null);

@@ -1,4 +1,4 @@
-const CACHE = 'ticketing-v1.1.22';
+const CACHE = 'ticketing-v1.1.23';
 
 // Static assets to cache on install
 const PRECACHE = [

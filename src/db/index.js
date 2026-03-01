@@ -344,6 +344,14 @@ function getAllUsers() {
   return prepare('SELECT u.*, o.name AS organization_name FROM users u LEFT JOIN organizations o ON o.id = u.organization_id ORDER BY u.created_at DESC').all();
 }
 
+function getAssignableUsers() {
+  return prepare(`
+    SELECT id, email, name FROM users
+    WHERE role IN ('admin', 'technician') AND blocked_at IS NULL
+    ORDER BY COALESCE(NULLIF(name, ''), email) ASC
+  `).all();
+}
+
 function updateUserOrganization(userId, orgId) {
   prepare('UPDATE users SET organization_id = ? WHERE id = ?').run(orgId || null, userId);
 }
@@ -966,7 +974,7 @@ function setTicketRemindersSent(ticketId, count) {
 module.exports = {
   initDb,
   // Users
-  findOrCreateUser, getUserById, getUserByEmail, getAllUsers,
+  findOrCreateUser, getUserById, getUserByEmail, getAllUsers, getAssignableUsers,
   updateUserRole, updateUserName, blockUser, unblockUser, deleteUser,
   updateUserOrganization, updateUserSuperuser, searchUsers,
   // Auth
