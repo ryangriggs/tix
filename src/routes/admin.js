@@ -402,6 +402,7 @@ router.post('/settings', (req, res) => {
     email_rate_limit_new_tickets:   String(rateLimitNew),
     reminder_count:                 String(reminderCount),
     reminder_frequency_hours:       String(reminderFreq),
+    notify_email_submitter:         req.body.notify_email_submitter === '1' ? 'true' : 'false',
   };
 
   for (const [key, val] of Object.entries(updates)) {

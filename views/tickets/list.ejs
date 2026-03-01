@@ -1,5 +1,10 @@
 <%- include('../partials/head', { title: 'Tickets' }) %>
 <%- include('../partials/nav') %>
+<% function fmtUser(u) {
+  let s = u.name ? `${u.name} (${u.email})` : u.email;
+  if (u.organization_name) s += ` - ${u.organization_name}`;
+  return s;
+} %>
 
 <main class="container">
   <div class="page-toolbar">
@@ -99,7 +104,7 @@
               <option value="unassigned" <%= filters.owner === 'unassigned' ? 'selected' : '' %>>Unassigned</option>
             <% } %>
             <% for (const o of distinctOwners) { %>
-              <option value="<%= o.id %>" <%= filters.owner == o.id ? 'selected' : '' %>><%= (o.name || o.email) + (o.organization_name ? ' (' + o.organization_name + ')' : '') %></option>
+              <option value="<%= o.id %>" <%= filters.owner == o.id ? 'selected' : '' %>><%= fmtUser(o) %></option>
             <% } %>
           </select>
         </div>
@@ -201,7 +206,7 @@
         <select id="bulk-assignee" name="bulkAssignee" class="form-select form-select-sm" onchange="bulkSubmit('assign')">
           <option value="">Assign to…</option>
           <% for (const u of assignableUsers) { %>
-            <option value="<%= u.id %>"><%= (u.name || u.email) + (u.organization_name ? ' (' + u.organization_name + ')' : '') %></option>
+            <option value="<%= u.id %>"><%= fmtUser(u) %></option>
           <% } %>
         </select>
         <% } %>

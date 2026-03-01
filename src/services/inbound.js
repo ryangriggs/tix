@@ -412,22 +412,24 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
     db.recordEmailMessage(ticket.id, parsed.messageId, 'in');
   }
 
-  // Send confirmation to sender
+  // Send confirmation to sender (if enabled in settings)
   const domain = getMailDomain();
   const outMsgId = `<ticket-${ticket.id}-${Date.now()}@${domain}>`;
   db.recordEmailMessage(ticket.id, outMsgId, 'out');
 
-  await sendTicketNotification({
-    to: fromEmail,
-    ticketSubject: ticket.subject,
-    body: `
-      <p>Your ticket has been received and assigned ID <strong>#${config.ticketPrefix}${ticket.id}</strong>.</p>
-      <p>Ticket Subject: <strong>${ticket.subject}</strong></p>
-      `,
-    ticketId: ticket.id,
-    messageId: outMsgId,
-    replyToken: ticket.reply_token,
-  });
+  if (config.notifyEmailSubmitter) {
+    await sendTicketNotification({
+      to: fromEmail,
+      ticketSubject: ticket.subject,
+      body: `
+        <p>Your ticket has been received and assigned ID <strong>#${config.ticketPrefix}${ticket.id}</strong>.</p>
+        <p>Ticket Subject: <strong>${ticket.subject}</strong></p>
+        `,
+      ticketId: ticket.id,
+      messageId: outMsgId,
+      replyToken: ticket.reply_token,
+    });
+  }
 
   // Notify original sender if this was a forwarded email
   if (originalSenderEmail) {

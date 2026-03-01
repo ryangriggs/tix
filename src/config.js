@@ -32,6 +32,7 @@ const config = {
   mailFromName:  process.env.MAIL_FROM_NAME  || 'Ticketing',
   defaultAssigneeEmail: process.env.DEFAULT_ASSIGNEE_EMAIL || null,
   adminEmail: process.env.ADMIN_EMAIL || null,
+  notifyEmailSubmitter: true,
 
   appUrl: (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, ''),
 
@@ -77,7 +78,8 @@ function applySettings(map) {
   if ('mail_from_name'         in map) config.mailFromName          = map.mail_from_name         || config.mailFromName;
   if ('admin_email'            in map) config.adminEmail            = map.admin_email            || null;
   if ('site_name'              in map) config.siteName              = map.site_name              || config.siteName;
-  if ('default_assignee_email' in map) config.defaultAssigneeEmail  = map.default_assignee_email || null;
+  if ('default_assignee_email'   in map) config.defaultAssigneeEmail  = map.default_assignee_email || null;
+  if ('notify_email_submitter'   in map) config.notifyEmailSubmitter  = map.notify_email_submitter !== 'false';
 
   if ('jwt_secret'          in map) config.jwtSecret         = map.jwt_secret          || config.jwtSecret;
   if ('secure_session'      in map) config.secureSession      = map.secure_session      === 'true';
