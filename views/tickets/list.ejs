@@ -89,6 +89,24 @@
         </div>
       <% } %>
 
+      <!-- Assigned To group -->
+      <% if (canFilterOwner) { %>
+        <div class="filter-group">
+          <select name="owner" class="form-select" onchange="this.form.submit()">
+            <option value="me" <%= filters.owner === 'me' ? 'selected' : '' %>>Assigned to me</option>
+            <option value=""   <%= !filters.owner || filters.owner === '' ? 'selected' : '' %>>All</option>
+            <% if (user && user.role === 'admin') { %>
+              <option value="unassigned" <%= filters.owner === 'unassigned' ? 'selected' : '' %>>Unassigned</option>
+            <% } %>
+            <% for (const o of distinctOwners) { %>
+              <option value="<%= o.id %>" <%= filters.owner == o.id ? 'selected' : '' %>><%= o.name || o.email %></option>
+            <% } %>
+          </select>
+        </div>
+      <% } else { %>
+        <input type="hidden" name="owner" value="">
+      <% } %>
+
     </div>
   </form>
 
@@ -226,6 +244,8 @@ function resetFilters() {
   document.getElementById('search-clear').style.display = 'none';
   const orgSel = form.querySelector('select[name="org"]');
   if (orgSel) orgSel.value = '';
+  const ownerSel = form.querySelector('select[name="owner"]');
+  if (ownerSel) ownerSel.value = 'me';
   const df = form.querySelector('[name="date_from"]');
   const dt = form.querySelector('[name="date_to"]');
   if (df) df.value = '';

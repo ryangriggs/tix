@@ -142,7 +142,7 @@ async function notifyParties(ticket, actorEmail, messageBody, commentId, inReply
 // ============================================================
 
 const SINCE_SECONDS    = { '1d': 86400, '7d': 7 * 86400, '30d': 30 * 86400 };
-const DEFAULT_PREFS    = { status: 'new,open,on_hold', priority: '', sort: 'priority', order: 'desc', since: '1d', org: '', q: '' };
+const DEFAULT_PREFS    = { status: 'new,open,on_hold', priority: '', sort: 'priority', order: 'desc', since: '1d', org: '', q: '', owner: 'me' };
 const VALID_STATUSES   = ['new', 'open', 'on_hold', 'closed'];
 const VALID_PRIORITIES = ['urgent', 'high', 'medium', 'low'];
 const FILTER_COOKIE  = 'tix_filters';
@@ -161,7 +161,7 @@ router.get('/', (req, res) => {
     return res.redirect(`/tickets?${qs}`);
   }
 
-  const { status, priority, sort, order, q, since, org, date_from, date_to } = req.query;
+  const { status, priority, sort, order, q, since, org, date_from, date_to, owner } = req.query;
 
   // Strip ticket prefix from search term; if remainder is a plain integer treat as ID lookup
   const prefix = config.ticketPrefix;
@@ -186,6 +186,7 @@ router.get('/', (req, res) => {
     q:         q        || '',
     date_from: date_from || '',
     date_to:   date_to   || '',
+    owner:     owner !== undefined ? (owner || '') : 'me',
   };
   res.cookie(FILTER_COOKIE, JSON.stringify(savedPrefs), {
     httpOnly: false,
@@ -208,6 +209,17 @@ router.get('/', (req, res) => {
   const statusValues   = (status   || '').split(',').filter(s => VALID_STATUSES.includes(s));
   const priorityValues = (priority || '').split(',').filter(p => VALID_PRIORITIES.includes(p));
 
+  // Owner filter — admin and technician only
+  const canFilterOwner = req.user.role === 'admin' || req.user.role === 'technician';
+  let ownerFilter = null;
+  if (canFilterOwner) {
+    const ov = savedPrefs.owner;
+    if (ov === 'me')          ownerFilter = 'me';
+    else if (ov === 'unassigned' && req.user.role === 'admin') ownerFilter = 'unassigned';
+    else if (/^\d+$/.test(ov)) ownerFilter = parseInt(ov, 10);
+    // empty string ('') = no filter (show all)
+  }
+
   const tickets = db.getTickets({
     userId:          req.user.id,
     userRole:        req.user.role,
@@ -223,16 +235,23 @@ router.get('/', (req, res) => {
     dateFrom,
     dateTo,
     orgFilter:       org === 'unassigned' ? -1 : (org ? parseInt(org, 10) : null),
+    ownerFilter,
   });
 
   // Org filter dropdown — visible to admins, technicians, and superusers
   const canFilterOrg = req.user.role === 'admin' || req.user.role === 'technician' || req.user.isGroupSuperuser;
   const organizations = canFilterOrg ? db.getAllOrganizations() : [];
 
+  const distinctOwners = canFilterOwner
+    ? db.getDistinctOwners({ userRole: req.user.role, userId: req.user.id, userTechOrgIds: req.user.techOrgIds || [] })
+    : [];
+
   res.render('tickets/list', {
     title: 'Tickets',
     tickets,
     organizations,
+    distinctOwners,
+    canFilterOwner,
     filters: savedPrefs,
   });
 });
@@ -641,14 +660,6 @@ router.post('/:id/parties/remove', (req, res) => {
 
   const userId = parseInt(req.body.userId, 10);
   if (!userId) return res.redirect(`/tickets/${ticket.id}`);
-
-  // Don't allow removing the only submitter
-  const parties = db.getParties(ticket.id);
-  const target = parties.find(p => p.user_id === userId);
-  if (target?.role === 'submitter' && parties.filter(p => p.role === 'submitter').length === 1) {
-    if (req.accepts('json')) return res.status(400).json({ error: 'Cannot remove the only submitter.' });
-    return res.redirect(`/tickets/${ticket.id}?error=cannot_remove_submitter`);
-  }
 
   db.removeParty(ticket.id, userId);
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'party_removed', userId });

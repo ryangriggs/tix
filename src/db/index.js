@@ -485,9 +485,30 @@ function updateTicket(id, fields) {
   prepare(`UPDATE tickets SET ${sets.join(', ')} WHERE id = ?`).run(...values);
 }
 
+function getDistinctOwners({ userRole, userId, userTechOrgIds = [] }) {
+  let query = `
+    SELECT DISTINCT u.id, u.email, u.name
+    FROM ticket_parties tp
+    JOIN users u ON u.id = tp.user_id
+    JOIN tickets t ON t.id = tp.ticket_id
+    WHERE tp.role = 'owner'
+  `;
+  const params = [];
+  if (userRole !== 'admin') {
+    const ph = userTechOrgIds.length ? userTechOrgIds.map(() => '?').join(',') : 'NULL';
+    query += ` AND (t.organization_id IN (${ph}) OR EXISTS (
+      SELECT 1 FROM ticket_parties tp2 WHERE tp2.ticket_id = t.id AND tp2.user_id = ?
+    ))`;
+    params.push(...userTechOrgIds, userId);
+  }
+  query += ` ORDER BY COALESCE(NULLIF(u.name, ''), u.email) ASC`;
+  return prepare(query).all(...params);
+}
+
 function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgIds = [],
                       status, priority, sort = 'updated_at', order = 'desc', search = '',
-                      dateFrom = null, dateTo = null, orgFilter = null, idSearch = null }) {
+                      dateFrom = null, dateTo = null, orgFilter = null, idSearch = null,
+                      ownerFilter = null }) {
   const validSorts = {
     created_at:    't.created_at',
     updated_at:    't.updated_at',
@@ -561,6 +582,15 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
   if (dateFrom)  { conditions.push('t.updated_at >= ?');     params.push(dateFrom); }
   if (dateTo)    { conditions.push('t.updated_at <= ?');     params.push(dateTo); }
   if (idSearch)  { conditions.push('t.id = ?');              params.push(idSearch); }
+  if (ownerFilter === 'me') {
+    conditions.push('EXISTS (SELECT 1 FROM ticket_parties tp_o WHERE tp_o.ticket_id = t.id AND tp_o.role = \'owner\' AND tp_o.user_id = ?)');
+    params.push(userId);
+  } else if (ownerFilter === 'unassigned') {
+    conditions.push('NOT EXISTS (SELECT 1 FROM ticket_parties tp_o WHERE tp_o.ticket_id = t.id AND tp_o.role = \'owner\')');
+  } else if (typeof ownerFilter === 'number') {
+    conditions.push('EXISTS (SELECT 1 FROM ticket_parties tp_o WHERE tp_o.ticket_id = t.id AND tp_o.role = \'owner\' AND tp_o.user_id = ?)');
+    params.push(ownerFilter);
+  }
   if (search && !idSearch) {
     // Build an FTS4 MATCH query: each whitespace-delimited token becomes a prefix search.
     // e.g. "john smith" → `john* smith*`  (both tokens must appear, prefix-matched)
@@ -953,6 +983,7 @@ module.exports = {
   // Email threading
   recordEmailMessage, findTicketByMessageId, findTicketByReplyToken,
   // Settings
+  getDistinctOwners,
   getSetting, setSetting, seedSetting, getAllSettings, getUserPrefs, setUserPrefs,
   // Reminders
   getTicketsDueSoon, getTicketsForReminders, setTicketRemindersSent,
