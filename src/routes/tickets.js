@@ -680,7 +680,7 @@ router.post('/:id/parties/role', (req, res) => {
     return res.status(404).json({ error: 'User is not a party to this ticket' });
 
   db.addParty(ticket.id, userId, role);
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'party_updated', userId });
+  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'party_updated', userId, role });
 
   if (req.accepts('json')) return res.json({ ok: true, role });
   res.redirect(`/tickets/${ticket.id}`);

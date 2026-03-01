@@ -163,6 +163,15 @@ document.addEventListener('DOMContentLoaded', () => localiseTimestamps());
 
       } else if (f === 'party_removed' && event.userId) {
         document.querySelector(`#party-list [data-user-id="${event.userId}"]`)?.remove();
+
+      } else if (f === 'party_updated' && event.userId && event.role) {
+        const row = document.querySelector(`#party-list [data-user-id="${event.userId}"]`);
+        if (row) {
+          const sel  = row.querySelector('.role-select');
+          const span = row.querySelector('.badge-role');
+          if (sel)  sel.value = event.role;
+          else if (span) span.textContent = event.role;
+        }
       }
     }
   }
