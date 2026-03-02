@@ -20,6 +20,7 @@ const config = {
   // Comma-separated extension lists (without leading dot, case-insensitive).
   // Whitelist: only these extensions are accepted. Empty = allow all.
   // Blacklist: always rejected, even if in the whitelist.
+  uploadMaxSizeMb: parseInt(process.env.UPLOAD_MAX_SIZE_MB || '25', 10),
   uploadAllowedExtensions: process.env.UPLOAD_ALLOWED_EXTENSIONS
     || 'jpg,jpeg,png,gif,webp,bmp,pdf,txt,md,csv,zip,doc,docx,xls,xlsx,ppt,pptx',
   uploadBlockedExtensions: process.env.UPLOAD_BLOCKED_EXTENSIONS || '',
@@ -101,7 +102,8 @@ function applySettings(map) {
   if ('gmail_refresh_token' in map) config.gmail.refreshToken = map.gmail_refresh_token || '';
   if ('gmail_user'          in map) config.gmail.user         = map.gmail_user          || '';
 
-  if ('upload_allowed_extensions'   in map) config.uploadAllowedExtensions  = map.upload_allowed_extensions   || config.uploadAllowedExtensions;
+  if ('upload_max_size_mb'          in map) config.uploadMaxSizeMb           = parseInt(map.upload_max_size_mb, 10) || 25;
+  if ('upload_allowed_extensions'   in map) config.uploadAllowedExtensions   = map.upload_allowed_extensions   || config.uploadAllowedExtensions;
   if ('upload_blocked_extensions'   in map) config.uploadBlockedExtensions   = map.upload_blocked_extensions   || '';
   if ('email_rate_limit_per_ticket'  in map) config.emailRateLimitPerTicket  = parseInt(map.email_rate_limit_per_ticket,  10) || 0;
   if ('email_rate_limit_new_tickets' in map) config.emailRateLimitNewTickets = parseInt(map.email_rate_limit_new_tickets, 10) || 0;

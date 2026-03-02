@@ -43,11 +43,14 @@ function buildFileFilter() {
   };
 }
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB per file
-  fileFilter: buildFileFilter(),
-});
+// Rebuilt per-request so runtime config changes (max size, extensions) take effect immediately
+function upload(req, res, next) {
+  multer({
+    storage,
+    limits: { fileSize: (config.uploadMaxSizeMb || 25) * 1024 * 1024 },
+    fileFilter: buildFileFilter(),
+  }).array('attachments')(req, res, next);
+}
 
 // ============================================================
 // Access helpers
@@ -273,11 +276,11 @@ router.get('/', (req, res) => {
 
 // GET /tickets/new
 router.get('/new', (req, res) => {
-  res.render('tickets/new', { title: 'New Ticket', error: null });
+  res.render('tickets/new', { title: 'New Ticket', error: null, uploadMaxSizeMb: config.uploadMaxSizeMb || 25 });
 });
 
 // POST /tickets — create a ticket
-router.post('/', upload.array('attachments'), async (req, res) => {
+router.post('/', upload, async (req, res) => {
   const { subject, body, priority, due_date, organization_name } = req.body;
 
   if (!subject || !subject.trim()) {
@@ -466,7 +469,7 @@ router.get('/:id', (req, res) => {
 });
 
 // POST /tickets/:id/comments — add a comment
-router.post('/:id/comments', upload.array('attachments'), async (req, res) => {
+router.post('/:id/comments', upload, async (req, res) => {
   const ticket = db.getTicketById(req.params.id);
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
 

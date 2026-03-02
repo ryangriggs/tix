@@ -231,6 +231,13 @@
     <div class="card" style="margin-bottom:1.5rem">
       <h2 class="settings-section-title">Uploads &amp; Rate Limits</h2>
 
+      <div class="form-group" style="max-width:14rem">
+        <label for="upload_max_size_mb">Max upload size (MB)</label>
+        <input type="number" id="upload_max_size_mb" name="upload_max_size_mb"
+               value="<%= s.upload_max_size_mb || '25' %>" min="1" step="1"
+               class="form-input form-input-sm" style="width:6rem">
+      </div>
+
       <div class="form-group">
         <label for="upload_allowed_extensions">Allowed file extensions</label>
         <input type="text" id="upload_allowed_extensions" name="upload_allowed_extensions"

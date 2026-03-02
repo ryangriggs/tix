@@ -366,6 +366,8 @@ router.post('/settings', (req, res) => {
   const otpLockout        = int('otp_lockout_seconds', 300);
   const rateLimitPerTicket = int('email_rate_limit_per_ticket', 10);
   const rateLimitNew      = int('email_rate_limit_new_tickets', 3);
+  const uploadMaxSizeMb   = int('upload_max_size_mb', 25);
+  if (uploadMaxSizeMb < 1) return res.redirect('/admin/settings?message=Upload+size+must+be+at+least+1+MB');
   const smtpRelayPort     = int('smtp_relay_port', 587);
 
   const mailTransport = trim('mail_transport');
@@ -396,6 +398,7 @@ router.post('/settings', (req, res) => {
     gmail_client_secret:            trim('gmail_client_secret'),
     gmail_refresh_token:            trim('gmail_refresh_token'),
     gmail_user:                     gmailUser,
+    upload_max_size_mb:             String(uploadMaxSizeMb),
     upload_allowed_extensions:      trim('upload_allowed_extensions'),
     upload_blocked_extensions:      trim('upload_blocked_extensions'),
     email_rate_limit_per_ticket:    String(rateLimitPerTicket),

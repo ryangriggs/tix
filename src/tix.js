@@ -168,6 +168,7 @@ async function start() {
     gmail_client_secret:            config.gmail.clientSecret,
     gmail_refresh_token:            config.gmail.refreshToken,
     gmail_user:                     config.gmail.user,
+    upload_max_size_mb:             String(config.uploadMaxSizeMb),
     upload_allowed_extensions:      config.uploadAllowedExtensions,
     upload_blocked_extensions:      config.uploadBlockedExtensions,
     email_rate_limit_per_ticket:    String(config.emailRateLimitPerTicket),

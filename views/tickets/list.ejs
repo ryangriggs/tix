@@ -146,8 +146,8 @@
     </div>
     <% if (user && user.role === 'admin' && tickets.length > 0) { %>
     <div class="ticket-select-wrap tlh-ticket-count">
-      <button type="button" class="ticket-select-btn" id="select-menu-btn"
-              onclick="toggleSelectMenu(event)" title="Selection options">&middot;&middot;&middot;</button>
+      <button type="button" class="tlh-sort-btn" id="select-menu-btn"
+              onclick="toggleSelectMenu(event)" title="Selection options">...</button>
       <div class="ticket-select-menu" id="select-menu">
         <button type="button" class="tsm-item" onclick="selectAll()">Select All</button>
         <button type="button" class="tsm-item" onclick="deselectAll()">Deselect All</button>
