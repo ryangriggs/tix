@@ -12,7 +12,7 @@ fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
 
 const swPath = 'src/public/sw.js';
 let sw = fs.readFileSync(swPath, 'utf8');
-sw = sw.replace(/const CACHE = 'ticketing-v[^']+';/, `const CACHE = 'ticketing-v${pkg.version}';`);
+sw = sw.replace(/const CACHE = 'tix-v[^']+';/, `const CACHE = 'tix-v${pkg.version}';`);
 fs.writeFileSync(swPath, sw);
 
 process.stdout.write('[pre-commit] Version bumped to ' + pkg.version + '\n');

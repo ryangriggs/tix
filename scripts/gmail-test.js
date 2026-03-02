@@ -37,7 +37,7 @@ const bodyHtml = `<p>${bodyText}</p>`;
 const boundary = `tix_test_${Date.now()}`;
 
 const lines = [
-  `From: Ticketing <${GMAIL_USER}>`,
+  `From: Tix <${GMAIL_USER}>`,
   `To: ${to}`,
   `Subject: ${subject}`,
   'MIME-Version: 1.0',

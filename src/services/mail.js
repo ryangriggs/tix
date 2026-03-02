@@ -173,7 +173,7 @@ async function sendMagicLink(toEmail, magicLinkUrl, otp) {
 async function sendTicketNotification({ to, ticketSubject, body, ticketId, messageId, inReplyTo, references, replyToken }) {
   let replyTo;
   if (replyToken) {
-    const mailDomain = config.ticketEmail.includes('@') ? config.ticketEmail.split('@')[1] : 'ticketing.local';
+    const mailDomain = config.ticketEmail.includes('@') ? config.ticketEmail.split('@')[1] : 'tix.local';
     const localPart  = config.ticketEmail.split('@')[0];
     replyTo = `${config.mailFromName} <${localPart}+${replyToken}@${mailDomain}>`;
   }
@@ -200,7 +200,7 @@ async function sendDueReminder(email, ticket) {
   const dueDate = new Date(ticket.due_date * 1000).toLocaleDateString();
   let replyTo;
   if (ticket.reply_token) {
-    const mailDomain = config.ticketEmail.includes('@') ? config.ticketEmail.split('@')[1] : 'ticketing.local';
+    const mailDomain = config.ticketEmail.includes('@') ? config.ticketEmail.split('@')[1] : 'tix.local';
     const localPart  = config.ticketEmail.split('@')[0];
     replyTo = `${config.mailFromName} <${localPart}+${ticket.reply_token}@${mailDomain}>`;
   }

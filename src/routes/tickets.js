@@ -122,7 +122,7 @@ async function notifyParties(ticket, actorEmail, messageBody, commentId, inReply
   const toEmails = parties.filter(p => p.email !== actorEmail).map(p => p.email);
   if (!toEmails.length) return;
 
-  const domain = config.ticketEmail.split('@')[1] || 'ticketing.local';
+  const domain = config.ticketEmail.split('@')[1] || 'tix.local';
   const msgId = `<ticket-${ticket.id}-c${commentId}-${Date.now()}@${domain}>`;
   db.recordEmailMessage(ticket.id, msgId, 'out');
 

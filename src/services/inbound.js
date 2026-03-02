@@ -101,7 +101,7 @@ function formatEmailAsPlaintext(parsed) {
 function getMailDomain() {
   return config.ticketEmail.includes('@')
     ? config.ticketEmail.split('@')[1]
-    : 'ticketing.local';
+    : 'tix.local';
 }
 
 // Returns true if the address belongs to the ticket system itself

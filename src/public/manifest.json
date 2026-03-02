@@ -1,6 +1,6 @@
 {
-  "name": "Ticketing",
-  "short_name": "Tickets",
+  "name": "tix",
+  "short_name": "tix",
   "description": "Simple email-based ticketing system",
   "start_url": "/",
   "display": "standalone",
