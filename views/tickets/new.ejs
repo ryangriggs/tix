@@ -178,16 +178,35 @@ document.addEventListener('DOMContentLoaded', () => {
     },
   });
 
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  function flushCollabInput() {
+    const val = collabInput.value.trim();
+    if (val && emailRe.test(val)) {
+      addCollab(null, val, val);
+      collabInput.value = '';
+    }
+  }
+
   collabInput.addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;
     const val = collabInput.value.trim();
     if (!val) return;
-    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+    if (emailRe.test(val)) {
       e.preventDefault();
       addCollab(null, val, val);
       collabInput.value = '';
     }
   });
+
+  // Auto-add on blur (tab away / click elsewhere) if a valid email is typed
+  collabInput.addEventListener('blur', () => {
+    // Delay slightly so autocomplete mousedown can fire first
+    setTimeout(flushCollabInput, 200);
+  });
+
+  // Auto-add on form submit if a valid email is still sitting in the input
+  document.getElementById('ticket-form').addEventListener('submit', flushCollabInput);
 });
 </script>
 

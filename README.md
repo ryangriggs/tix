@@ -1,4 +1,4 @@
-# tix
+# ✅ Tix
 Trouble ticket system built with Claude Code
 See .env.example for configuration options.
 
