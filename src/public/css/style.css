@@ -547,7 +547,7 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 
 /* Floating bulk action bar */
 .bulk-bar {
-  display: none;
+  display: flex;
   position: fixed;
   top: calc(var(--header-h) + 0.5rem);
   left: 50%;
@@ -555,7 +555,7 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
   z-index: 150;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 1.25rem;
+  padding: 0.5rem 0.75rem;
   background: var(--surface);
   border: 1px solid var(--accent);
   border-radius: 999px;
@@ -563,7 +563,8 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
   white-space: nowrap;
 }
 
-.bulk-bar.bulk-bar-visible { display: flex; }
+.bulk-actions { display: none; align-items: center; gap: 0.75rem; }
+.bulk-actions.bulk-actions-visible { display: flex; }
 
 .bulk-count {
   font-size: 0.875rem;
@@ -698,12 +699,6 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 }
 
 /* Checkbox column on the right */
-.ticket-select-header {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: .25rem;
-}
-
 .ticket-select-wrap {
   position: relative;
 }

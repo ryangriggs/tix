@@ -152,21 +152,6 @@
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <input type="hidden" name="action" id="bulk-action" value="">
 
-    <% if (user && user.role === 'admin' && tickets.length > 0) { %>
-    <div class="ticket-select-header">
-      <div class="ticket-select-wrap" id="select-menu-wrap">
-        <button type="button" class="ticket-select-btn" id="select-menu-btn"
-                onclick="toggleSelectMenu(event)" title="Selection options">⋯</button>
-        <div class="ticket-select-menu" id="select-menu">
-          <button type="button" class="tsm-item" onclick="selectAll()">Select All</button>
-          <button type="button" class="tsm-item" onclick="deselectAll()">Deselect All</button>
-          <button type="button" class="tsm-item" onclick="invertSelection()">Invert Selection</button>
-          <div class="tsm-info" id="select-menu-info">0 / <%= tickets.length %> selected</div>
-        </div>
-      </div>
-    </div>
-    <% } %>
-
     <div class="ticket-list" id="ticket-list">
       <% if (tickets.length === 0) { %>
         <div class="empty-state">
@@ -199,10 +184,20 @@
       <% } %>
     </div>
 
-    <!-- Floating bulk action bar — only visible when tickets are selected -->
+    <!-- Floating bulk action bar — always visible for admins with tickets -->
+    <% if (user && user.role === 'admin' && tickets.length > 0) { %>
     <div class="bulk-bar" id="bulk-bar">
-      <span class="bulk-count" id="bulk-count">0 selected</span>
-      <div class="bulk-actions">
+      <div class="ticket-select-wrap">
+        <button type="button" class="ticket-select-btn" id="select-menu-btn"
+                onclick="toggleSelectMenu(event)" title="Selection options">⋯</button>
+        <div class="ticket-select-menu" id="select-menu">
+          <button type="button" class="tsm-item" onclick="selectAll()">Select All</button>
+          <button type="button" class="tsm-item" onclick="deselectAll()">Deselect All</button>
+          <button type="button" class="tsm-item" onclick="invertSelection()">Invert Selection</button>
+          <div class="tsm-info" id="select-menu-info">0 / <%= tickets.length %> selected</div>
+        </div>
+      </div>
+      <div class="bulk-actions" id="bulk-actions">
         <select id="bulk-status" name="bulkStatus" class="form-select form-select-sm" onchange="bulkSubmit('status')">
           <option value="">Status…</option>
           <option value="new">New</option>
@@ -228,6 +223,7 @@
         <button type="button" class="btn btn-sm btn-danger" onclick="bulkDelete()">Delete</button>
       </div>
     </div>
+    <% } %>
   </form>
 </main>
 
@@ -294,9 +290,8 @@ function setSort(col) {
 function updateBulkBar() {
   const checked = document.querySelectorAll('.ticket-checkbox:checked');
   const total   = document.querySelectorAll('.ticket-checkbox').length;
-  const bar = document.getElementById('bulk-bar');
-  document.getElementById('bulk-count').textContent = `${checked.length} selected`;
-  bar.classList.toggle('bulk-bar-visible', checked.length > 0);
+  const actions = document.getElementById('bulk-actions');
+  if (actions) actions.classList.toggle('bulk-actions-visible', checked.length > 0);
   const info = document.getElementById('select-menu-info');
   if (info) info.textContent = `${checked.length} / ${total} selected`;
 }
