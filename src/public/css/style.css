@@ -698,6 +698,70 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 }
 
 /* Checkbox column on the right */
+.ticket-select-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: .25rem;
+}
+
+.ticket-select-wrap {
+  position: relative;
+}
+
+.ticket-select-btn {
+  width: 3.25rem;
+  height: 2rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  letter-spacing: .1em;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ticket-select-btn:hover { background: var(--accent-light); color: var(--accent); }
+
+.ticket-select-menu {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: calc(100% + .25rem);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.1);
+  min-width: 13rem;
+  z-index: 200;
+  overflow: hidden;
+}
+.ticket-select-menu.open { display: block; }
+
+.tsm-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: .5rem .9rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: .875rem;
+  color: var(--text);
+}
+.tsm-item:hover { background: var(--accent-light); }
+
+.tsm-info {
+  padding: .45rem .9rem;
+  font-size: .8rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  cursor: default;
+  user-select: none;
+}
+
 .ticket-card-checkbox {
   display: flex;
   align-items: center;

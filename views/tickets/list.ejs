@@ -152,6 +152,21 @@
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <input type="hidden" name="action" id="bulk-action" value="">
 
+    <% if (user && user.role === 'admin' && tickets.length > 0) { %>
+    <div class="ticket-select-header">
+      <div class="ticket-select-wrap" id="select-menu-wrap">
+        <button type="button" class="ticket-select-btn" id="select-menu-btn"
+                onclick="toggleSelectMenu(event)" title="Selection options">⋯</button>
+        <div class="ticket-select-menu" id="select-menu">
+          <button type="button" class="tsm-item" onclick="selectAll()">Select All</button>
+          <button type="button" class="tsm-item" onclick="deselectAll()">Deselect All</button>
+          <button type="button" class="tsm-item" onclick="invertSelection()">Invert Selection</button>
+          <div class="tsm-info" id="select-menu-info">0 / <%= tickets.length %> selected</div>
+        </div>
+      </div>
+    </div>
+    <% } %>
+
     <div class="ticket-list" id="ticket-list">
       <% if (tickets.length === 0) { %>
         <div class="empty-state">
@@ -278,10 +293,42 @@ function setSort(col) {
 
 function updateBulkBar() {
   const checked = document.querySelectorAll('.ticket-checkbox:checked');
+  const total   = document.querySelectorAll('.ticket-checkbox').length;
   const bar = document.getElementById('bulk-bar');
   document.getElementById('bulk-count').textContent = `${checked.length} selected`;
   bar.classList.toggle('bulk-bar-visible', checked.length > 0);
+  const info = document.getElementById('select-menu-info');
+  if (info) info.textContent = `${checked.length} / ${total} selected`;
 }
+
+function toggleSelectMenu(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('select-menu');
+  menu.classList.toggle('open');
+}
+
+function selectAll() {
+  document.querySelectorAll('.ticket-checkbox').forEach(cb => { cb.checked = true; });
+  updateBulkBar();
+  document.getElementById('select-menu').classList.remove('open');
+}
+
+function deselectAll() {
+  document.querySelectorAll('.ticket-checkbox').forEach(cb => { cb.checked = false; });
+  updateBulkBar();
+  document.getElementById('select-menu').classList.remove('open');
+}
+
+function invertSelection() {
+  document.querySelectorAll('.ticket-checkbox').forEach(cb => { cb.checked = !cb.checked; });
+  updateBulkBar();
+  document.getElementById('select-menu').classList.remove('open');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', () => {
+  document.getElementById('select-menu')?.classList.remove('open');
+});
 
 function bulkSubmit(type) {
   const checked = document.querySelectorAll('.ticket-checkbox:checked');
