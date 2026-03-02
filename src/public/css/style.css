@@ -555,7 +555,7 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
   z-index: 150;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.75rem 1.25rem;
   background: var(--surface);
   border: 1px solid var(--accent);
   border-radius: 999px;
@@ -564,7 +564,6 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 }
 
 .bulk-bar.bulk-bar-visible { display: flex; }
-.bulk-actions { display: flex; align-items: center; gap: 0.75rem; }
 
 .bulk-count {
   font-size: 0.875rem;
@@ -704,26 +703,27 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 }
 
 .ticket-select-btn {
-  width: 3.25rem;
-  height: 2rem;
-  background: var(--surface-2);
+  width: 100%;
+  height: 1.6rem;
+  background: none;
   border: 1px solid var(--border);
   border-radius: 4px;
   cursor: pointer;
-  font-size: 1.1rem;
-  letter-spacing: .1em;
+  font-size: .85rem;
+  letter-spacing: .15em;
   color: var(--text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.ticket-select-btn:hover { background: var(--accent-light); color: var(--accent); }
+.ticket-select-btn:hover { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
 
 .ticket-select-menu {
   display: none;
   position: absolute;
   right: 0;
   top: calc(100% + .25rem);
+  margin-top: .1rem;
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 6px;

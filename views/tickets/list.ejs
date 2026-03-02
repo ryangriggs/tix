@@ -144,7 +144,20 @@
       <button type="button" class="tc-updated tlh-sort-btn <%= filters.sort==='updated_at'   ? 'tlh-active':'' %>" onclick="setSort('updated_at')"  >Updated<%= filters.sort==='updated_at'   ? (filters.order==='desc'?' ↓':' ↑'):'' %></button>
       <span class="tc-actor tlh-col">Updated by</span>
     </div>
+    <% if (user && user.role === 'admin' && tickets.length > 0) { %>
+    <div class="ticket-select-wrap tlh-ticket-count">
+      <button type="button" class="ticket-select-btn" id="select-menu-btn"
+              onclick="toggleSelectMenu(event)" title="Selection options">&middot;&middot;&middot;</button>
+      <div class="ticket-select-menu" id="select-menu">
+        <button type="button" class="tsm-item" onclick="selectAll()">Select All</button>
+        <button type="button" class="tsm-item" onclick="deselectAll()">Deselect All</button>
+        <button type="button" class="tsm-item" onclick="invertSelection()">Invert Selection</button>
+        <div class="tsm-info" id="select-menu-info">0 / <%= tickets.length %> selected</div>
+      </div>
+    </div>
+    <% } else { %>
     <span class="tlh-ticket-count"><%= tickets.length %></span>
+    <% } %>
   </div>
 
   <!-- Ticket list wrapped in bulk form -->
@@ -186,19 +199,8 @@
 
     <!-- Floating bulk action bar — shown when tickets are selected -->
     <div class="bulk-bar" id="bulk-bar">
-      <% if (user && user.role === 'admin' && tickets.length > 0) { %>
-      <div class="ticket-select-wrap">
-        <button type="button" class="ticket-select-btn" id="select-menu-btn"
-                onclick="toggleSelectMenu(event)" title="Selection options">&middot;&middot;&middot;</button>
-        <div class="ticket-select-menu" id="select-menu">
-          <button type="button" class="tsm-item" onclick="selectAll()">Select All</button>
-          <button type="button" class="tsm-item" onclick="deselectAll()">Deselect All</button>
-          <button type="button" class="tsm-item" onclick="invertSelection()">Invert Selection</button>
-          <div class="tsm-info" id="select-menu-info">0 / <%= tickets.length %> selected</div>
-        </div>
-      </div>
-      <% } %>
-      <div class="bulk-actions" id="bulk-actions">
+      <span class="bulk-count" id="bulk-count">0 selected</span>
+      <div class="bulk-actions">
         <select id="bulk-status" name="bulkStatus" class="form-select form-select-sm" onchange="bulkSubmit('status')">
           <option value="">Status…</option>
           <option value="new">New</option>
@@ -290,7 +292,9 @@ function setSort(col) {
 function updateBulkBar() {
   const checked = document.querySelectorAll('.ticket-checkbox:checked');
   const total   = document.querySelectorAll('.ticket-checkbox').length;
-  document.getElementById('bulk-bar').classList.toggle('bulk-bar-visible', checked.length > 0);
+  const bar = document.getElementById('bulk-bar');
+  document.getElementById('bulk-count').textContent = `${checked.length} selected`;
+  bar.classList.toggle('bulk-bar-visible', checked.length > 0);
   const info = document.getElementById('select-menu-info');
   if (info) info.textContent = `${checked.length} / ${total} selected`;
 }
