@@ -547,7 +547,7 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 
 /* Floating bulk action bar */
 .bulk-bar {
-  display: flex;
+  display: none;
   position: fixed;
   top: calc(var(--header-h) + 0.5rem);
   left: 50%;
@@ -563,8 +563,8 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
   white-space: nowrap;
 }
 
-.bulk-actions { display: none; align-items: center; gap: 0.75rem; }
-.bulk-actions.bulk-actions-visible { display: flex; }
+.bulk-bar.bulk-bar-visible { display: flex; }
+.bulk-actions { display: flex; align-items: center; gap: 0.75rem; }
 
 .bulk-count {
   font-size: 0.875rem;
