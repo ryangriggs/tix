@@ -1,9 +1,9 @@
-const CACHE = 'tix-v1.1.36';
+const CACHE = 'tix-v1.1.37';
 
 // Static assets to cache on install
 const PRECACHE = [
   '/css/style.css',
-  '/js/app.js',
+  '/js/tix.js',
 ];
 
 self.addEventListener('install', event => {

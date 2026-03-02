@@ -16,5 +16,5 @@ services:
     environment:
       - NODE_ENV=production
     restart: unless-stopped
-    command: node src/app.js
+    command: node src/tix.js
     # No mailhog dependency in production

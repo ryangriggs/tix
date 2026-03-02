@@ -3,7 +3,7 @@
     "allow": [
       "Bash(cd:*)",
       "Bash(cd /c/temp/tickets/new/tix && npm install 2>&1 | tail -3 && node -e \"require\\('./src/db/index.js'\\)\" 2>&1)",
-      "Bash(cd /c/temp/tickets/new/tix && node -e \"\nconst app = require\\('./src/app.js'\\);\nsetTimeout\\(\\(\\) => { console.log\\('OK — startup complete'\\); process.exit\\(0\\); }, 3000\\);\n\" 2>&1)",
+      "Bash(cd /c/temp/tickets/new/tix && node -e \"\nconst app = require\\('./src/tix.js'\\);\nsetTimeout\\(\\(\\) => { console.log\\('OK — startup complete'\\); process.exit\\(0\\); }, 3000\\);\n\" 2>&1)",
       "Bash(ls:*)",
       "Bash(chmod +x:*)"
     ]

@@ -239,7 +239,7 @@ const SCHEMA = `
 `;
 
 // ============================================================
-// Async initialisation — call once from app.js before starting servers
+// Async initialisation — call once from tix.js before starting servers
 // ============================================================
 
 async function initDb() {

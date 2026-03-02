@@ -15,4 +15,4 @@ RUN mkdir -p /app/data/uploads
 
 EXPOSE 3000 25
 
-CMD ["node", "src/app.js"]
+CMD ["node", "src/tix.js"]

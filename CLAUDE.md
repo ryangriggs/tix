@@ -27,7 +27,7 @@ A server-rendered email ticketing system. Users submit tickets via web UI or by 
 
 | File | Purpose |
 |------|---------|
-| `src/app.js` | Express app setup, server startup, cron jobs |
+| `src/tix.js` | Express app setup, server startup, cron jobs |
 | `src/config.js` | All environment variable definitions with defaults |
 | `src/db/index.js` | SQLite schema, all SQL queries, migrations |
 | `src/middleware/auth.js` | JWT session validation, CSRF verification |
