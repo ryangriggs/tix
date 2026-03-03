@@ -95,35 +95,39 @@ function getTransport() {
     };
   } else if (config.mailTransport === 'resend') {
     // Resend REST API — uses Node 18+ native fetch, no extra package needed
-    _transport = {
-      async sendMail(opts) {
-        const body = {
-          from:     opts.from,
-          to:       Array.isArray(opts.to) ? opts.to : [opts.to],
-          subject:  opts.subject,
-          html:     opts.html   || undefined,
-          text:     opts.text   || undefined,
-          reply_to: opts.replyTo || undefined,
-          headers: {
-            'Auto-Submitted':           'auto-generated',
-            'Precedence':               'bulk',
-            'X-Auto-Response-Suppress': 'All',
-            ...(opts.messageId  && { 'Message-ID':  opts.messageId }),
-            ...(opts.inReplyTo  && { 'In-Reply-To': opts.inReplyTo }),
-            ...(opts.references && { 'References':  opts.references }),
-          },
-        };
-        const res = await fetch('https://api.resend.com/emails', {
-          method:  'POST',
-          headers: { 'Authorization': `Bearer ${config.resend.apiKey}`, 'Content-Type': 'application/json' },
-          body:    JSON.stringify(body),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(`Resend API error ${res.status}: ${err.message || JSON.stringify(err)}`);
-        }
-        return res.json();
+    function _resendBody(opts) {
+      return {
+        from:     opts.from,
+        to:       Array.isArray(opts.to) ? opts.to : [opts.to],
+        subject:  opts.subject,
+        html:     opts.html   || undefined,
+        text:     opts.text   || undefined,
+        reply_to: opts.replyTo || undefined,
+        headers: {
+          'Auto-Submitted':           'auto-generated',
+          'Precedence':               'bulk',
+          'X-Auto-Response-Suppress': 'All',
+          ...(opts.messageId  && { 'Message-ID':  opts.messageId }),
+          ...(opts.inReplyTo  && { 'In-Reply-To': opts.inReplyTo }),
+          ...(opts.references && { 'References':  opts.references }),
+        },
+      };
+    }
+    async function _resendFetch(url, body) {
+      const res = await fetch(url, {
+        method:  'POST',
+        headers: { 'Authorization': `Bearer ${config.resend.apiKey}`, 'Content-Type': 'application/json' },
+        body:    JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(`Resend API error ${res.status}: ${err.message || JSON.stringify(err)}`);
       }
+      return res.json();
+    }
+    _transport = {
+      sendMail:      opts       => _resendFetch('https://api.resend.com/emails',       _resendBody(opts)),
+      sendMailBatch: optsArray  => _resendFetch('https://api.resend.com/emails/batch', optsArray.map(_resendBody)),
     };
   } else {
     // Mailgun REST API (default for production)
@@ -208,21 +212,29 @@ async function sendTicketNotification({ to, ticketSubject, body, ticketId, messa
     replyTo = `${config.mailFromName} <${localPart}+${replyToken}@${mailDomain}>`;
   }
 
-  const html = await renderEmail('ticket-notification', { body, ticketId, ticketSubject });
-  const text = html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  const html    = await renderEmail('ticket-notification', { body, ticketId, ticketSubject });
+  const text    = html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  const subject = `[Ticket #${config.ticketPrefix}${ticketId}] ${ticketSubject}`;
 
   const recipients = Array.isArray(to) ? to : [to];
+  const transport  = getTransport();
+
+  // Resend batch: send all recipients in one API call to avoid the 2 msg/sec rate limit
+  if (config.mailTransport === 'resend' && recipients.length > 1) {
+    const from  = `${config.mailFromName} <${config.ticketEmail}>`;
+    const batch = recipients.map(email => ({ from, to: email, subject, html, text, messageId, inReplyTo, references, replyTo }));
+    try {
+      await transport.sendMailBatch(batch);
+      for (const email of recipients) logEmail(email, subject);
+    } catch (err) {
+      for (const email of recipients) logEmail(email, subject, err.message || String(err));
+      throw err;
+    }
+    return;
+  }
+
   for (const email of recipients) {
-    await send({
-      to: email,
-      subject: `[Ticket #${config.ticketPrefix}${ticketId}] ${ticketSubject}`,
-      html,
-      text,
-      messageId,
-      inReplyTo,
-      references,
-      replyTo,
-    });
+    await send({ to: email, subject, html, text, messageId, inReplyTo, references, replyTo });
   }
 }
 
