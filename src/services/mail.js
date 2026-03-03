@@ -93,6 +93,38 @@ function getTransport() {
         return gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
       }
     };
+  } else if (config.mailTransport === 'resend') {
+    // Resend REST API — uses Node 18+ native fetch, no extra package needed
+    _transport = {
+      async sendMail(opts) {
+        const body = {
+          from:     opts.from,
+          to:       Array.isArray(opts.to) ? opts.to : [opts.to],
+          subject:  opts.subject,
+          html:     opts.html   || undefined,
+          text:     opts.text   || undefined,
+          reply_to: opts.replyTo || undefined,
+          headers: {
+            'Auto-Submitted':           'auto-generated',
+            'Precedence':               'bulk',
+            'X-Auto-Response-Suppress': 'All',
+            ...(opts.messageId  && { 'Message-ID':  opts.messageId }),
+            ...(opts.inReplyTo  && { 'In-Reply-To': opts.inReplyTo }),
+            ...(opts.references && { 'References':  opts.references }),
+          },
+        };
+        const res = await fetch('https://api.resend.com/emails', {
+          method:  'POST',
+          headers: { 'Authorization': `Bearer ${config.resend.apiKey}`, 'Content-Type': 'application/json' },
+          body:    JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(`Resend API error ${res.status}: ${err.message || JSON.stringify(err)}`);
+        }
+        return res.json();
+      }
+    };
   } else {
     // Mailgun REST API (default for production)
     const Mailgun  = require('mailgun.js');
@@ -130,9 +162,7 @@ async function send({ to, subject, html, text, messageId, inReplyTo, references,
   const transport = getTransport();
 
   try {
-    if (config.mailTransport === 'mailgun') {
-      await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references, replyTo });
-    } else if (config.mailTransport === 'gmail') {
+    if (config.mailTransport === 'mailgun' || config.mailTransport === 'resend' || config.mailTransport === 'gmail') {
       await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references, replyTo });
     } else {
       // nodemailer SMTP relay

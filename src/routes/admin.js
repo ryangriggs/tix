@@ -377,7 +377,7 @@ router.post('/settings', (req, res) => {
   const smtpRelayPort     = int('smtp_relay_port', 587);
 
   const mailTransport = trim('mail_transport');
-  if (mailTransport && !['mailgun', 'smtp', 'gmail'].includes(mailTransport))
+  if (mailTransport && !['mailgun', 'smtp', 'gmail', 'resend'].includes(mailTransport))
     return res.redirect('/admin/settings?message=Invalid+mail+transport');
 
   const updates = {
@@ -404,6 +404,7 @@ router.post('/settings', (req, res) => {
     gmail_client_secret:            trim('gmail_client_secret'),
     gmail_refresh_token:            trim('gmail_refresh_token'),
     gmail_user:                     gmailUser,
+    resend_api_key:                 trim('resend_api_key'),
     upload_max_size_mb:             String(uploadMaxSizeMb),
     upload_allowed_extensions:      trim('upload_allowed_extensions'),
     upload_blocked_extensions:      trim('upload_blocked_extensions'),

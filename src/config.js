@@ -49,8 +49,13 @@ const config = {
     domain: process.env.MAILGUN_DOMAIN || '',
   },
 
-  // Outbound mail transport: 'mailgun' (default), 'smtp', or 'gmail'
+  // Outbound mail transport: 'mailgun' (default), 'smtp', 'gmail', or 'resend'
   mailTransport: process.env.MAIL_TRANSPORT || 'mailgun',
+
+  // Resend API — used when MAIL_TRANSPORT=resend
+  resend: {
+    apiKey: process.env.RESEND_API_KEY || '',
+  },
 
   // SMTP relay — used when MAIL_TRANSPORT=smtp
   smtpRelay: {
@@ -105,6 +110,8 @@ function applySettings(map) {
   if ('gmail_client_secret' in map) config.gmail.clientSecret = map.gmail_client_secret || '';
   if ('gmail_refresh_token' in map) config.gmail.refreshToken = map.gmail_refresh_token || '';
   if ('gmail_user'          in map) config.gmail.user         = map.gmail_user          || '';
+
+  if ('resend_api_key' in map) config.resend.apiKey = map.resend_api_key || '';
 
   if ('upload_max_size_mb'          in map) config.uploadMaxSizeMb           = parseInt(map.upload_max_size_mb, 10) || 25;
   if ('upload_allowed_extensions'   in map) config.uploadAllowedExtensions   = map.upload_allowed_extensions   || config.uploadAllowedExtensions;

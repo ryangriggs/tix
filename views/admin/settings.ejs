@@ -154,6 +154,7 @@
           <option value="mailgun" <%= (s.mail_transport||'mailgun')==='mailgun' ? 'selected':'' %>>Mailgun</option>
           <option value="smtp"    <%= s.mail_transport==='smtp'    ? 'selected':'' %>>SMTP Relay</option>
           <option value="gmail"   <%= s.mail_transport==='gmail'   ? 'selected':'' %>>Gmail API</option>
+          <option value="resend"  <%= s.mail_transport==='resend'  ? 'selected':'' %>>Resend</option>
         </select>
       </div>
 
@@ -197,6 +198,18 @@
           <label for="smtp_relay_pass">Password</label>
           <input type="password" id="smtp_relay_pass" name="smtp_relay_pass"
                  value="<%= s.smtp_relay_pass || '' %>" autocomplete="new-password" class="form-input">
+        </div>
+      </div>
+
+      <!-- Resend -->
+      <div class="settings-transport-section" id="transport-resend">
+        <h3 class="settings-sub-title">Resend</h3>
+        <p class="form-hint">Get your API key at <a href="https://resend.com/api-keys" target="_blank" rel="noopener">resend.com/api-keys</a>. Add and verify your sending domain at <a href="https://resend.com/domains" target="_blank" rel="noopener">resend.com/domains</a>.</p>
+        <div class="form-group">
+          <label for="resend_api_key">API key</label>
+          <input type="password" id="resend_api_key" name="resend_api_key"
+                 value="<%= s.resend_api_key || '' %>" autocomplete="new-password" class="form-input"
+                 placeholder="re_xxxxxxxxxxxxxxxxxxxx">
         </div>
       </div>
 
