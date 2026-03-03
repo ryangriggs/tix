@@ -275,8 +275,10 @@ document.addEventListener('DOMContentLoaded', () => localiseTimestamps());
  *   allowFreeform  — if true, free-typed text is preserved on blur
  */
 function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars = 1, showOnFocus = false } = {}) {
-  // Attach dropdown to <body> so it's never clipped by overflow:hidden ancestors
-  // (e.g. .ticket-sidebar). Use position:fixed + getBoundingClientRect for placement.
+  // Attach dropdown to the nearest <dialog> ancestor (if any) so it renders in the
+  // browser top layer alongside the dialog — otherwise fall back to <body>.
+  // Either way use position:fixed + getBoundingClientRect for overflow-safe placement.
+  const dropdownParent = inputEl.closest('dialog') || document.body;
   const dropdown = document.createElement('ul');
   dropdown.className = 'autocomplete-dropdown';
   dropdown.style.cssText = [
@@ -285,7 +287,7 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
     'border-radius:4px', 'max-height:240px', 'overflow-y:auto',
     'box-shadow:0 4px 6px rgba(0,0,0,.08)',
   ].join(';');
-  document.body.appendChild(dropdown);
+  dropdownParent.appendChild(dropdown);
 
   function positionDropdown() {
     const r = inputEl.getBoundingClientRect();
