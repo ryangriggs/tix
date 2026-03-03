@@ -19,15 +19,35 @@
     </form>
   </details>
 
-  <div style="overflow-x:auto">
+  <%# Hidden form drives sort navigation %>
+  <form id="user-sort-form" method="GET" action="/admin/users" style="display:none">
+    <input type="hidden" name="sort"  id="user-sort-field"  value="<%= sort %>">
+    <input type="hidden" name="order" id="user-order-field" value="<%= order %>">
+  </form>
+
+  <%# Mobile sort bar (hidden on desktop via CSS) %>
+  <div class="mobile-sort-bar">
+    <label for="user-mobile-sort" style="flex-shrink:0">Sort</label>
+    <select id="user-mobile-sort" class="form-select form-select-sm" onchange="setUserSort(this.value)">
+      <option value="organization_name" <%= sort==='organization_name' ? 'selected':'' %>>Organization</option>
+      <option value="name"              <%= sort==='name'              ? 'selected':'' %>>Name</option>
+      <option value="email"             <%= sort==='email'             ? 'selected':'' %>>Email</option>
+      <option value="role"              <%= sort==='role'              ? 'selected':'' %>>Role</option>
+      <option value="created_at"        <%= sort==='created_at'        ? 'selected':'' %>>Created</option>
+    </select>
+    <button type="button" class="btn btn-sm btn-ghost" onclick="setUserSort('<%= sort %>')" title="Toggle direction"><%= order==='desc' ? '↓' : '↑' %></button>
+  </div>
+
+  <%# Desktop table (hidden on mobile) %>
+  <div class="user-table-wrap">
   <table class="data-table">
     <thead>
       <tr>
-        <th>Email</th>
-        <th>Name</th>
-        <th>Role</th>
-        <th>Organization</th>
-        <th>Created</th>
+        <th><button class="th-sort-btn <%= sort==='email' ?'tlh-active':'' %>" onclick="setUserSort('email')">Email<%= sort==='email' ? (order==='asc'?' ↑':' ↓'):'' %></button></th>
+        <th><button class="th-sort-btn <%= sort==='name'  ?'tlh-active':'' %>" onclick="setUserSort('name')">Name<%= sort==='name'  ? (order==='asc'?' ↑':' ↓'):'' %></button></th>
+        <th><button class="th-sort-btn <%= sort==='role'  ?'tlh-active':'' %>" onclick="setUserSort('role')">Role<%= sort==='role'  ? (order==='asc'?' ↑':' ↓'):'' %></button></th>
+        <th><button class="th-sort-btn <%= sort==='organization_name' ?'tlh-active':'' %>" onclick="setUserSort('organization_name')">Organization<%= sort==='organization_name' ? (order==='asc'?' ↑':' ↓'):'' %></button></th>
+        <th><button class="th-sort-btn <%= sort==='created_at' ?'tlh-active':'' %>" onclick="setUserSort('created_at')">Created<%= sort==='created_at' ? (order==='asc'?' ↑':' ↓'):'' %></button></th>
         <th>Status</th>
         <th>Actions</th>
       </tr>
@@ -40,7 +60,7 @@
           <td><span class="badge badge-role"><%= u.role %></span></td>
           <td><%= u.organization_name || '—' %></td>
           <td><span data-ts="<%= u.created_at %>"><%= formatDate(u.created_at) %></span></td>
-          <td><%= u.blocked_at ? '🚫 Blocked' : '✓ Active' %></td>
+          <td><%= u.blocked_at ? 'Blocked' : 'Active' %></td>
           <td class="actions-cell">
             <button type="button" class="btn btn-sm btn-secondary"
               onclick="openEditDialog(this)"
@@ -58,6 +78,33 @@
     </tbody>
   </table>
   </div>
+
+  <%# Mobile card list (hidden on desktop) %>
+  <div class="user-mobile-list">
+    <% for (const u of users) { %>
+      <div class="user-card <%= u.blocked_at ? 'user-card-blocked' : '' %>"
+        onclick="openEditDialog(this)"
+        data-user-id="<%= u.id %>"
+        data-user-email="<%= u.email %>"
+        data-user-name="<%= (u.name || '').replace(/"/g,'&quot;') %>"
+        data-user-role="<%= u.role %>"
+        data-user-org="<%= (u.organization_name || '').replace(/"/g,'&quot;') %>"
+        data-user-superuser="<%= u.is_group_superuser ? '1' : '0' %>"
+        data-user-blocked="<%= u.blocked_at ? '1' : '0' %>"
+        data-is-self="<%= u.id === user.id ? '1' : '0' %>">
+        <div class="user-card-top">
+          <span class="user-card-name"><%= u.name || u.email %></span>
+          <span class="badge badge-role"><%= u.role %></span>
+        </div>
+        <% if (u.name) { %><div class="user-card-email"><%= u.email %></div><% } %>
+        <div class="user-card-meta">
+          <span><%= u.organization_name || '—' %></span>
+          <% if (u.blocked_at) { %><span style="color:#dc2626">Blocked</span><% } %>
+        </div>
+      </div>
+    <% } %>
+  </div>
+
 </main>
 
 <!-- Edit User Dialog -->
@@ -147,6 +194,15 @@
 </dialog>
 
 <script>
+function setUserSort(col) {
+  const sortEl  = document.getElementById('user-sort-field');
+  const orderEl = document.getElementById('user-order-field');
+  const isCurrent = sortEl.value === col;
+  orderEl.value = isCurrent && orderEl.value === 'asc' ? 'desc' : 'asc';
+  sortEl.value  = col;
+  document.getElementById('user-sort-form').submit();
+}
+
 let _dialogUserId = null;
 let _dialogBlocked = false;
 const _csrf = '<%= csrfToken %>';

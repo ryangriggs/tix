@@ -1137,6 +1137,32 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 .data-table .row-blocked td { color: var(--text-muted); opacity: 0.6; }
 .actions-cell { display: flex; gap: 0.25rem; }
 
+/* Sortable column header buttons inside data-table */
+.data-table th { padding: 0; }
+.th-sort-btn {
+  display: block; width: 100%;
+  padding: 0.75rem 1rem;
+  text-align: left; background: none; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: 0.78rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;
+}
+.th-sort-btn:hover { color: var(--text); }
+.th-sort-btn.tlh-active { color: var(--accent); }
+
+/* User list — desktop wrapper, mobile card list */
+.user-mobile-list { display: none; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+.user-card {
+  display: flex; flex-direction: column; gap: 0.2rem;
+  padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.user-card:last-child { border-bottom: none; }
+.user-card:hover { background: var(--bg); }
+.user-card-blocked { opacity: 0.55; }
+.user-card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.user-card-name { font-weight: 500; font-size: 0.9rem; }
+.user-card-email { font-size: 0.8rem; color: var(--text-muted); }
+.user-card-meta { font-size: 0.78rem; color: var(--text-muted); display: flex; gap: 0.75rem; margin-top: 0.1rem; }
+
 /* ============================================================
    Auth pages
    ============================================================ */
@@ -1274,6 +1300,8 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 
   .ticket-list-header { display: none; }
   .mobile-sort-bar    { display: flex; }
+  .user-table-wrap    { display: none; }
+  .user-mobile-list   { display: block; }
   .filter-search-row .search-wrap { max-width: none; }
   .filter-search-input { font-size: 0.95rem; }
 

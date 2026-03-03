@@ -344,6 +344,26 @@ function getAllUsers() {
   return prepare('SELECT u.*, o.name AS organization_name FROM users u LEFT JOIN organizations o ON o.id = u.organization_id ORDER BY u.created_at DESC').all();
 }
 
+function getUsersSorted(sort, order) {
+  const dir = order === 'desc' ? 'DESC' : 'ASC';
+  const cols = {
+    name:              "COALESCE(u.name, u.email) COLLATE NOCASE",
+    email:             "u.email COLLATE NOCASE",
+    role:              "u.role",
+    organization_name: "COALESCE(o.name, '') COLLATE NOCASE",
+    created_at:        "u.created_at",
+  };
+  const primary = cols[sort] || cols.organization_name;
+  const secondary = sort === 'organization_name'
+    ? "COALESCE(u.name, u.email) COLLATE NOCASE ASC"
+    : "COALESCE(o.name, '') COLLATE NOCASE ASC, COALESCE(u.name, u.email) COLLATE NOCASE ASC";
+  return prepare(
+    `SELECT u.*, o.name AS organization_name FROM users u
+     LEFT JOIN organizations o ON o.id = u.organization_id
+     ORDER BY ${primary} ${dir}, ${secondary}`
+  ).all();
+}
+
 function getAssignableUsers() {
   return prepare(`
     SELECT u.id, u.email, u.name, o.name AS organization_name
@@ -983,7 +1003,7 @@ function setTicketRemindersSent(ticketId, count) {
 module.exports = {
   initDb,
   // Users
-  findOrCreateUser, getUserById, getUserByEmail, getAllUsers, getAssignableUsers,
+  findOrCreateUser, getUserById, getUserByEmail, getAllUsers, getUsersSorted, getAssignableUsers,
   updateUserRole, updateUserName, blockUser, unblockUser, deleteUser,
   updateUserOrganization, updateUserSuperuser, searchUsers,
   // Auth

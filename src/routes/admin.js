@@ -17,7 +17,11 @@ function maskSecret(val) {
 
 // GET /admin/users
 router.get('/users', (req, res) => {
-  const users = db.getAllUsers();
+  const validSorts = ['name', 'email', 'role', 'organization_name', 'created_at'];
+  const sort  = validSorts.includes(req.query.sort) ? req.query.sort : 'organization_name';
+  const order = req.query.order === 'desc' ? 'desc' : 'asc';
+
+  const users = db.getUsersSorted(sort, order);
   const organizations = db.getAllOrganizations();
 
   // Build techOrgMap: userId → [org, ...] for technician rows
@@ -31,6 +35,8 @@ router.get('/users', (req, res) => {
     users,
     organizations,
     techOrgMap,
+    sort,
+    order,
     message: req.query.message || null,
   });
 });
