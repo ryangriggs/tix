@@ -354,7 +354,7 @@
     document.getElementById('comment-required-err')?.remove();
 
     const sc = document.querySelector('[name="status_change"]');
-    if (BILLABLE_ENABLED && sc && sc.value === 'closed') {
+    if (<%= enableBillableHours ? 'true' : 'false' %> && sc && sc.value === 'closed') {
       if (!confirm('Once closed, no further billable hours can be added. Close this ticket?')) {
         e.preventDefault(); return;
       }
