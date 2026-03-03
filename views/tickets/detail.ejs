@@ -62,14 +62,17 @@
             <div id="attach-btnwrap-comment"></div>
             <input type="file" name="attachments" multiple id="attach-input-comment" style="display:none">
           </div>
-          <% if (isTechOrAdmin) { %>
+          <% if (isTechOrAdmin && (enableBillableHours || enableLocation)) { %>
           <div class="form-row" style="align-items:flex-end;gap:.75rem;flex-wrap:wrap;margin-bottom:.5rem">
+            <% if (enableBillableHours) { %>
             <div class="form-group" style="flex:0 0 auto;margin-bottom:0">
               <label for="billable-hours">Billable Hours <span class="optional">(optional)</span></label>
               <input type="number" id="billable-hours" name="billable_hours"
                      min="0" step="0.25" placeholder="0.00" class="form-input form-input-sm"
                      style="width:6rem" <%= ticket.status === 'closed' ? 'disabled' : '' %>>
             </div>
+            <% } %>
+            <% if (enableLocation) { %>
             <div class="form-group" style="flex:1 1 200px;margin-bottom:0;position:relative">
               <label for="location-input">Location <span class="optional">(optional)</span></label>
               <input type="text" id="location-input" name="location_name"
@@ -80,9 +83,10 @@
                      <%= (!ticket.organization_id || ticket.status === 'closed') ? 'disabled' : '' %>>
               <input type="hidden" id="location-id" name="location_id">
             </div>
+            <% } %>
           </div>
           <% if (ticket.status === 'closed') { %>
-            <p class="form-hint">Billable hours and location cannot be added to a closed ticket.</p>
+            <p class="form-hint"><%= [enableBillableHours ? 'Billable hours' : '', enableLocation ? 'location' : ''].filter(Boolean).join(' and ') %> cannot be added to a closed ticket.</p>
           <% } %>
           <% } %>
           <div class="form-actions" style="flex-wrap:wrap;gap:.5rem">
@@ -140,8 +144,8 @@
                 <% } %>
               </span>
               <% if (c.is_email) { %><span class="badge badge-email">via email</span><% } %>
-              <% if (isTechOrAdmin && c.billable_hours) { %><span class="badge badge-billing"><%= c.billable_hours %>h</span><% } %>
-              <% if (c.location_name) { %><span class="badge badge-location">📍 <%= c.location_name %></span><% } %>
+              <% if (enableBillableHours && isTechOrAdmin && c.billable_hours) { %><span class="badge badge-billing"><%= c.billable_hours %>h</span><% } %>
+              <% if (enableLocation && c.location_name) { %><span class="badge badge-location">📍 <%= c.location_name %></span><% } %>
               <span class="comment-time" data-ts="<%= c.created_at %>" data-fmt="full"><%= formatDateFull(c.created_at) %></span>
               <% if (user && user.role === 'admin') { %>
                 <form method="POST" action="/tickets/<%= ticket.id %>/comments/<%= c.id %>/delete" style="display:inline;margin-left:.5rem">
@@ -230,7 +234,7 @@
       </div>
 
       <!-- Billable Hours total (admin only) -->
-      <% if (user && user.role === 'admin' && ticket.total_billable_hours > 0) { %>
+      <% if (enableBillableHours && user && user.role === 'admin' && ticket.total_billable_hours > 0) { %>
       <div class="sidebar-section">
         <div class="sidebar-label">Billable Hours</div>
         <span class="billing-total"><%= ticket.total_billable_hours.toFixed(2) %> hrs</span>

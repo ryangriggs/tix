@@ -4,15 +4,21 @@ const express = require('express');
 const router  = express.Router();
 const { requireAdmin } = require('../middleware/auth');
 const db = require('../db');
-const { ticketPrefix } = require('../config');
+const config = require('../config');
+const { ticketPrefix } = config;
 
 // GET /reports
 router.get('/', (req, res) => {
-  res.render('reports/index', { title: 'Reports' });
+  res.render('reports/index', {
+    title: 'Reports',
+    enableBillableHours: config.enableBillableHours,
+    enableLocation:      config.enableLocation,
+  });
 });
 
 // GET /reports/billing.csv — admin only
 router.get('/billing.csv', requireAdmin, (req, res) => {
+  if (!config.enableBillableHours) return res.status(404).send('Billing report is disabled.');
   const { from, to } = req.query;
   if (!from || !to) return res.status(400).send('from and to query parameters are required');
 
@@ -44,6 +50,7 @@ router.get('/billing.csv', requireAdmin, (req, res) => {
 
 // GET /reports/travel.csv — admin only
 router.get('/travel.csv', requireAdmin, (req, res) => {
+  if (!config.enableLocation) return res.status(404).send('Travel report is disabled.');
   const { from, to } = req.query;
   if (!from || !to) return res.status(400).send('from and to query parameters are required');
 

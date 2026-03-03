@@ -275,18 +275,29 @@ document.addEventListener('DOMContentLoaded', () => localiseTimestamps());
  *   allowFreeform  — if true, free-typed text is preserved on blur
  */
 function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars = 1, showOnFocus = false } = {}) {
-  const wrap = inputEl.parentElement;
-  if (getComputedStyle(wrap).position === 'static') wrap.style.position = 'relative';
-
+  // Attach dropdown to <body> so it's never clipped by overflow:hidden ancestors
+  // (e.g. .ticket-sidebar). Use position:fixed + getBoundingClientRect for placement.
   const dropdown = document.createElement('ul');
   dropdown.className = 'autocomplete-dropdown';
   dropdown.style.cssText = [
-    'display:none', 'position:absolute', 'z-index:1000', 'list-style:none',
+    'display:none', 'position:fixed', 'z-index:9999', 'list-style:none',
     'margin:0', 'padding:0', 'background:#fff', 'border:1px solid #d1d5db',
     'border-radius:4px', 'max-height:240px', 'overflow-y:auto',
-    'min-width:100%', 'box-shadow:0 4px 6px rgba(0,0,0,.08)', 'top:100%', 'left:0',
+    'box-shadow:0 4px 6px rgba(0,0,0,.08)',
   ].join(';');
-  wrap.appendChild(dropdown);
+  document.body.appendChild(dropdown);
+
+  function positionDropdown() {
+    const r = inputEl.getBoundingClientRect();
+    dropdown.style.top   = r.bottom + 'px';
+    dropdown.style.left  = r.left   + 'px';
+    dropdown.style.width = r.width  + 'px';
+  }
+
+  // Reposition on scroll/resize (passive — no perf impact)
+  const reposition = () => { if (dropdown.style.display !== 'none') positionDropdown(); };
+  window.addEventListener('scroll', reposition, { passive: true, capture: true });
+  window.addEventListener('resize', reposition, { passive: true });
 
   let activeIdx = -1;
   let currentItems = [];
@@ -305,6 +316,7 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
       li.addEventListener('mousedown', e => { e.preventDefault(); choose(item); });
       dropdown.appendChild(li);
     });
+    positionDropdown();
     dropdown.style.display = 'block';
   }
 

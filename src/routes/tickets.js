@@ -463,6 +463,8 @@ router.get('/:id', (req, res) => {
     isSuperuser: req.user.isGroupSuperuser,
     organizations: db.getAllOrganizations(),
     isTechOrAdmin,
+    enableBillableHours: config.enableBillableHours,
+    enableLocation:      config.enableLocation,
     canClose:  canCloseTicket(req.user),
     canReopen: canReopenTicket(req.user),
   });
@@ -492,10 +494,10 @@ router.post('/:id/comments', upload, async (req, res) => {
   // Billable hours and location (admin/tech only, disabled on closed tickets)
   const isTechOrAdmin = req.user.role === 'admin' || req.user.role === 'technician';
   const rawHours = parseFloat(req.body.billable_hours);
-  const billableHours = isTechOrAdmin && ticket.status !== 'closed' && rawHours > 0 ? rawHours : null;
+  const billableHours = isTechOrAdmin && config.enableBillableHours && ticket.status !== 'closed' && rawHours > 0 ? rawHours : null;
 
   let locationId = null;
-  if (isTechOrAdmin && ticket.organization_id) {
+  if (isTechOrAdmin && config.enableLocation && ticket.organization_id) {
     const submittedId   = parseInt(req.body.location_id, 10);
     const submittedName = (req.body.location_name || '').trim();
     if (submittedId) {

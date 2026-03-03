@@ -269,6 +269,29 @@
       <p class="form-hint">Maximum inbound email messages per minute. 0 disables the limit.</p>
     </div>
 
+    <!-- ── Features ─────────────────────────────────────────── -->
+    <div class="card" style="margin-bottom:1.5rem">
+      <h2 class="settings-section-title">Features</h2>
+
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" name="enable_billable_hours" value="1"
+                 <%= s.enable_billable_hours !== 'false' ? 'checked' : '' %>>
+          Enable billable hours
+        </label>
+        <p class="form-hint">Show the billable hours field on ticket replies and include the Billing Report in Reports.</p>
+      </div>
+
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" name="enable_location" value="1"
+                 <%= s.enable_location !== 'false' ? 'checked' : '' %>>
+          Enable location tracking
+        </label>
+        <p class="form-hint">Show the location field on ticket replies and include the Travel Report in Reports.</p>
+      </div>
+    </div>
+
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">Save settings</button>
     </div>

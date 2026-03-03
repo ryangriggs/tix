@@ -406,6 +406,8 @@ router.post('/settings', (req, res) => {
     reminder_count:                 String(reminderCount),
     reminder_frequency_hours:       String(reminderFreq),
     notify_email_submitter:         req.body.notify_email_submitter === '1' ? 'true' : 'false',
+    enable_billable_hours:          req.body.enable_billable_hours  === '1' ? 'true' : 'false',
+    enable_location:                req.body.enable_location         === '1' ? 'true' : 'false',
   };
 
   for (const [key, val] of Object.entries(updates)) {

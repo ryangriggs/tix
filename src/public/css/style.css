@@ -1279,6 +1279,15 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 
   .form-row { flex-direction: column; gap: 0; }
 
+  /* Make all inputs/selects inside form-rows full-width and tap-friendly on mobile.
+     !important is needed to beat inline flex/width styles on individual form groups. */
+  .form-row .form-group { flex: 1 1 100% !important; margin-bottom: 0.6rem !important; }
+  .form-row .form-group:last-child { margin-bottom: 0 !important; }
+  .form-row .form-group input,
+  .form-row .form-group select { width: 100% !important; max-width: none !important; box-sizing: border-box; }
+  .form-row .form-group .form-input-sm,
+  .form-row .form-group .form-select-sm { padding: 0.5rem 0.75rem; font-size: 0.875rem; }
+
   .app-header-inner { gap: 0.5rem; }
   .user-email { display: none; }
   .hamburger-btn { display: flex; }

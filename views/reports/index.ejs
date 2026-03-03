@@ -7,8 +7,10 @@
   </div>
 
   <% if (user && user.role === 'admin') { %>
+    <% if (enableBillableHours || enableLocation) { %>
     <div class="reports-grid">
 
+      <% if (enableBillableHours) { %>
       <!-- Billing Report -->
       <div class="report-card">
         <div class="report-card-title">Billing Report</div>
@@ -28,7 +30,9 @@
         </div>
         <p class="form-hint" id="billing-error" style="color:var(--danger,#dc2626);display:none"></p>
       </div>
+      <% } %>
 
+      <% if (enableLocation) { %>
       <!-- Travel Report -->
       <div class="report-card">
         <div class="report-card-title">Travel Report</div>
@@ -48,8 +52,12 @@
         </div>
         <p class="form-hint" id="travel-error" style="color:var(--danger,#dc2626);display:none"></p>
       </div>
+      <% } %>
 
     </div>
+    <% } else { %>
+      <p class="text-muted">No reports are enabled. Turn on Billable Hours or Location Tracking in Settings.</p>
+    <% } %>
   <% } else { %>
     <p class="text-muted">No reports are available for your account.</p>
   <% } %>

@@ -176,6 +176,8 @@ async function start() {
     reminder_count:                 '1',
     reminder_frequency_hours:       '24',
     notify_email_submitter:         'true',
+    enable_billable_hours:          'true',
+    enable_location:                'true',
   };
   for (const [key, val] of Object.entries(seedDefaults)) {
     if (val !== null && val !== undefined) seedSetting(key, val);
