@@ -1305,8 +1305,10 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     box-shadow: var(--shadow-md);
   }
   .app-nav.nav-open { display: flex; }
+  /* Hamburger menu: all items full-width block links */
+  .app-nav a { display: block; width: 100%; box-sizing: border-box; }
   .nav-link { padding: 0.6rem 0.75rem; font-size: 0.95rem; }
-  .nav-new-ticket { margin-right: 0; align-self: flex-start; margin: 0.4rem 0.75rem; }
+  .nav-new-ticket { margin: 0; border-radius: 0; text-align: left; }
 
   .auth-card { padding: 1.5rem; }
   .page-toolbar { flex-wrap: wrap; }

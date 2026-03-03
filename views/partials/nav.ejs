@@ -44,7 +44,7 @@
     btn.classList.toggle('hamburger-active', open);
   });
   nav.addEventListener('click', function(e) {
-    if (e.target.closest('.nav-link')) {
+    if (e.target.closest('a[href]')) {
       nav.classList.remove('nav-open');
       btn.classList.remove('hamburger-active');
       btn.setAttribute('aria-expanded', 'false');
