@@ -354,7 +354,7 @@
     document.getElementById('comment-required-err')?.remove();
 
     const sc = document.querySelector('[name="status_change"]');
-    if (sc && sc.value === 'closed') {
+    if (BILLABLE_ENABLED && sc && sc.value === 'closed') {
       if (!confirm('Once closed, no further billable hours can be added. Close this ticket?')) {
         e.preventDefault(); return;
       }
@@ -525,11 +525,12 @@ document.addEventListener('DOMContentLoaded', () => {
 // Sidebar AJAX actions — no page reload for sidebar changes
 // ============================================================
 (function() {
-  const TICKET_ID       = '<%= ticket.id %>';
-  const CSRF            = '<%= csrfToken %>';
-  const CAN_MANAGE      = <%= canManage ? 'true' : 'false' %>;
-  const CURRENT_USER_ID = <%= user.id %>;
-  const IS_ADMIN        = <%= user.role === 'admin' ? 'true' : 'false' %>;
+  const TICKET_ID          = '<%= ticket.id %>';
+  const CSRF               = '<%= csrfToken %>';
+  const CAN_MANAGE         = <%= canManage ? 'true' : 'false' %>;
+  const CURRENT_USER_ID    = <%= user.id %>;
+  const IS_ADMIN           = <%= user.role === 'admin' ? 'true' : 'false' %>;
+  const BILLABLE_ENABLED   = <%= enableBillableHours ? 'true' : 'false' %>;
 
   async function sidebarPost(path, data) {
     const body = new URLSearchParams({ _csrf: CSRF, ...data });
@@ -554,8 +555,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('#status-pills .pill-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const sv = btn.dataset.status;
-      if (sv === 'closed' && !confirm('Once closed, no further billable hours can be added. Close this ticket?')) return;
-      if (_currentStatus === 'closed' && sv !== 'closed' && !confirm('Warning: Reopening a closed ticket may cause missed or double-billed hours. Reopen anyway?')) return;
+      if (BILLABLE_ENABLED && sv === 'closed' && !confirm('Once closed, no further billable hours can be added. Close this ticket?')) return;
+      if (BILLABLE_ENABLED && _currentStatus === 'closed' && sv !== 'closed' && !confirm('Warning: Reopening a closed ticket may cause missed or double-billed hours. Reopen anyway?')) return;
       try {
         await sidebarPost(`/tickets/${TICKET_ID}/status`, { status: sv });
         document.querySelectorAll('#status-pills .pill-btn').forEach(b => b.classList.remove('pill-active'));
