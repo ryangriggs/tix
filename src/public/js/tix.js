@@ -432,20 +432,53 @@ function _escHtml(s) {
 
 let _cameraList = null;
 
+function _normCameraLabel(raw, index, total) {
+  const s = (raw || '').toLowerCase();
+  if (s.includes('front') || s.includes('facing front') || s.includes('facing user')) return 'Front Camera';
+  if (s.includes('back') || s.includes('rear') || s.includes('facing back') || s.includes('environment')) return 'Back Camera';
+  if (s.includes('wide')) return 'Wide Camera';
+  if (s.includes('tele') || s.includes('zoom')) return 'Telephoto Camera';
+  if (raw && raw.trim()) return raw.trim();
+  return total === 1 ? 'Camera' : `Camera ${index + 1}`;
+}
+
 async function _detectCameras() {
   if (_cameraList !== null) return _cameraList;
   try {
     if (!navigator.mediaDevices?.enumerateDevices) return (_cameraList = []);
     const all  = await navigator.mediaDevices.enumerateDevices();
     const cams = all.filter(d => d.kind === 'videoinput');
-    _cameraList = cams.map((d, i) => ({
-      deviceId: d.deviceId,
-      label:    d.label || (cams.length === 1 ? 'Camera' : `Camera ${i + 1}`),
-    }));
+    if (!cams.length) return (_cameraList = []);
+
+    const hasRealIds = cams.some(d => d.deviceId && d.deviceId !== 'default');
+
+    if (hasRealIds) {
+      // Permission already granted — use specific deviceId constraints
+      _cameraList = cams.map((d, i) => ({
+        label:      _normCameraLabel(d.label, i, cams.length),
+        constraint: { video: { deviceId: { exact: d.deviceId } } },
+      }));
+    } else {
+      // No permission yet — deviceIds are all "" so use facingMode constraints.
+      // This correctly opens back vs front camera on Android/iOS.
+      if (cams.length === 1) {
+        _cameraList = [{ label: 'Camera', constraint: { video: true } }];
+      } else {
+        // Most devices: index 0 = back, index 1 = front
+        _cameraList = [
+          { label: 'Back Camera',  constraint: { video: { facingMode: 'environment' } } },
+          { label: 'Front Camera', constraint: { video: { facingMode: 'user' } } },
+        ];
+        // Extra cameras (ultrawide, telephoto, depth) — can't distinguish without IDs
+        for (let i = 2; i < cams.length; i++) {
+          _cameraList.push({ label: `Camera ${i + 1}`, constraint: { video: true } });
+        }
+      }
+    }
   } catch (_) {
     _cameraList = [];
   }
-  // Invalidate cache if device permissions change so labels update
+  // Invalidate cache when permissions change so real deviceIds/labels load on next open
   navigator.mediaDevices?.addEventListener?.('devicechange', () => { _cameraList = null; }, { once: true });
   return _cameraList;
 }
@@ -479,14 +512,13 @@ function _buildCameraModal() {
 let _cameraStream  = null;
 let _cameraCaptureCb = null;
 
-function _openCameraModal(deviceId, label, onCapture) {
+function _openCameraModal(constraint, label, onCapture) {
   _buildCameraModal();
   _cameraCaptureCb = onCapture;
   document.getElementById('camera-modal-label').textContent = label || 'Take Photo';
   document.getElementById('camera-modal').style.display = 'block';
 
-  const constraints = deviceId ? { video: { deviceId: { exact: deviceId } } } : { video: true };
-  navigator.mediaDevices.getUserMedia(constraints)
+  navigator.mediaDevices.getUserMedia(constraint)
     .then(stream => {
       _cameraStream = stream;
       document.getElementById('camera-video').srcObject = stream;
@@ -614,18 +646,38 @@ function initAttachmentUI({ stageId, inputId, btnWrapperId, prefix }) {
       browseItem.addEventListener('click', () => { menu.classList.remove('open'); picker.click(); });
       menu.appendChild(browseItem);
 
-      cameras.forEach(cam => {
-        const item = document.createElement('button');
-        item.type = 'button'; item.className = 'attach-menu-item';
-        item.textContent = '\uD83D\uDCF7 ' + cam.label;
-        item.addEventListener('click', () => {
-          menu.classList.remove('open');
-          _openCameraModal(cam.deviceId, cam.label, blob => addPhoto(blob));
-        });
-        menu.appendChild(item);
-      });
+      // Camera items are built lazily on first dropdown open so we can probe
+      // for camera permission first — this gives us real deviceIds and labels
+      // for all cameras, including extras beyond just front/back.
+      let camItemsReady = false;
 
-      toggle.addEventListener('click', e => { e.stopPropagation(); menu.classList.toggle('open'); });
+      async function ensureCamItems() {
+        if (camItemsReady) return;
+        camItemsReady = true; // set early to prevent double-build on fast clicks
+        try {
+          // Brief permission probe — request then immediately stop the stream
+          const s = await navigator.mediaDevices.getUserMedia({ video: true });
+          s.getTracks().forEach(t => t.stop());
+          _cameraList = null; // force re-enumerate now that permission is granted
+        } catch (_) { /* permission denied — fall back to facingMode entries */ }
+        const freshCams = await _detectCameras();
+        freshCams.forEach(cam => {
+          const item = document.createElement('button');
+          item.type = 'button'; item.className = 'attach-menu-item';
+          item.textContent = '\uD83D\uDCF7 ' + cam.label;
+          item.addEventListener('click', () => {
+            menu.classList.remove('open');
+            _openCameraModal(cam.constraint, cam.label, blob => addPhoto(blob));
+          });
+          menu.appendChild(item);
+        });
+      }
+
+      toggle.addEventListener('click', async e => {
+        e.stopPropagation();
+        if (!camItemsReady) await ensureCamItems();
+        menu.classList.toggle('open');
+      });
       document.addEventListener('click', () => menu.classList.remove('open'));
 
       wrap.appendChild(toggle);
