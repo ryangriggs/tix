@@ -266,7 +266,9 @@ async function initDb() {
   try { _db.exec('ALTER TABLE comments ADD COLUMN billable_hours  REAL'); } catch (_) {}
   try { _db.exec('ALTER TABLE comments DROP COLUMN work_type'); } catch (_) {}
   try { _db.exec('ALTER TABLE tickets  ADD COLUMN reminders_sent  INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
-  try { _db.exec('ALTER TABLE comments ADD COLUMN location_id     INTEGER REFERENCES locations(id)'); } catch (_) {}
+  try { _db.exec('ALTER TABLE comments ADD COLUMN location_id              INTEGER REFERENCES locations(id)'); } catch (_) {}
+  try { _db.exec('ALTER TABLE tickets ADD COLUMN inactivity_reminder_days    INTEGER'); } catch (_) {}
+  try { _db.exec('ALTER TABLE tickets ADD COLUMN inactivity_reminder_sent_at INTEGER'); } catch (_) {}
   _db.exec('CREATE INDEX IF NOT EXISTS idx_comments_location ON comments(location_id)');
   // Back-fill close_date for tickets closed before this column existed
   _db.exec(`UPDATE tickets SET close_date = updated_at WHERE status = 'closed' AND close_date IS NULL`);
@@ -506,7 +508,7 @@ function getTicketById(id) {
 }
 
 function updateTicket(id, fields) {
-  const allowed = ['subject', 'body', 'status', 'priority', 'due_date', 'organization_id', 'close_date'];
+  const allowed = ['subject', 'body', 'status', 'priority', 'due_date', 'organization_id', 'close_date', 'inactivity_reminder_days'];
   const keys = Object.keys(fields).filter(k => allowed.includes(k));
   if (keys.length === 0) return;
 
@@ -1000,6 +1002,28 @@ function setTicketRemindersSent(ticketId, count) {
   prepare('UPDATE tickets SET reminders_sent = ? WHERE id = ?').run(count, ticketId);
 }
 
+function getTicketsForInactivityReminders() {
+  return prepare(`
+    SELECT t.id, t.subject, t.reply_token, t.updated_at, t.inactivity_reminder_days,
+           u.email AS party_email
+    FROM tickets t
+    JOIN ticket_parties tp ON tp.ticket_id = t.id
+    JOIN users u ON u.id = tp.user_id
+    WHERE t.status != 'closed'
+      AND t.inactivity_reminder_days > 0
+      AND (unixepoch() - t.updated_at) >= t.inactivity_reminder_days * 86400
+      AND (t.inactivity_reminder_sent_at IS NULL
+           OR t.inactivity_reminder_sent_at <= t.updated_at)
+      AND tp.role != 'submitter'
+    ORDER BY t.id ASC
+  `).all();
+}
+
+function setInactivityReminderSent(ticketId) {
+  // Must NOT update updated_at or it would reset the inactivity clock
+  prepare('UPDATE tickets SET inactivity_reminder_sent_at = unixepoch() WHERE id = ?').run(ticketId);
+}
+
 module.exports = {
   initDb,
   // Users
@@ -1024,6 +1048,7 @@ module.exports = {
   getSetting, setSetting, seedSetting, getAllSettings, getUserPrefs, setUserPrefs,
   // Reminders
   getTicketsDueSoon, getTicketsForReminders, setTicketRemindersSent,
+  getTicketsForInactivityReminders, setInactivityReminderSent,
   // Reports
   getBillingReport,
   // Organizations

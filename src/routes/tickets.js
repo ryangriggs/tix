@@ -467,6 +467,7 @@ router.get('/:id', (req, res) => {
     enableLocation:      config.enableLocation,
     canClose:  canCloseTicket(req.user),
     canReopen: canReopenTicket(req.user),
+    inactivityReminderDays: ticket.inactivity_reminder_days || null,
   });
 });
 
@@ -671,6 +672,18 @@ router.post('/:id/organization', (req, res) => {
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'org', value: resolvedOrgName });
   if (req.accepts('json')) return res.json({ ok: true, orgName: resolvedOrgName, orgId: orgId || null });
   res.redirect(`/tickets/${ticket.id}`);
+});
+
+// POST /tickets/:id/reminder — set inactivity reminder (admin/tech only)
+router.post('/:id/reminder', (req, res) => {
+  const ticket = db.getTicketById(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Not found' });
+  if (!['admin', 'technician'].includes(req.user.role)) return res.status(403).json({ error: 'Forbidden' });
+
+  const raw  = parseInt(req.body.days, 10);
+  const days = (!isNaN(raw) && raw >= 1 && raw <= 365) ? raw : null;
+  db.updateTicket(ticket.id, { inactivity_reminder_days: days });
+  return res.json({ ok: true, days });
 });
 
 // POST /tickets/:id/parties — add a party

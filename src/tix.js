@@ -9,8 +9,9 @@ const config = require('./config');
 const { requireAuth, requireAdmin, optionalAuth, verifyCsrf } = require('./middleware/auth');
 const { startSMTPServer } = require('./smtp');
 const sse = require('./services/sse');
-const { initDb, getTicketsForReminders, setTicketRemindersSent, getSetting, seedSetting, getAllSettings } = require('./db');
-const { sendDueReminder } = require('./services/mail');
+const { initDb, getTicketsForReminders, setTicketRemindersSent, getSetting, seedSetting, getAllSettings,
+        getTicketsForInactivityReminders, setInactivityReminderSent } = require('./db');
+const { sendDueReminder, sendInactivityReminder } = require('./services/mail');
 
 const app = express();
 
@@ -239,6 +240,26 @@ async function start() {
       }
     } catch (err) {
       console.error('[Reminders] Error:', err);
+    }
+  }, 60 * 60 * 1000);
+
+  // Inactivity reminders — check every hour
+  setInterval(async () => {
+    try {
+      const rows = getTicketsForInactivityReminders();
+      const ticketMap = new Map();
+      for (const row of rows) {
+        if (!ticketMap.has(row.id)) ticketMap.set(row.id, { ...row, emails: [] });
+        if (row.party_email) ticketMap.get(row.id).emails.push(row.party_email);
+      }
+      for (const t of ticketMap.values()) {
+        for (const email of t.emails) {
+          await sendInactivityReminder(email, t).catch(console.error);
+        }
+        setInactivityReminderSent(t.id);
+      }
+    } catch (err) {
+      console.error('[Inactivity Reminders] Error:', err);
     }
   }, 60 * 60 * 1000);
 }

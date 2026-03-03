@@ -1,0 +1,13 @@
+<%- include('_header') %>
+
+<p>This ticket has had no activity for <strong><%= ticket.inactivity_reminder_days %> day<%= ticket.inactivity_reminder_days === 1 ? '' : 's' %></strong>:</p>
+
+<p style="margin:16px 0">
+  <a href="<%= appUrl %>/tickets/<%= ticket.id %>" style="font-weight:600">
+    #<%= ticketPrefix %><%= ticket.id %>: <%= ticket.subject %>
+  </a>
+</p>
+
+<p>Reply to this email to add a comment, or <a href="<%= appUrl %>/tickets/<%= ticket.id %>">view the ticket online</a>.</p>
+
+<%- include('_footer') %>
