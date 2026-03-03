@@ -433,13 +433,21 @@ function _escHtml(s) {
 let _cameraList = null;
 
 function _normCameraLabel(raw, index, total) {
-  const s = (raw || '').toLowerCase();
-  if (s.includes('front') || s.includes('facing front') || s.includes('facing user')) return 'Front Camera';
-  if (s.includes('back') || s.includes('rear') || s.includes('facing back') || s.includes('environment')) return 'Back Camera';
-  if (s.includes('wide')) return 'Wide Camera';
-  if (s.includes('tele') || s.includes('zoom')) return 'Telephoto Camera';
-  if (raw && raw.trim()) return raw.trim();
-  return total === 1 ? 'Camera' : `Camera ${index + 1}`;
+  if (!raw || !raw.trim()) return total === 1 ? 'Camera' : `Camera ${index + 1}`;
+
+  // Android Chrome labels cameras like "camera2 0, facing back" or "camera2 1, facing front".
+  // Extract the camera index and facing direction so every entry gets a unique label.
+  const facingMatch = raw.match(/facing\s+(back|front|environment|user|external)/i);
+  const numMatch    = raw.match(/\b(\d+)\b/);
+  if (facingMatch) {
+    const dir   = facingMatch[1].toLowerCase();
+    const face  = (dir === 'front' || dir === 'user') ? 'Front' : 'Back';
+    const num   = numMatch ? numMatch[1] : String(index);
+    return `${face} Camera ${num}`;
+  }
+
+  // For non-Android labels (desktop, iOS) use the raw string — it's already descriptive
+  return raw.trim();
 }
 
 async function _detectCameras() {
