@@ -394,6 +394,7 @@ router.post('/settings', (req, res) => {
     otp_max_tries:                  String(otpMaxTries),
     otp_lockout_seconds:            String(otpLockout),
     mail_transport:                 mailTransport,
+    mail_queue_delay_ms:            String(int('mail_queue_delay_ms', 0)),
     mailgun_api_key:                trim('mailgun_api_key'),
     mailgun_domain:                 trim('mailgun_domain'),
     smtp_relay_host:                trim('smtp_relay_host'),

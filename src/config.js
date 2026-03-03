@@ -52,6 +52,10 @@ const config = {
   // Outbound mail transport: 'mailgun' (default), 'smtp', 'gmail', or 'resend'
   mailTransport: process.env.MAIL_TRANSPORT || 'mailgun',
 
+  // Milliseconds to wait between outgoing emails (0 = no delay).
+  // Set to 500–600 when using Resend to stay under their 2 msg/sec limit.
+  mailQueueDelayMs: parseInt(process.env.MAIL_QUEUE_DELAY_MS || '0', 10),
+
   // Resend API — used when MAIL_TRANSPORT=resend
   resend: {
     apiKey: process.env.RESEND_API_KEY || '',
@@ -96,7 +100,8 @@ function applySettings(map) {
   if ('otp_max_tries'       in map) config.otpMaxTries        = parseInt(map.otp_max_tries,       10) || config.otpMaxTries;
   if ('otp_lockout_seconds' in map) config.otpLockoutSeconds  = parseInt(map.otp_lockout_seconds, 10) || config.otpLockoutSeconds;
 
-  if ('mail_transport' in map) config.mailTransport = map.mail_transport || config.mailTransport;
+  if ('mail_transport'     in map) config.mailTransport    = map.mail_transport     || config.mailTransport;
+  if ('mail_queue_delay_ms' in map) config.mailQueueDelayMs = parseInt(map.mail_queue_delay_ms, 10) || 0;
 
   if ('mailgun_api_key' in map) config.mailgun.apiKey  = map.mailgun_api_key || '';
   if ('mailgun_domain'  in map) config.mailgun.domain  = map.mailgun_domain  || '';

@@ -160,11 +160,36 @@ function getTransport() {
   return _transport;
 }
 
-// Low-level send — all helpers funnel through here
-async function send({ to, subject, html, text, messageId, inReplyTo, references, replyTo }) {
+// ============================================================
+// Send queue — serialises all outbound sends with a configurable
+// inter-message delay, preventing rate-limit errors (e.g. Resend
+// allows 2 req/sec; set mail_queue_delay_ms to 600 to stay under).
+// ============================================================
+const _queue = [];
+let _draining = false;
+
+async function _drainQueue() {
+  if (_draining) return;
+  _draining = true;
+  try {
+    while (_queue.length > 0) {
+      const opts = _queue.shift();
+      try   { await _doSend(opts); }
+      catch  { /* already logged inside _doSend */ }
+      const delay = config.mailQueueDelayMs;
+      if (delay > 0 && _queue.length > 0) {
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+  } finally {
+    _draining = false;
+  }
+}
+
+// Internal: actually delivers one message — called only by _drainQueue
+async function _doSend({ to, subject, html, text, messageId, inReplyTo, references, replyTo }) {
   const from = `${config.mailFromName} <${config.ticketEmail}>`;
   const transport = getTransport();
-
   try {
     if (config.mailTransport === 'mailgun' || config.mailTransport === 'resend' || config.mailTransport === 'gmail') {
       await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references, replyTo });
@@ -188,6 +213,13 @@ async function send({ to, subject, html, text, messageId, inReplyTo, references,
     logEmail(to, subject, err.message || String(err));
     throw err;
   }
+}
+
+// Public: enqueues a message and returns immediately (fire-and-forget).
+// Delivery happens asynchronously; errors are written to the email log.
+function send(opts) {
+  _queue.push(opts);
+  _drainQueue();
 }
 
 // ============================================================

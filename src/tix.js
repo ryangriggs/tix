@@ -159,6 +159,7 @@ async function start() {
     otp_max_tries:                  String(config.otpMaxTries),
     otp_lockout_seconds:            String(config.otpLockoutSeconds),
     mail_transport:                 config.mailTransport,
+    mail_queue_delay_ms:            String(config.mailQueueDelayMs),
     mailgun_api_key:                config.mailgun.apiKey,
     mailgun_domain:                 config.mailgun.domain,
     smtp_relay_host:                config.smtpRelay.host,
