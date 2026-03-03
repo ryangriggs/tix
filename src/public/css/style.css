@@ -1005,6 +1005,26 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 .attachment-list { list-style: none; display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.5rem; }
 .attachment-link { font-size: 0.875rem; }
 
+/* Staged attachment UI */
+.attach-stage { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.5rem; }
+.attach-file-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.875rem; }
+.attach-file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attach-file-size { color: var(--text-muted); white-space: nowrap; font-size: 0.8rem; }
+.attach-btn-wrap { position: relative; display: inline-block; }
+.attach-menu { display: none; position: absolute; top: 100%; left: 0; min-width: 180px; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 4px 12px rgba(0,0,0,.1); z-index: 200; padding: 0.25rem 0; margin-top: 0.25rem; }
+.attach-menu.open { display: block; }
+.attach-menu-item { display: block; width: 100%; padding: 0.45rem 0.75rem; text-align: left; background: none; border: none; cursor: pointer; font-size: 0.875rem; color: var(--text); white-space: nowrap; }
+.attach-menu-item:hover { background: var(--surface); }
+.form-hint-error { color: #dc2626; margin-top: 0.25rem; }
+
+/* Camera modal */
+#camera-modal { position: fixed; inset: 0; z-index: 1000; }
+.camera-overlay { position: absolute; inset: 0; background: rgba(0,0,0,.75); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.camera-inner { background: #fff; border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; max-width: min(640px, 100%); width: 100%; }
+.camera-hdr { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); font-size: 0.875rem; font-weight: 600; }
+#camera-video { width: 100%; max-height: 60vh; object-fit: cover; display: block; background: #000; }
+.camera-ftr { padding: 0.75rem; display: flex; justify-content: center; border-top: 1px solid var(--border); }
+
 /* Sidebar */
 .ticket-sidebar {
   display: flex;

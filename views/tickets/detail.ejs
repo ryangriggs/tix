@@ -58,7 +58,9 @@
             <p class="form-hint">Use [#x] (where x = ticket number) to insert links to other tickets.</p>
           </div>
           <div class="form-group">
-            <input type="file" name="attachments" multiple class="form-file">
+            <div class="attach-stage" id="attach-stage-comment"></div>
+            <div id="attach-btnwrap-comment"></div>
+            <input type="file" name="attachments" multiple id="attach-input-comment" style="display:none">
           </div>
           <% if (isTechOrAdmin) { %>
           <div class="form-row" style="align-items:flex-end;gap:.75rem;flex-wrap:wrap;margin-bottom:.5rem">
@@ -322,9 +324,7 @@
             key: 'Enter',
             ctrlKey: true,
             handler() {
-              _quillDirty = false;
-              document.getElementById('comment-body').value = quill.root.innerHTML;
-              document.getElementById('comment-form').submit();
+              document.getElementById('comment-form').requestSubmit();
             }
           }
         }
@@ -333,6 +333,22 @@
   });
 
   document.getElementById('comment-form').addEventListener('submit', e => {
+    // Require comment text
+    if (!quill.getText().trim()) {
+      e.preventDefault();
+      let err = document.getElementById('comment-required-err');
+      if (!err) {
+        err = document.createElement('p');
+        err.id = 'comment-required-err';
+        err.className = 'form-hint form-hint-error';
+        err.textContent = 'A comment is required.';
+        document.getElementById('comment-editor').insertAdjacentElement('afterend', err);
+      }
+      quill.focus();
+      return;
+    }
+    document.getElementById('comment-required-err')?.remove();
+
     const sc = document.querySelector('[name="status_change"]');
     if (sc && sc.value === 'closed') {
       if (!confirm('Once closed, no further billable hours can be added. Close this ticket?')) {
@@ -341,6 +357,18 @@
     }
     document.getElementById('comment-body').value = quill.root.innerHTML;
     _quillDirty = false;
+  });
+
+  // Clear the required-error when user starts typing
+  quill.on('text-change', () => {
+    if (quill.getText().trim()) document.getElementById('comment-required-err')?.remove();
+  });
+
+  // Attachment UI — init after tix.js loads
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof initAttachmentUI === 'function') {
+      initAttachmentUI({ stageId: 'attach-stage-comment', inputId: 'attach-input-comment', btnWrapperId: 'attach-btnwrap-comment', prefix: 'comment' });
+    }
   });
 
   // Location autocomplete — init after tix.js loads (tix.js is in foot.ejs, after this block)

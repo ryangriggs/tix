@@ -69,8 +69,10 @@
     </div>
 
     <div class="form-group">
-      <label for="attachments">Attachments <span class="optional">(optional)</span></label>
-      <input type="file" id="attachments" name="attachments" multiple class="form-file">
+      <label>Attachments <span class="optional">(optional)</span></label>
+      <div class="attach-stage" id="attach-stage-new"></div>
+      <div id="attach-btnwrap-new"></div>
+      <input type="file" name="attachments" multiple id="attach-input-new" style="display:none">
       <p class="form-hint">Max <%= uploadMaxSizeMb %> MB per file. Accepted: images, PDF, text, CSV, ZIP, Office documents.</p>
     </div>
 
@@ -123,6 +125,10 @@
 </script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+  if (typeof initAttachmentUI === 'function') {
+    initAttachmentUI({ stageId: 'attach-stage-new', inputId: 'attach-input-new', btnWrapperId: 'attach-btnwrap-new', prefix: 'new' });
+  }
+
   if (typeof createAutocomplete !== 'function') return;
 
   // Organization autocomplete

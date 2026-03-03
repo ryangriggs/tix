@@ -477,7 +477,7 @@ router.post('/:id/comments', upload, async (req, res) => {
   if (!access) return res.status(403).json({ error: 'Forbidden' });
 
   const body = sanitize(req.body.body);
-  if (!body.trim() && !req.files?.length) return res.redirect(`/tickets/${ticket.id}`);
+  if (!body.trim()) return res.redirect(`/tickets/${ticket.id}`);
 
   // Optional status change submitted alongside the comment
   const validStatuses = ['new', 'open', 'on_hold', 'closed'];

@@ -421,3 +421,216 @@ document.addEventListener('keydown', e => {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => { /* SW not critical */ });
 }
+
+// ============================================================
+// Attachment UI — staged file list + optional camera support
+// ============================================================
+
+function _escHtml(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+let _cameraList = null;
+
+async function _detectCameras() {
+  if (_cameraList !== null) return _cameraList;
+  try {
+    if (!navigator.mediaDevices?.enumerateDevices) return (_cameraList = []);
+    const all  = await navigator.mediaDevices.enumerateDevices();
+    const cams = all.filter(d => d.kind === 'videoinput');
+    _cameraList = cams.map((d, i) => ({
+      deviceId: d.deviceId,
+      label:    d.label || (cams.length === 1 ? 'Camera' : `Camera ${i + 1}`),
+    }));
+  } catch (_) {
+    _cameraList = [];
+  }
+  // Invalidate cache if device permissions change so labels update
+  navigator.mediaDevices?.addEventListener?.('devicechange', () => { _cameraList = null; }, { once: true });
+  return _cameraList;
+}
+
+function _buildCameraModal() {
+  if (document.getElementById('camera-modal')) return;
+  const el = document.createElement('div');
+  el.id = 'camera-modal';
+  el.style.display = 'none';
+  el.innerHTML = `
+    <div class="camera-overlay" id="camera-overlay">
+      <div class="camera-inner">
+        <div class="camera-hdr">
+          <span id="camera-modal-label">Take Photo</span>
+          <button type="button" id="camera-modal-close" class="btn-icon" title="Close">×</button>
+        </div>
+        <video id="camera-video" autoplay playsinline muted></video>
+        <canvas id="camera-canvas" style="display:none"></canvas>
+        <div class="camera-ftr">
+          <button type="button" id="camera-shutter" class="btn btn-primary">Capture</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  document.getElementById('camera-modal-close').addEventListener('click', _closeCameraModal);
+  document.getElementById('camera-overlay').addEventListener('click', e => {
+    if (e.target === e.currentTarget) _closeCameraModal();
+  });
+}
+
+let _cameraStream  = null;
+let _cameraCaptureCb = null;
+
+function _openCameraModal(deviceId, label, onCapture) {
+  _buildCameraModal();
+  _cameraCaptureCb = onCapture;
+  document.getElementById('camera-modal-label').textContent = label || 'Take Photo';
+  document.getElementById('camera-modal').style.display = 'block';
+
+  const constraints = deviceId ? { video: { deviceId: { exact: deviceId } } } : { video: true };
+  navigator.mediaDevices.getUserMedia(constraints)
+    .then(stream => {
+      _cameraStream = stream;
+      document.getElementById('camera-video').srcObject = stream;
+    })
+    .catch(err => {
+      alert('Camera unavailable: ' + err.message);
+      _closeCameraModal();
+    });
+
+  // Replace shutter button to remove any previous listener
+  const oldBtn = document.getElementById('camera-shutter');
+  const newBtn = oldBtn.cloneNode(true);
+  oldBtn.replaceWith(newBtn);
+  newBtn.addEventListener('click', () => {
+    const video  = document.getElementById('camera-video');
+    const canvas = document.getElementById('camera-canvas');
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    canvas.toBlob(blob => {
+      _closeCameraModal();
+      if (_cameraCaptureCb && blob) _cameraCaptureCb(blob);
+    }, 'image/jpeg', 0.85);
+  });
+}
+
+function _closeCameraModal() {
+  if (_cameraStream) { _cameraStream.getTracks().forEach(t => t.stop()); _cameraStream = null; }
+  const modal = document.getElementById('camera-modal');
+  if (modal) modal.style.display = 'none';
+  const video = document.getElementById('camera-video');
+  if (video) video.srcObject = null;
+}
+
+/**
+ * initAttachmentUI({ stageId, inputId, btnWrapperId, prefix })
+ *   stageId      — id of the <div> that will show staged file rows
+ *   inputId      — id of the hidden <input type="file" name="attachments" multiple>
+ *   btnWrapperId — id of the <div> where the Attach button will be injected
+ *   prefix       — unique string to namespace ids within this page
+ */
+function initAttachmentUI({ stageId, inputId, btnWrapperId, prefix }) {
+  const stageEl = document.getElementById(stageId);
+  const inputEl = document.getElementById(inputId);
+  const btnWrap = document.getElementById(btnWrapperId);
+  if (!stageEl || !inputEl || !btnWrap) return;
+
+  let stagedFiles = []; // array of File objects
+  let photoCount  = 0;
+
+  function fmtBytes(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+
+  function syncInput() {
+    const dt = new DataTransfer();
+    stagedFiles.forEach(f => dt.items.add(f));
+    inputEl.files = dt.files;
+  }
+
+  function render() {
+    stageEl.innerHTML = '';
+    if (!stagedFiles.length) { stageEl.style.display = 'none'; return; }
+    stageEl.style.display = '';
+    stagedFiles.forEach((f, idx) => {
+      const row = document.createElement('div');
+      row.className = 'attach-file-row';
+      row.innerHTML = `<span class="attach-file-name">${_escHtml(f.name)}</span>`
+        + `<span class="attach-file-size">${fmtBytes(f.size)}</span>`
+        + `<button type="button" class="btn-icon" title="Remove">×</button>`;
+      row.querySelector('button').addEventListener('click', () => {
+        stagedFiles.splice(idx, 1);
+        syncInput();
+        render();
+      });
+      stageEl.appendChild(row);
+    });
+  }
+
+  function addFiles(list) {
+    Array.from(list).forEach(f => stagedFiles.push(f));
+    syncInput();
+    render();
+  }
+
+  function addPhoto(blob) {
+    photoCount++;
+    addFiles([new File([blob], `photo ${photoCount}.jpg`, { type: 'image/jpeg' })]);
+  }
+
+  // Hidden file picker (separate from the DataTransfer-managed input)
+  const picker = document.createElement('input');
+  picker.type = 'file'; picker.multiple = true; picker.style.display = 'none';
+  picker.addEventListener('change', () => { addFiles(picker.files); picker.value = ''; });
+  document.body.appendChild(picker);
+
+  stageEl.style.display = 'none';
+
+  // Build button UI after camera detection
+  _detectCameras().then(cameras => {
+    if (!cameras.length) {
+      // No cameras — plain Browse button
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'btn btn-secondary btn-sm';
+      btn.textContent = 'Browse…';
+      btn.addEventListener('click', () => picker.click());
+      btnWrap.appendChild(btn);
+    } else {
+      // Cameras available — Attach ▾ dropdown
+      const wrap   = document.createElement('div');
+      wrap.className = 'attach-btn-wrap';
+
+      const toggle = document.createElement('button');
+      toggle.type = 'button'; toggle.className = 'btn btn-secondary btn-sm attach-toggle';
+      toggle.innerHTML = 'Attach &#9662;';
+
+      const menu = document.createElement('div');
+      menu.className = 'attach-menu';
+
+      const browseItem = document.createElement('button');
+      browseItem.type = 'button'; browseItem.className = 'attach-menu-item';
+      browseItem.textContent = 'Upload file…';
+      browseItem.addEventListener('click', () => { menu.classList.remove('open'); picker.click(); });
+      menu.appendChild(browseItem);
+
+      cameras.forEach(cam => {
+        const item = document.createElement('button');
+        item.type = 'button'; item.className = 'attach-menu-item';
+        item.textContent = '\uD83D\uDCF7 ' + cam.label;
+        item.addEventListener('click', () => {
+          menu.classList.remove('open');
+          _openCameraModal(cam.deviceId, cam.label, blob => addPhoto(blob));
+        });
+        menu.appendChild(item);
+      });
+
+      toggle.addEventListener('click', e => { e.stopPropagation(); menu.classList.toggle('open'); });
+      document.addEventListener('click', () => menu.classList.remove('open'));
+
+      wrap.appendChild(toggle);
+      wrap.appendChild(menu);
+      btnWrap.appendChild(wrap);
+    }
+  });
+}
