@@ -275,19 +275,37 @@ document.addEventListener('DOMContentLoaded', () => localiseTimestamps());
  *   allowFreeform  — if true, free-typed text is preserved on blur
  */
 function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars = 1, showOnFocus = false } = {}) {
-  // Attach dropdown to the nearest <dialog> ancestor (if any) so it renders in the
-  // browser top layer alongside the dialog — otherwise fall back to <body>.
-  // Either way use position:fixed + getBoundingClientRect for overflow-safe placement.
-  const dropdownParent = inputEl.closest('dialog') || document.body;
+  // Use the Popover API when available: popover elements are placed in the browser
+  // top layer, which sits above showModal() dialogs regardless of z-index.
+  // Fallback: body-attached position:fixed (works fine outside dialogs).
+  const usePopover = typeof HTMLElement.prototype.showPopover === 'function';
+
   const dropdown = document.createElement('ul');
   dropdown.className = 'autocomplete-dropdown';
-  dropdown.style.cssText = [
-    'display:none', 'position:fixed', 'z-index:9999', 'list-style:none',
+  // Don't set display:none when using popover — the UA stylesheet controls it.
+  const styleArr = [
+    'position:fixed', 'z-index:9999', 'list-style:none',
     'margin:0', 'padding:0', 'background:#fff', 'border:1px solid #d1d5db',
     'border-radius:4px', 'max-height:240px', 'overflow-y:auto',
     'box-shadow:0 4px 6px rgba(0,0,0,.08)',
-  ].join(';');
-  dropdownParent.appendChild(dropdown);
+  ];
+  if (!usePopover) styleArr.unshift('display:none');
+  dropdown.style.cssText = styleArr.join(';');
+
+  if (usePopover) dropdown.setAttribute('popover', 'manual');
+  document.body.appendChild(dropdown);
+
+  function isOpen()  {
+    return usePopover ? dropdown.matches(':popover-open') : dropdown.style.display !== 'none';
+  }
+  function openDropdown()  {
+    if (usePopover) { try { dropdown.showPopover(); } catch(_){} }
+    else dropdown.style.display = 'block';
+  }
+  function closeDropdown() {
+    if (usePopover) { try { dropdown.hidePopover(); } catch(_){} }
+    else dropdown.style.display = 'none';
+  }
 
   function positionDropdown() {
     const r = inputEl.getBoundingClientRect();
@@ -297,7 +315,7 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
   }
 
   // Reposition on scroll/resize (passive — no perf impact)
-  const reposition = () => { if (dropdown.style.display !== 'none') positionDropdown(); };
+  const reposition = () => { if (isOpen()) positionDropdown(); };
   window.addEventListener('scroll', reposition, { passive: true, capture: true });
   window.addEventListener('resize', reposition, { passive: true });
 
@@ -309,7 +327,7 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
     currentItems = items;
     activeIdx = -1;
     dropdown.innerHTML = '';
-    if (!items.length) { dropdown.style.display = 'none'; return; }
+    if (!items.length) { closeDropdown(); return; }
     items.forEach((item, i) => {
       const li = document.createElement('li');
       li.style.cssText = 'padding:.4rem .75rem;cursor:pointer;font-size:.875rem;white-space:nowrap;';
@@ -319,7 +337,7 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
       dropdown.appendChild(li);
     });
     positionDropdown();
-    dropdown.style.display = 'block';
+    openDropdown();
   }
 
   function setActive(i) {
@@ -331,12 +349,12 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
 
   function choose(item) {
     onSelect(item);
-    dropdown.style.display = 'none';
+    closeDropdown();
     currentItems = [];
     activeIdx = -1;
   }
 
-  function close() { dropdown.style.display = 'none'; activeIdx = -1; }
+  function close() { closeDropdown(); activeIdx = -1; }
 
   function doFetch(q) {
     fetch(fetchUrl(q), { headers: { Accept: 'application/json' } })
