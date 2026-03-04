@@ -279,7 +279,7 @@ async function sendTicketNotification({ to, ticketSubject, body, ticketId, messa
 
   const html    = await renderEmail('ticket-notification', { body, ticketId, ticketSubject });
   const text    = html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-  const subject = `[Ticket #${config.ticketPrefix}${ticketId}] ${ticketSubject}`;
+  const subject = `${ticketSubject} [Ticket #${config.ticketPrefix}${ticketId}]`;
 
   const recipients = Array.isArray(to) ? to : [to];
   const transport  = getTransport();
@@ -319,7 +319,7 @@ async function sendDueReminder(email, ticket) {
   const html = await renderEmail('due-reminder', { ticket, dueDate });
   await send({
     to: email,
-    subject: `[Ticket #${config.ticketPrefix}${ticket.id}] Due date reminder`,
+    subject: `Due date reminder [Ticket #${config.ticketPrefix}${ticket.id}]`,
     html,
     text: `Ticket #${config.ticketPrefix}${ticket.id}: ${ticket.subject} is due on ${dueDate}.`,
     replyTo,
@@ -336,7 +336,7 @@ async function sendInactivityReminder(email, ticket) {
   const html = await renderEmail('inactivity-reminder', { ticket });
   await send({
     to:      email,
-    subject: `[Ticket #${config.ticketPrefix}${ticket.id}] Reminder: no recent activity`,
+    subject: `Reminder: no recent activity [Ticket #${config.ticketPrefix}${ticket.id}]`,
     html,
     text:    `Ticket #${config.ticketPrefix}${ticket.id} "${ticket.subject}" has had no activity for ${ticket.inactivity_reminder_days} day(s). Reply to add a comment.`,
     replyTo,
