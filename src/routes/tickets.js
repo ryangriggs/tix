@@ -452,6 +452,8 @@ router.get('/:id', (req, res) => {
   const attachments = db.getAttachments(ticket.id);
 
   const isTechOrAdmin = req.user.role === 'admin' || req.user.role === 'technician';
+  const _localPart = config.ticketEmail.split('@')[0];
+  const _domain    = config.ticketEmail.split('@')[1] || 'tix.local';
   res.render('tickets/detail', {
     title: `#${ticket.id} — ${ticket.subject}`,
     ticket,
@@ -468,6 +470,8 @@ router.get('/:id', (req, res) => {
     canClose:  canCloseTicket(req.user),
     canReopen: canReopenTicket(req.user),
     inactivityReminderDays: ticket.inactivity_reminder_days || null,
+    ticketUrl:        `${config.appUrl}/tickets/${ticket.id}`,
+    ticketReplyEmail: `${_localPart}+${ticket.reply_token}@${_domain}`,
   });
 });
 

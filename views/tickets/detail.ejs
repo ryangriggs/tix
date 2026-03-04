@@ -7,9 +7,13 @@
 
 <main class="container">
 
-  <!-- Back link -->
-  <div style="margin-bottom:1rem">
+  <!-- Back link + copy actions -->
+  <div style="margin-bottom:1rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
     <a href="/tickets" class="btn btn-ghost btn-sm nav-guard">← All Tickets</a>
+    <button type="button" class="btn btn-ghost btn-sm" id="copy-url-btn"
+            title="Copy ticket URL to clipboard">Copy URL</button>
+    <button type="button" class="btn btn-ghost btn-sm" id="copy-email-btn"
+            title="Copy reply-to email address">Copy Email</button>
   </div>
 
   <!-- Ticket header -->
@@ -870,6 +874,22 @@ document.querySelectorAll('.rich-content').forEach(el => {
     /\[#(\d+)\]/g,
     '<a href="/tickets/$1" class="ticket-ref">#$1</a>'
   );
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  function flashBtn(btn, label) {
+    btn.textContent = 'Copied!';
+    btn.disabled = true;
+    setTimeout(() => { btn.textContent = label; btn.disabled = false; }, 1800);
+  }
+  document.getElementById('copy-url-btn').addEventListener('click', function () {
+    navigator.clipboard.writeText('<%- ticketUrl %>').then(() => flashBtn(this, 'Copy URL'));
+  });
+  document.getElementById('copy-email-btn').addEventListener('click', function () {
+    navigator.clipboard.writeText('<%- ticketReplyEmail %>').then(() => flashBtn(this, 'Copy Email'));
+  });
 });
 </script>
 
