@@ -276,10 +276,10 @@
             <li class="party-item" data-user-id="<%= p.user_id %>" data-notifications-disabled="<%= p.notifications_disabled ? '1' : '0' %>">
               <div class="party-info">
                 <% if (p.name) { %>
-                  <span class="party-name<%= p.notifications_disabled ? ' party-muted' : '' %>"><%= p.name %></span>
-                  <a href="mailto:<%= p.email %>" class="party-email-link<%= p.notifications_disabled ? ' party-muted' : '' %>"><%= p.email %></a>
+                  <span class="party-name"><%= p.name %></span>
+                  <a href="mailto:<%= p.email %>" class="party-email-link"><%= p.email %></a>
                 <% } else { %>
-                  <span class="party-name<%= p.notifications_disabled ? ' party-muted' : '' %>"><%= p.email %></span>
+                  <span class="party-name"><%= p.email %></span>
                 <% } %>
                 <% if (p.organization_name) { %><span class="party-org">[<%= p.organization_name %>]</span><% } %>
               </div>
@@ -292,7 +292,7 @@
               <% } else { %>
                 <span class="badge badge-role"><%= p.role %></span>
               <% } %>
-              <% if (canManage) { %>
+              <% if (canManage && p.role !== 'submitter') { %>
                 <button type="button" class="btn-icon notify-party-btn" data-user-id="<%= p.user_id %>"
                         title="<%= p.notifications_disabled ? 'Enable notifications' : 'Mute notifications' %>">
                   <% if (p.notifications_disabled) { %>
@@ -673,13 +673,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const BELL_OFF_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
 
   function renderPartyItem(p) {
-    const muted   = !!p.notificationsDisabled;
-    const mutedCls = muted ? ' party-muted' : '';
+    const muted    = !!p.notificationsDisabled;
     const nameHtml = p.name
-      ? `<span class="party-name${mutedCls}">${_esc(p.name)}</span><a href="mailto:${_esc(p.email)}" class="party-email-link${mutedCls}">${_esc(p.email)}</a>`
-      : `<span class="party-name${mutedCls}">${_esc(p.email)}</span>`;
+      ? `<span class="party-name">${_esc(p.name)}</span><a href="mailto:${_esc(p.email)}" class="party-email-link">${_esc(p.email)}</a>`
+      : `<span class="party-name">${_esc(p.email)}</span>`;
     const orgHtml    = p.orgName ? `<span class="party-org">[${_esc(p.orgName)}]</span>` : '';
-    const notifyHtml = CAN_MANAGE
+    const notifyHtml = CAN_MANAGE && p.role !== 'submitter'
       ? `<button type="button" class="btn-icon notify-party-btn" data-user-id="${p.userId}" title="${muted ? 'Enable notifications' : 'Mute notifications'}">${muted ? BELL_OFF_SVG : BELL_SVG}</button>`
       : '';
     const removeHtml = CAN_MANAGE && p.userId !== CURRENT_USER_ID
@@ -721,7 +720,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!li) return;
         const disabled = data.notificationsDisabled;
         li.dataset.notificationsDisabled = disabled ? '1' : '0';
-        li.querySelectorAll('.party-name, .party-email-link').forEach(el => el.classList.toggle('party-muted', disabled));
         notifyBtn.title     = disabled ? 'Enable notifications' : 'Mute notifications';
         notifyBtn.innerHTML = disabled ? BELL_OFF_SVG : BELL_SVG;
       } catch (err) { alert('Could not toggle notifications: ' + err.message); }

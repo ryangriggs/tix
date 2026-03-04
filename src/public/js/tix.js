@@ -151,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => localiseTimestamps());
             : `<span class="party-name">${_e(p.email)}</span>`;
           const orgHtml    = p.orgName ? `<span class="party-org">[${_e(p.orgName)}]</span>` : '';
           const bellSvg    = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`;
-          const notifyHtml = canManage
+          const notifyHtml = canManage && p.role !== 'submitter'
             ? `<button type="button" class="btn-icon notify-party-btn" data-user-id="${p.userId}" title="Mute notifications">${bellSvg}</button>`
             : '';
           const removeHtml = canManage && p.userId !== currentUserId
