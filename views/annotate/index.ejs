@@ -488,20 +488,25 @@ document.addEventListener('keydown', e => {
     setTool('select');
     activeCanvas?.renderAll();
   }
-  if (e.key === 'Delete' || e.key === 'Backspace') {
-    const obj = activeCanvas?.getActiveObject();
-    if (obj) { activeCanvas.remove(obj); activeCanvas.discardActiveObject(); markDirty(); }
-  }
+  if (e.key === 'Delete' || e.key === 'Backspace') { deleteSelected(); }
 });
+
+// ── Delete selected objects (single or multi-select) ───────
+function deleteSelected() {
+  if (!activeCanvas) return;
+  const objs = activeCanvas.getActiveObjects();
+  if (!objs.length) return;
+  activeCanvas.discardActiveObject();
+  objs.forEach(obj => activeCanvas.remove(obj));
+  activeCanvas.renderAll();
+  markDirty();
+}
 
 // ── Toolbar wiring ─────────────────────────────────────────
 document.querySelectorAll('.tb-tool[data-tool]').forEach(btn =>
   btn.addEventListener('click', () => setTool(btn.dataset.tool)));
 
-document.getElementById('delete-btn').addEventListener('click', () => {
-  const obj = activeCanvas?.getActiveObject();
-  if (obj) { activeCanvas.remove(obj); activeCanvas.discardActiveObject(); markDirty(); }
-});
+document.getElementById('delete-btn').addEventListener('click', deleteSelected);
 
 const strokeColorEl   = document.getElementById('stroke-color');
 const strokeOpacityEl = document.getElementById('stroke-opacity');
