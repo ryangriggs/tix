@@ -773,17 +773,19 @@ function createPageCanvas(pageNum) {
     allowTouchScrolling:    true,       // default; updated by setTool()
   });
 
-  // Fabric.js computes _offset = getBoundingClientRect() + scrollLeftTop.
-  // getBoundingClientRect() already reflects the container's scroll position,
-  // so scrollLeftTop is double-counted and cancels out — meaning scroll is
-  // never included in the final canvas coordinate.  We add it back here,
-  // divided by zoomLevel to convert from viewport pixels to canvas pixels.
-  const origGetPointer = fc.getPointer.bind(fc);
-  fc.getPointer = function(e, ignoreZoom) {
-    const ptr = origGetPointer(e, ignoreZoom);
-    ptr.x += canvasWrap.scrollLeft / zoomLevel;
-    ptr.y += canvasWrap.scrollTop  / zoomLevel;
-    return ptr;
+  // Replace Fabric's getPointer entirely.
+  // getBoundingClientRect() already reflects current scroll + CSS zoom position,
+  // so (clientX - rect.left) / zoomLevel gives exact canvas-pixel coordinates
+  // without any scroll-compensation arithmetic.
+  fc.getPointer = function(e) {
+    const touch  = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]);
+    const clientX = touch ? touch.clientX : (e.clientX || 0);
+    const clientY = touch ? touch.clientY : (e.clientY || 0);
+    const rect    = this.upperCanvasEl.getBoundingClientRect();
+    return {
+      x: (clientX - rect.left) / zoomLevel,
+      y: (clientY - rect.top)  / zoomLevel,
+    };
   };
 
   setupCanvasEvents(fc);
