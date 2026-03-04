@@ -34,6 +34,7 @@ const config = {
   defaultAssigneeEmail: process.env.DEFAULT_ASSIGNEE_EMAIL || null,
   adminEmail: process.env.ADMIN_EMAIL || null,
   notifyEmailSubmitter: true,
+  notifyEmailStatusChange: true,
   enableBillableHours: true,
   enableLocation: true,
 
@@ -91,7 +92,8 @@ function applySettings(map) {
   if ('admin_email'            in map) config.adminEmail            = map.admin_email            || null;
   if ('site_name'              in map) config.siteName              = map.site_name              || config.siteName;
   if ('default_assignee_email'   in map) config.defaultAssigneeEmail  = map.default_assignee_email || null;
-  if ('notify_email_submitter'   in map) config.notifyEmailSubmitter  = map.notify_email_submitter !== 'false';
+  if ('notify_email_submitter'    in map) config.notifyEmailSubmitter    = map.notify_email_submitter    !== 'false';
+  if ('notify_email_status_change' in map) config.notifyEmailStatusChange = map.notify_email_status_change !== 'false';
   if ('enable_billable_hours'    in map) config.enableBillableHours   = map.enable_billable_hours   !== 'false';
   if ('enable_location'          in map) config.enableLocation         = map.enable_location          !== 'false';
 

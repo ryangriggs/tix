@@ -350,16 +350,6 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
   const body = formatEmailAsPlaintext(parsed);
   const ticket = db.createTicket({ subject, body, organizationId: senderUser.organization_id || null });
 
-  // Silent mode: sender is sole owner, no collaborators, no notifications.
-  if (silent) {
-    db.addParty(ticket.id, senderUser.id, 'owner');
-    commitAttachments(prepared, ticket.id, null);
-    if (parsed.messageId) db.recordEmailMessage(ticket.id, parsed.messageId, 'in');
-    sse.broadcastToAll({ type: 'ticket_created', ticketId: ticket.id });
-    console.log(`[Inbound] Created silent ticket #${ticket.id} from ${fromEmail}`);
-    return;
-  }
-
   // Sender is submitter
   db.addParty(ticket.id, senderUser.id, 'submitter');
 
@@ -403,6 +393,16 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
   if (defaultEmail) {
     const assignee = db.findOrCreateUser(defaultEmail);
     db.addParty(ticket.id, assignee.id, 'owner');
+  }
+
+  // Silent mode: all parties added above, but notifications disabled and no emails sent.
+  if (silent) {
+    db.disableAllPartyNotifications(ticket.id);
+    commitAttachments(prepared, ticket.id, null);
+    if (parsed.messageId) db.recordEmailMessage(ticket.id, parsed.messageId, 'in');
+    sse.broadcastToAll({ type: 'ticket_created', ticketId: ticket.id });
+    console.log(`[Inbound] Created silent ticket #${ticket.id} from ${fromEmail}`);
+    return;
   }
 
   commitAttachments(prepared, ticket.id, null);

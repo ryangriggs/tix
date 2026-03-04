@@ -269,6 +269,7 @@ async function initDb() {
   try { _db.exec('ALTER TABLE comments ADD COLUMN location_id              INTEGER REFERENCES locations(id)'); } catch (_) {}
   try { _db.exec('ALTER TABLE tickets ADD COLUMN inactivity_reminder_days    INTEGER'); } catch (_) {}
   try { _db.exec('ALTER TABLE tickets ADD COLUMN inactivity_reminder_sent_at INTEGER'); } catch (_) {}
+  try { _db.exec('ALTER TABLE ticket_parties ADD COLUMN notifications_disabled INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   _db.exec('CREATE INDEX IF NOT EXISTS idx_comments_location ON comments(location_id)');
   // Back-fill close_date for tickets closed before this column existed
   _db.exec(`UPDATE tickets SET close_date = updated_at WHERE status = 'closed' AND close_date IS NULL`);
@@ -694,6 +695,31 @@ function getParties(ticketId) {
   `).all(ticketId);
 }
 
+function getTicketByReplyToken(token) {
+  return prepare('SELECT * FROM tickets WHERE reply_token = ?').get(token);
+}
+
+function disableAllPartyNotifications(ticketId) {
+  prepare('UPDATE ticket_parties SET notifications_disabled = 1 WHERE ticket_id = ?').run(ticketId);
+}
+
+function disablePartyNotifications(ticketId, email) {
+  prepare(`
+    UPDATE ticket_parties SET notifications_disabled = 1
+    WHERE ticket_id = ? AND user_id = (SELECT id FROM users WHERE email = ? COLLATE NOCASE)
+  `).run(ticketId, email);
+}
+
+function togglePartyNotifications(ticketId, userId) {
+  prepare(`
+    UPDATE ticket_parties
+    SET notifications_disabled = CASE WHEN notifications_disabled = 1 THEN 0 ELSE 1 END
+    WHERE ticket_id = ? AND user_id = ?
+  `).run(ticketId, userId);
+  const row = prepare('SELECT notifications_disabled FROM ticket_parties WHERE ticket_id = ? AND user_id = ?').get(ticketId, userId);
+  return row ? !!row.notifications_disabled : false;
+}
+
 function getUserTicketRole(ticketId, userId) {
   const row = prepare('SELECT role FROM ticket_parties WHERE ticket_id = ? AND user_id = ?').get(ticketId, userId);
   return row ? row.role : null;
@@ -1049,6 +1075,7 @@ module.exports = {
   // Reminders
   getTicketsDueSoon, getTicketsForReminders, setTicketRemindersSent,
   getTicketsForInactivityReminders, setInactivityReminderSent,
+  getTicketByReplyToken, disableAllPartyNotifications, disablePartyNotifications, togglePartyNotifications,
   // Reports
   getBillingReport,
   // Organizations

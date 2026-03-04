@@ -3,8 +3,32 @@
 const fs        = require('fs');
 const path      = require('path');
 const ejs       = require('ejs');
+const crypto    = require('crypto');
 const nodemailer = require('nodemailer');
 const config = require('../config');
+
+// ============================================================
+// Unsubscribe token helpers (used by mail + unsubscribe route)
+// ============================================================
+function makeUnsubToken(replyToken, email) {
+  const payload = Buffer.from(JSON.stringify({ r: replyToken, e: email })).toString('base64url');
+  const sig = crypto.createHmac('sha256', config.jwtSecret)
+    .update('unsub:' + payload).digest('base64url').slice(0, 16);
+  return payload + '.' + sig;
+}
+
+function parseUnsubToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  const dot = token.lastIndexOf('.');
+  if (dot < 0) return null;
+  const payload = token.slice(0, dot);
+  const sig     = token.slice(dot + 1);
+  const expected = crypto.createHmac('sha256', config.jwtSecret)
+    .update('unsub:' + payload).digest('base64url').slice(0, 16);
+  if (sig !== expected) return null;
+  try { return JSON.parse(Buffer.from(payload, 'base64url').toString()); }
+  catch { return null; }
+}
 
 function logEmail(to, subject, error = null) {
   if (!config.emailLog) return;
@@ -68,7 +92,9 @@ function getTransport() {
           ...(opts.replyTo    ? [`Reply-To: ${opts.replyTo}`]         : []),
           ...(opts.messageId  ? [`Message-ID: ${opts.messageId}`]     : []),
           ...(opts.inReplyTo  ? [`In-Reply-To: ${opts.inReplyTo}`]    : []),
-          ...(opts.references ? [`References: ${opts.references}`]    : []),
+          ...(opts.references     ? [`References: ${opts.references}`]                              : []),
+          ...(opts.unsubscribeUrl ? [`List-Unsubscribe: <${opts.unsubscribeUrl}>`]                 : []),
+          ...(opts.unsubscribeUrl ? ['List-Unsubscribe-Post: List-Unsubscribe=One-Click']          : []),
           'Auto-Submitted: auto-generated',
           'Precedence: bulk',
           'X-Auto-Response-Suppress: All',
@@ -107,9 +133,10 @@ function getTransport() {
           'Auto-Submitted':           'auto-generated',
           'Precedence':               'bulk',
           'X-Auto-Response-Suppress': 'All',
-          ...(opts.messageId  && { 'Message-ID':  opts.messageId }),
-          ...(opts.inReplyTo  && { 'In-Reply-To': opts.inReplyTo }),
-          ...(opts.references && { 'References':  opts.references }),
+          ...(opts.messageId     && { 'Message-ID':        opts.messageId }),
+          ...(opts.inReplyTo     && { 'In-Reply-To':       opts.inReplyTo }),
+          ...(opts.references    && { 'References':         opts.references }),
+          ...(opts.unsubscribeUrl && { 'List-Unsubscribe': `<${opts.unsubscribeUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' }),
         },
       };
     }
@@ -152,6 +179,10 @@ function getTransport() {
         msg['h:Auto-Submitted']           = 'auto-generated';
         msg['h:Precedence']               = 'bulk';
         msg['h:X-Auto-Response-Suppress'] = 'All';
+        if (opts.unsubscribeUrl) {
+          msg['h:List-Unsubscribe']      = `<${opts.unsubscribeUrl}>`;
+          msg['h:List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
+        }
         return mg.messages.create(config.mailgun.domain, msg);
       }
     };
@@ -187,12 +218,12 @@ async function _drainQueue() {
 }
 
 // Internal: actually delivers one message — called only by _drainQueue
-async function _doSend({ to, subject, html, text, messageId, inReplyTo, references, replyTo }) {
+async function _doSend({ to, subject, html, text, messageId, inReplyTo, references, replyTo, unsubscribeUrl }) {
   const from = `${config.mailFromName} <${config.ticketEmail}>`;
   const transport = getTransport();
   try {
     if (config.mailTransport === 'mailgun' || config.mailTransport === 'resend' || config.mailTransport === 'gmail') {
-      await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references, replyTo });
+      await transport.sendMail({ from, to, subject, html, text, messageId, inReplyTo, references, replyTo, unsubscribeUrl });
     } else {
       // nodemailer SMTP relay
       await transport.sendMail({
@@ -203,8 +234,10 @@ async function _doSend({ to, subject, html, text, messageId, inReplyTo, referenc
           'Auto-Submitted':           'auto-generated',
           'Precedence':               'bulk',
           'X-Auto-Response-Suppress': 'All',
-          ...(inReplyTo  && { 'In-Reply-To': inReplyTo }),
-          ...(references && { References: references }),
+          ...(inReplyTo      && { 'In-Reply-To':          inReplyTo }),
+          ...(references     && { References:              references }),
+          ...(unsubscribeUrl && { 'List-Unsubscribe':     `<${unsubscribeUrl}>` }),
+          ...(unsubscribeUrl && { 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' }),
         },
       });
     }
@@ -251,10 +284,15 @@ async function sendTicketNotification({ to, ticketSubject, body, ticketId, messa
   const recipients = Array.isArray(to) ? to : [to];
   const transport  = getTransport();
 
+  // Per-recipient unsubscribe URL (signed token, no DB lookup needed)
+  const unsubUrl = replyToken
+    ? email => `${config.appUrl}/unsubscribe?t=${makeUnsubToken(replyToken, email)}`
+    : () => null;
+
   // Resend batch: send all recipients in one API call to avoid the 2 msg/sec rate limit
   if (config.mailTransport === 'resend' && recipients.length > 1) {
     const from  = `${config.mailFromName} <${config.ticketEmail}>`;
-    const batch = recipients.map(email => ({ from, to: email, subject, html, text, messageId, inReplyTo, references, replyTo }));
+    const batch = recipients.map(email => ({ from, to: email, subject, html, text, messageId, inReplyTo, references, replyTo, unsubscribeUrl: unsubUrl(email) }));
     try {
       await transport.sendMailBatch(batch);
       for (const email of recipients) logEmail(email, subject);
@@ -266,7 +304,7 @@ async function sendTicketNotification({ to, ticketSubject, body, ticketId, messa
   }
 
   for (const email of recipients) {
-    await send({ to: email, subject, html, text, messageId, inReplyTo, references, replyTo });
+    send({ to: email, subject, html, text, messageId, inReplyTo, references, replyTo, unsubscribeUrl: unsubUrl(email) });
   }
 }
 
@@ -307,4 +345,4 @@ async function sendInactivityReminder(email, ticket) {
 
 function resetMailTransport() { _transport = null; }
 
-module.exports = { send, sendMagicLink, sendTicketNotification, sendDueReminder, sendInactivityReminder, resetMailTransport };
+module.exports = { send, sendMagicLink, sendTicketNotification, sendDueReminder, sendInactivityReminder, resetMailTransport, makeUnsubToken, parseUnsubToken };

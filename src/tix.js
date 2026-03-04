@@ -87,7 +87,8 @@ app.use('/tickets', requireAuth, verifyCsrf, require('./routes/tickets'));
 app.use('/admin', requireAuth, requireAdmin, verifyCsrf, require('./routes/admin'));
 app.use('/api', requireAuth, require('./routes/api'));
 app.use('/reports', requireAuth, require('./routes/reports'));
-app.use('/inbound', require('./routes/inbound'));
+app.use('/inbound',     require('./routes/inbound'));
+app.use('/unsubscribe', require('./routes/unsubscribe'));
 
 // Root
 app.get('/', requireAuth, (req, res) => res.redirect('/tickets'));
@@ -179,6 +180,7 @@ async function start() {
     reminder_count:                 '1',
     reminder_frequency_hours:       '24',
     notify_email_submitter:         'true',
+    notify_email_status_change:     'true',
     enable_billable_hours:          'true',
     enable_location:                'true',
   };

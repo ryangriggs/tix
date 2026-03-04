@@ -146,17 +146,22 @@ document.addEventListener('DOMContentLoaded', () => localiseTimestamps());
           const canManage     = list.dataset.canManage === 'true';
           const currentUserId = parseInt(list.dataset.currentUserId || '0', 10);
           const p = event.party;
-          const nameHtml = p.name
+          const nameHtml   = p.name
             ? `<span class="party-name">${_e(p.name)}</span><a href="mailto:${_e(p.email)}" class="party-email-link">${_e(p.email)}</a>`
             : `<span class="party-name">${_e(p.email)}</span>`;
           const orgHtml    = p.orgName ? `<span class="party-org">[${_e(p.orgName)}]</span>` : '';
+          const bellSvg    = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`;
+          const notifyHtml = canManage
+            ? `<button type="button" class="btn-icon notify-party-btn" data-user-id="${p.userId}" title="Mute notifications">${bellSvg}</button>`
+            : '';
           const removeHtml = canManage && p.userId !== currentUserId
             ? `<button type="button" class="btn-icon remove-party-btn" data-user-id="${p.userId}" title="Remove">×</button>`
             : '';
           list.insertAdjacentHTML('beforeend',
-            `<li class="party-item" data-user-id="${p.userId}">
+            `<li class="party-item" data-user-id="${p.userId}" data-notifications-disabled="0">
                <div class="party-info">${nameHtml}${orgHtml}</div>
                <span class="badge badge-role">${_e(p.role)}</span>
+               ${notifyHtml}
                ${removeHtml}
              </li>`);
         }

@@ -273,13 +273,13 @@
             data-current-user-id="<%= user.id %>"
             data-ticket-id="<%= ticket.id %>">
           <% for (const p of parties) { %>
-            <li class="party-item" data-user-id="<%= p.user_id %>">
+            <li class="party-item" data-user-id="<%= p.user_id %>" data-notifications-disabled="<%= p.notifications_disabled ? '1' : '0' %>">
               <div class="party-info">
                 <% if (p.name) { %>
-                  <span class="party-name"><%= p.name %></span>
-                  <a href="mailto:<%= p.email %>" class="party-email-link"><%= p.email %></a>
+                  <span class="party-name<%= p.notifications_disabled ? ' party-muted' : '' %>"><%= p.name %></span>
+                  <a href="mailto:<%= p.email %>" class="party-email-link<%= p.notifications_disabled ? ' party-muted' : '' %>"><%= p.email %></a>
                 <% } else { %>
-                  <span class="party-name"><%= p.email %></span>
+                  <span class="party-name<%= p.notifications_disabled ? ' party-muted' : '' %>"><%= p.email %></span>
                 <% } %>
                 <% if (p.organization_name) { %><span class="party-org">[<%= p.organization_name %>]</span><% } %>
               </div>
@@ -291,6 +291,16 @@
                 </select>
               <% } else { %>
                 <span class="badge badge-role"><%= p.role %></span>
+              <% } %>
+              <% if (canManage) { %>
+                <button type="button" class="btn-icon notify-party-btn" data-user-id="<%= p.user_id %>"
+                        title="<%= p.notifications_disabled ? 'Enable notifications' : 'Mute notifications' %>">
+                  <% if (p.notifications_disabled) { %>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  <% } else { %>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                  <% } %>
+                </button>
               <% } %>
               <% if (canManage && p.user_id !== user.id) { %>
                 <button type="button" class="btn-icon remove-party-btn" data-user-id="<%= p.user_id %>" title="Remove">×</button>
@@ -659,11 +669,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Party list helpers ---
   function _esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+  const BELL_SVG     = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`;
+  const BELL_OFF_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+
   function renderPartyItem(p) {
+    const muted   = !!p.notificationsDisabled;
+    const mutedCls = muted ? ' party-muted' : '';
     const nameHtml = p.name
-      ? `<span class="party-name">${_esc(p.name)}</span><a href="mailto:${_esc(p.email)}" class="party-email-link">${_esc(p.email)}</a>`
-      : `<span class="party-name">${_esc(p.email)}</span>`;
+      ? `<span class="party-name${mutedCls}">${_esc(p.name)}</span><a href="mailto:${_esc(p.email)}" class="party-email-link${mutedCls}">${_esc(p.email)}</a>`
+      : `<span class="party-name${mutedCls}">${_esc(p.email)}</span>`;
     const orgHtml    = p.orgName ? `<span class="party-org">[${_esc(p.orgName)}]</span>` : '';
+    const notifyHtml = CAN_MANAGE
+      ? `<button type="button" class="btn-icon notify-party-btn" data-user-id="${p.userId}" title="${muted ? 'Enable notifications' : 'Mute notifications'}">${muted ? BELL_OFF_SVG : BELL_SVG}</button>`
+      : '';
     const removeHtml = CAN_MANAGE && p.userId !== CURRENT_USER_ID
       ? `<button type="button" class="btn-icon remove-party-btn" data-user-id="${p.userId}" title="Remove">×</button>`
       : '';
@@ -674,22 +692,40 @@ document.addEventListener('DOMContentLoaded', () => {
           <option value="collaborator" ${p.role === 'collaborator' ? 'selected' : ''}>collaborator</option>
         </select>`
       : `<span class="badge badge-role">${_esc(p.role)}</span>`;
-    return `<li class="party-item" data-user-id="${p.userId}">
+    return `<li class="party-item" data-user-id="${p.userId}" data-notifications-disabled="${muted ? '1' : '0'}">
       <div class="party-info">${nameHtml}${orgHtml}</div>
       ${roleBadge}
+      ${notifyHtml}
       ${removeHtml}
     </li>`;
   }
 
   // Delegated remove listener — handles both server-rendered and dynamically added rows
   document.getElementById('party-list')?.addEventListener('click', async e => {
-    const btn = e.target.closest('.remove-party-btn');
-    if (!btn) return;
-    const userId = btn.dataset.userId;
-    try {
-      await sidebarPost(`/tickets/${TICKET_ID}/parties/remove`, { userId });
-      document.querySelector(`#party-list [data-user-id="${userId}"]`)?.remove();
-    } catch (err) { alert('Could not remove person: ' + err.message); }
+    const removeBtn = e.target.closest('.remove-party-btn');
+    if (removeBtn) {
+      const userId = removeBtn.dataset.userId;
+      try {
+        await sidebarPost(`/tickets/${TICKET_ID}/parties/remove`, { userId });
+        document.querySelector(`#party-list [data-user-id="${userId}"]`)?.remove();
+      } catch (err) { alert('Could not remove person: ' + err.message); }
+      return;
+    }
+
+    const notifyBtn = e.target.closest('.notify-party-btn');
+    if (notifyBtn) {
+      const userId = notifyBtn.dataset.userId;
+      try {
+        const data = await sidebarPost(`/tickets/${TICKET_ID}/parties/notify`, { userId });
+        const li   = document.querySelector(`#party-list [data-user-id="${userId}"]`);
+        if (!li) return;
+        const disabled = data.notificationsDisabled;
+        li.dataset.notificationsDisabled = disabled ? '1' : '0';
+        li.querySelectorAll('.party-name, .party-email-link').forEach(el => el.classList.toggle('party-muted', disabled));
+        notifyBtn.title     = disabled ? 'Enable notifications' : 'Mute notifications';
+        notifyBtn.innerHTML = disabled ? BELL_OFF_SVG : BELL_SVG;
+      } catch (err) { alert('Could not toggle notifications: ' + err.message); }
+    }
   });
 
   // Delegated role-change listener

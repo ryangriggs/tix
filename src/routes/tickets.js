@@ -122,7 +122,7 @@ function saveUploadedFiles(files, ticketId, commentId) {
 // Helper: notify all parties except the actor
 async function notifyParties(ticket, actorEmail, messageBody, commentId, inReplyTo) {
   const parties = db.getParties(ticket.id);
-  const toEmails = parties.filter(p => p.email !== actorEmail).map(p => p.email);
+  const toEmails = parties.filter(p => p.email !== actorEmail && !p.notifications_disabled).map(p => p.email);
   if (!toEmails.length) return;
 
   const domain = config.ticketEmail.split('@')[1] || 'tix.local';
@@ -606,11 +606,13 @@ router.post('/:id/status', async (req, res) => {
 
   const comment = db.addComment(ticket.id, req.user.id, `<em>Status changed to <strong>${status}</strong></em>`);
 
-  try {
-    await notifyParties(ticket, req.user.email,
-      `<p>${req.user.email} changed status to <strong>${status}</strong>.</p>`,
-      comment.id);
-  } catch (err) { console.error('[Tickets] Notification error:', err); }
+  if (config.notifyEmailStatusChange) {
+    try {
+      await notifyParties(ticket, req.user.email,
+        `<p>${req.user.email} changed status to <strong>${status}</strong>.</p>`,
+        comment.id);
+    } catch (err) { console.error('[Tickets] Notification error:', err); }
+  }
 
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'status', value: status });
 
@@ -721,7 +723,7 @@ router.post('/:id/parties', async (req, res) => {
     });
   } catch (err) { console.error('[Tickets] Notification error:', err); }
 
-  const partyPayload = { userId: full.id, name: full.name || null, email: full.email, orgName: full.organization_name || null, role };
+  const partyPayload = { userId: full.id, name: full.name || null, email: full.email, orgName: full.organization_name || null, role, notificationsDisabled: false };
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'party_added', party: partyPayload });
 
   if (req.accepts('json')) return res.json({ ok: true, party: partyPayload });
@@ -761,6 +763,21 @@ router.post('/:id/parties/role', async (req, res) => {
 
   if (req.accepts('json')) return res.json({ ok: true, role });
   res.redirect(`/tickets/${ticket.id}`);
+});
+
+// POST /tickets/:id/parties/notify — toggle notifications for a party (canManage)
+router.post('/:id/parties/notify', (req, res) => {
+  const ticket = db.getTicketById(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Not found' });
+  if (!canManage(ticket, req.user)) return res.status(403).json({ error: 'Forbidden' });
+
+  const userId = parseInt(req.body.userId, 10);
+  if (!userId) return res.status(400).json({ error: 'Invalid' });
+  if (!db.getUserTicketRole(ticket.id, userId))
+    return res.status(404).json({ error: 'User is not a party to this ticket' });
+
+  const disabled = db.togglePartyNotifications(ticket.id, userId);
+  return res.json({ ok: true, notificationsDisabled: disabled });
 });
 
 // POST /tickets/:id/parties/remove — remove a party

@@ -413,8 +413,9 @@ router.post('/settings', (req, res) => {
     email_rate_limit_new_tickets:   String(rateLimitNew),
     reminder_count:                 String(reminderCount),
     reminder_frequency_hours:       String(reminderFreq),
-    notify_email_submitter:         req.body.notify_email_submitter === '1' ? 'true' : 'false',
-    enable_billable_hours:          req.body.enable_billable_hours  === '1' ? 'true' : 'false',
+    notify_email_submitter:         req.body.notify_email_submitter    === '1' ? 'true' : 'false',
+    notify_email_status_change:     req.body.notify_email_status_change === '1' ? 'true' : 'false',
+    enable_billable_hours:          req.body.enable_billable_hours     === '1' ? 'true' : 'false',
     enable_location:                req.body.enable_location         === '1' ? 'true' : 'false',
   };
 

@@ -1088,6 +1088,7 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
   text-decoration: none;
 }
 .party-email-link:hover { color: var(--accent); text-decoration: underline; }
+.party-muted { text-decoration: line-through; opacity: 0.55; }
 
 .add-party-details { margin-top: 0.75rem; }
 .add-party-details summary { font-size: 0.8rem; cursor: pointer; color: var(--accent); list-style: none; }
