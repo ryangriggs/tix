@@ -778,13 +778,17 @@ function createPageCanvas(pageNum) {
   // so (clientX - rect.left) / zoomLevel gives exact canvas-pixel coordinates
   // without any scroll-compensation arithmetic.
   fc.getPointer = function(e) {
-    const touch  = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]);
+    const touch   = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]);
     const clientX = touch ? touch.clientX : (e.clientX || 0);
     const clientY = touch ? touch.clientY : (e.clientY || 0);
     const rect    = this.upperCanvasEl.getBoundingClientRect();
+    // Convert viewport px → canvas px using the live rendered scale,
+    // which already reflects CSS zoom + scroll without any separate correction.
+    const scaleX  = this.upperCanvasEl.width  / (rect.width  || 1);
+    const scaleY  = this.upperCanvasEl.height / (rect.height || 1);
     return {
-      x: (clientX - rect.left) / zoomLevel,
-      y: (clientY - rect.top)  / zoomLevel,
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top)  * scaleY,
     };
   };
 
