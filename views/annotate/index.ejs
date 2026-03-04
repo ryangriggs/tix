@@ -78,6 +78,8 @@
     }
     .tb-tool:hover  { background: #334155; color: #f1f5f9; }
     .tb-tool.active { background: #2563eb; border-color: #3b82f6; color: #fff; }
+    #delete-btn:not(:disabled) { color: #f87171; }
+    #delete-btn:not(:disabled):hover { background: #7f1d1d; color: #fca5a5; border-color: #991b1b; }
 
     .tb-btn {
       background: #334155;
@@ -219,6 +221,9 @@
     <button class="tb-tool" data-tool="text" title="Text (T)">
       <svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
     </button>
+    <button id="delete-btn" class="tb-tool" title="Delete selected (Del)" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+    </button>
 
     <div class="tb-sep"></div>
 
@@ -331,9 +336,10 @@ function getFill()   { return hexToRgba(fillHex,   fillOpacity);   }
 function setTool(tool) {
   currentTool = tool;
   for (const { fc } of pages) {
-    fc.isDrawingMode = (tool === 'pencil');
-    fc.selection     = (tool === 'select');
-    fc.defaultCursor = (tool === 'select') ? 'default' : 'crosshair';
+    fc.isDrawingMode       = (tool === 'pencil');
+    fc.selection           = (tool === 'select');
+    fc.defaultCursor       = (tool === 'select') ? 'default' : 'crosshair';
+    fc.allowTouchScrolling = (tool === 'select');
     fc.forEachObject(obj => {
       obj.selectable = (tool === 'select');
       obj.evented    = (tool === 'select');
@@ -424,11 +430,12 @@ function setupCanvasEvents(fc) {
     fc.requestRenderAll();
   });
 
-  fc.on('selection:created', () => { activeCanvas = fc; syncToolbarToSelection(fc); });
-  fc.on('selection:updated', () => { activeCanvas = fc; syncToolbarToSelection(fc); });
+  fc.on('selection:created', () => { activeCanvas = fc; syncToolbarToSelection(fc); document.getElementById('delete-btn').disabled = false; });
+  fc.on('selection:updated', () => { activeCanvas = fc; syncToolbarToSelection(fc); document.getElementById('delete-btn').disabled = false; });
   fc.on('selection:cleared', () => {
     document.getElementById('font-controls').style.display =
       (currentTool === 'text') ? 'flex' : 'none';
+    document.getElementById('delete-btn').disabled = true;
   });
   fc.on('object:modified', markDirty);
   fc.on('object:removed',  markDirty);
@@ -488,8 +495,13 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Toolbar wiring ─────────────────────────────────────────
-document.querySelectorAll('.tb-tool').forEach(btn =>
+document.querySelectorAll('.tb-tool[data-tool]').forEach(btn =>
   btn.addEventListener('click', () => setTool(btn.dataset.tool)));
+
+document.getElementById('delete-btn').addEventListener('click', () => {
+  const obj = activeCanvas?.getActiveObject();
+  if (obj) { activeCanvas.remove(obj); activeCanvas.discardActiveObject(); markDirty(); }
+});
 
 const strokeColorEl   = document.getElementById('stroke-color');
 const strokeOpacityEl = document.getElementById('stroke-opacity');
@@ -620,6 +632,7 @@ function createPageCanvas(pageNum) {
     selection:              true,
     preserveObjectStacking: true,
     enableRetinaScaling:    false,
+    allowTouchScrolling:    true,  // default tool is select; updated by setTool()
   });
   setupCanvasEvents(fc);
   pages.push({ fc, pageNum });
