@@ -41,7 +41,9 @@ const config = {
   appUrl: (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, ''),
 
   dataDir: process.env.DATA_DIR || '/app/data',
-  uploadsDir: process.env.UPLOADS_DIR || '/app/data/uploads',
+  uploadsDir:     process.env.UPLOADS_DIR     || '/app/data/uploads',
+  annotationsDir: process.env.ANNOTATIONS_DIR || '/app/data/annotations',
+  annotationExtensions: 'pdf,jpg,jpeg,gif,png,svg',
   emailLog: process.env.EMAIL_LOG || '',
   userLog:  process.env.USER_LOG  || '',
 
@@ -120,6 +122,7 @@ function applySettings(map) {
 
   if ('resend_api_key' in map) config.resend.apiKey = map.resend_api_key || '';
 
+  if ('annotation_extensions'       in map) config.annotationExtensions      = map.annotation_extensions       || '';
   if ('upload_max_size_mb'          in map) config.uploadMaxSizeMb           = parseInt(map.upload_max_size_mb, 10) || 25;
   if ('upload_allowed_extensions'   in map) config.uploadAllowedExtensions   = map.upload_allowed_extensions   || config.uploadAllowedExtensions;
   if ('upload_blocked_extensions'   in map) config.uploadBlockedExtensions   = map.upload_blocked_extensions   || '';

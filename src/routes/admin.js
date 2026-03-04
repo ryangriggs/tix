@@ -406,6 +406,7 @@ router.post('/settings', (req, res) => {
     gmail_refresh_token:            trim('gmail_refresh_token'),
     gmail_user:                     gmailUser,
     resend_api_key:                 trim('resend_api_key'),
+    annotation_extensions:          trim('annotation_extensions'),
     upload_max_size_mb:             String(uploadMaxSizeMb),
     upload_allowed_extensions:      trim('upload_allowed_extensions'),
     upload_blocked_extensions:      trim('upload_blocked_extensions'),

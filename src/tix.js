@@ -4,7 +4,8 @@ const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 
-const jwt = require('jsonwebtoken');
+const fs   = require('fs');
+const jwt  = require('jsonwebtoken');
 const config = require('./config');
 const { requireAuth, requireAdmin, optionalAuth, verifyCsrf } = require('./middleware/auth');
 const { startSMTPServer } = require('./smtp');
@@ -46,6 +47,7 @@ app.use((req, res, next) => {
     } catch (_) { res.clearCookie('admin_session'); }
   }
   try { res.locals.siteName = getSetting('site_name') || config.siteName; } catch (_) { res.locals.siteName = config.siteName; }
+  res.locals.annotationExts = new Set(config.annotationExtensions.split(',').map(e => e.trim().toLowerCase()).filter(Boolean));
 
   res.locals.formatDate = function (ts) {
     if (!ts) return '—';
@@ -83,6 +85,7 @@ app.use((req, res, next) => {
 // Routes
 // ============================================================
 app.use('/auth', optionalAuth, require('./routes/auth'));
+app.use('/tickets', requireAuth, verifyCsrf, require('./routes/annotate'));
 app.use('/tickets', requireAuth, verifyCsrf, require('./routes/tickets'));
 app.use('/admin', requireAuth, requireAdmin, verifyCsrf, require('./routes/admin'));
 app.use('/api', requireAuth, require('./routes/api'));
@@ -143,6 +146,7 @@ app.use((err, req, res, _next) => {
 // ============================================================
 async function start() {
   await initDb();
+  fs.mkdirSync(config.annotationsDir, { recursive: true });
 
   // Seed configurable settings from .env defaults (INSERT OR IGNORE — won't overwrite DB values).
   // This runs once on first boot, migrating .env values into the DB.
@@ -181,6 +185,7 @@ async function start() {
     reminder_frequency_hours:       '24',
     notify_email_submitter:         'true',
     notify_email_status_change:     'true',
+    annotation_extensions:          'pdf,jpg,jpeg,gif,png,svg',
     enable_billable_hours:          'true',
     enable_location:                'true',
   };

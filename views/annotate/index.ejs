@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= attachment.original_name %> — Annotate</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, Arial, sans-serif;
+      font-size: 13px;
+      background: #1e293b;
+      color: #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Toolbar ─────────────────────────────────────── */
+    #toolbar {
+      flex-shrink: 0;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      user-select: none;
+    }
+
+    .tb-row {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .4rem .75rem;
+      flex-wrap: wrap;
+    }
+
+    .tb-row-header {
+      background: #0f172a;
+      padding: .35rem .75rem;
+      gap: .75rem;
+    }
+
+    .tb-back {
+      color: #94a3b8;
+      text-decoration: none;
+      font-size: .8rem;
+      white-space: nowrap;
+    }
+    .tb-back:hover { color: #f1f5f9; }
+
+    .tb-filename {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: .8rem;
+      color: #cbd5e1;
+    }
+
+    .tb-sep {
+      width: 1px;
+      height: 22px;
+      background: #334155;
+      flex-shrink: 0;
+    }
+
+    /* Tool buttons */
+    .tb-tool {
+      background: none;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      color: #94a3b8;
+      cursor: pointer;
+      padding: 3px 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 28px;
+    }
+    .tb-tool:hover  { background: #334155; color: #f1f5f9; }
+    .tb-tool.active { background: #2563eb; border-color: #3b82f6; color: #fff; }
+
+    /* Generic toolbar button */
+    .tb-btn {
+      background: #334155;
+      border: 1px solid #475569;
+      border-radius: 4px;
+      color: #f1f5f9;
+      cursor: pointer;
+      padding: 3px 10px;
+      font-size: 12px;
+      height: 28px;
+      white-space: nowrap;
+    }
+    .tb-btn:hover    { background: #475569; }
+    .tb-btn:disabled { opacity: .5; cursor: default; }
+    .tb-btn-primary  { background: #2563eb; border-color: #3b82f6; }
+    .tb-btn-primary:hover { background: #1d4ed8; }
+
+    /* Color pickers */
+    .color-group {
+      display: flex;
+      align-items: center;
+      gap: .3rem;
+    }
+    .color-label { font-size: 11px; color: #94a3b8; white-space: nowrap; }
+
+    input[type="color"] {
+      width: 26px;
+      height: 24px;
+      border: 1px solid #475569;
+      border-radius: 3px;
+      padding: 1px;
+      background: #0f172a;
+      cursor: pointer;
+    }
+    input[type="range"] {
+      width: 64px;
+      height: 4px;
+      accent-color: #3b82f6;
+      cursor: pointer;
+    }
+
+    /* Font controls */
+    #font-controls {
+      display: none;
+      align-items: center;
+      gap: .3rem;
+    }
+    #font-family {
+      background: #0f172a;
+      border: 1px solid #475569;
+      border-radius: 3px;
+      color: #f1f5f9;
+      font-size: 12px;
+      padding: 2px 4px;
+      height: 26px;
+    }
+
+    /* Page nav */
+    #page-nav {
+      display: flex;
+      align-items: center;
+      gap: .3rem;
+    }
+    #page-info { font-size: 11px; color: #94a3b8; white-space: nowrap; }
+
+    /* Status bar */
+    #status-msg {
+      font-size: 11px;
+      color: #4ade80;
+      transition: opacity .4s;
+      white-space: nowrap;
+      margin-left: auto;
+    }
+
+    /* ── Canvas area ──────────────────────────────────── */
+    #canvas-wrap {
+      flex: 1;
+      overflow: auto;
+      background: #475569;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 1.5rem;
+    }
+
+    #canvas-wrap canvas {
+      display: block;
+      box-shadow: 0 4px 20px rgba(0,0,0,.5);
+    }
+
+    /* ── Loading overlay ──────────────────────────────── */
+    #loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, .65);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 4px solid rgba(255,255,255,.2);
+      border-top-color: #60a5fa;
+      border-radius: 50%;
+      animation: spin .75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Print ────────────────────────────────────────── */
+    @media print {
+      #toolbar, #loading-overlay { display: none !important; }
+      body { background: #fff; overflow: visible; height: auto; }
+      #canvas-wrap { overflow: visible; padding: 0; background: none; display: block; }
+      #canvas-wrap canvas { max-width: 100%; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loading-overlay"><div class="spinner"></div></div>
+
+<!-- Toolbar -->
+<div id="toolbar">
+
+  <!-- Row 1: header -->
+  <div class="tb-row tb-row-header">
+    <a href="/tickets/<%= ticket.id %>" class="tb-back" target="_self">
+      ← #<%= formatTicketId(ticket.id) %>
+    </a>
+    <span class="tb-filename"><%= attachment.original_name %></span>
+    <button id="save-btn" class="tb-btn tb-btn-primary">Save</button>
+    <button id="print-btn" class="tb-btn">Print</button>
+  </div>
+
+  <!-- Row 2: tools + colors + font + page nav -->
+  <div class="tb-row">
+
+    <!-- Drawing tools -->
+    <button class="tb-tool active" data-tool="select" title="Select / Move (V)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 0l16 12-7 2-4 9z"/></svg>
+    </button>
+    <button class="tb-tool" data-tool="line" title="Line (L)">
+      <svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="3" y1="21" x2="21" y2="3"/></svg>
+    </button>
+    <button class="tb-tool" data-tool="pencil" title="Freehand (P)">
+      <svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+    </button>
+    <button class="tb-tool" data-tool="ellipse" title="Ellipse (E)">
+      <svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" fill="none"><ellipse cx="12" cy="12" rx="10" ry="7"/></svg>
+    </button>
+    <button class="tb-tool" data-tool="rect" title="Rectangle (R)">
+      <svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" fill="none"><rect x="3" y="5" width="18" height="14" rx="1"/></svg>
+    </button>
+    <button class="tb-tool" data-tool="text" title="Text (T)">
+      <svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+    </button>
+
+    <div class="tb-sep"></div>
+
+    <!-- Stroke color -->
+    <div class="color-group">
+      <span class="color-label">Stroke</span>
+      <input type="color"  id="stroke-color"   value="#000000" title="Stroke colour">
+      <input type="range"  id="stroke-opacity" min="0" max="100" value="100" title="Stroke opacity">
+    </div>
+
+    <div class="tb-sep"></div>
+
+    <!-- Fill color -->
+    <div class="color-group">
+      <span class="color-label">Fill</span>
+      <input type="color"  id="fill-color"   value="#ffff00" title="Fill colour">
+      <input type="range"  id="fill-opacity" min="0" max="100" value="50" title="Fill opacity">
+    </div>
+
+    <div class="tb-sep"></div>
+
+    <!-- Font controls (text tool / text selected) -->
+    <div id="font-controls">
+      <span class="color-label">Font</span>
+      <select id="font-family">
+        <option value="Arial">Arial</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Courier New">Courier New</option>
+        <option value="Times New Roman">Times New Roman</option>
+        <option value="Verdana">Verdana</option>
+      </select>
+      <div class="tb-sep"></div>
+    </div>
+
+    <% if (isPdf) { %>
+    <!-- PDF page nav -->
+    <div id="page-nav">
+      <button id="prev-page" class="tb-btn" disabled>&#8592;</button>
+      <span id="page-info">Page 1 / 1</span>
+      <button id="next-page" class="tb-btn" disabled>&#8594;</button>
+    </div>
+    <div class="tb-sep"></div>
+    <% } %>
+
+    <span id="status-msg"></span>
+  </div>
+</div>
+
+<!-- Canvas container -->
+<div id="canvas-wrap">
+  <canvas id="c"></canvas>
+</div>
+
+<!-- Fabric.js (always) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js" crossorigin="anonymous"></script>
+<% if (isPdf) { %>
+<!-- PDF.js (PDF files only) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+<% } %>
+
+<script>
+'use strict';
+
+// ── Constants injected from server ────────────────────────
+const TICKET_ID   = '<%= ticket.id %>';
+const STORED_NAME = '<%= attachment.stored_name %>';
+const CSRF        = '<%= csrfToken %>';
+const IS_PDF      = <%- isPdf ? 'true' : 'false' %>;
+const FILE_URL    = '/tickets/attachments/<%= attachment.stored_name %>';
+
+// ── Fabric canvas ──────────────────────────────────────────
+const canvas = new fabric.Canvas('c', {
+  selection:              true,
+  preserveObjectStacking: true,
+  enableRetinaScaling:    false,
+});
+
+// ── State ──────────────────────────────────────────────────
+let currentTool  = 'select';
+let isDrawing    = false;
+let drawStart    = null;
+let activeShape  = null;
+let isDirty      = false;
+let currentPage  = 1;
+let totalPages   = 1;
+let pdfDoc       = null;
+let loadCount    = 0;   // tracks pending async loads
+
+// Default drawing styles
+let strokeHex     = '#000000';
+let strokeOpacity = 1.0;
+let fillHex       = '#ffff00';
+let fillOpacity   = 0.5;
+let fontFamily    = 'Arial';
+const STROKE_WIDTH = 2;
+
+// ── Loading overlay ────────────────────────────────────────
+const overlay = document.getElementById('loading-overlay');
+function showLoading() { loadCount++; overlay.style.display = 'flex'; }
+function hideLoading() { if (--loadCount <= 0) { loadCount = 0; overlay.style.display = 'none'; } }
+
+// ── Status bar ─────────────────────────────────────────────
+const statusEl = document.getElementById('status-msg');
+let statusTimer;
+function setStatus(msg, isError) {
+  statusEl.textContent = msg;
+  statusEl.style.color = isError ? '#f87171' : '#4ade80';
+  statusEl.style.opacity = '1';
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => { statusEl.style.opacity = '0'; }, 3000);
+}
+
+// ── Colour helpers ─────────────────────────────────────────
+function hexToRgba(hex, opacity) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${opacity.toFixed(3)})`;
+}
+function rgbaToHex(c) {
+  if (!c || c === 'transparent') return '#000000';
+  const m = String(c).match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
+  if (!m) return c.startsWith('#') ? c.slice(0,7) : '#000000';
+  return '#' + [m[1],m[2],m[3]].map(n => (+n).toString(16).padStart(2,'0')).join('');
+}
+function rgbaToAlpha(c) {
+  if (!c || c === 'transparent') return 0;
+  const m = String(c).match(/rgba?\(\s*\d+[,\s]+\d+[,\s]+\d+[,\s]+([0-9.]+)/);
+  return m ? parseFloat(m[1]) : 1;
+}
+function getStroke() { return hexToRgba(strokeHex, strokeOpacity); }
+function getFill()   { return hexToRgba(fillHex,   fillOpacity);   }
+
+// ── Tool management ────────────────────────────────────────
+function setTool(tool) {
+  currentTool = tool;
+  canvas.isDrawingMode = (tool === 'pencil');
+  canvas.selection     = (tool === 'select');
+  canvas.defaultCursor = (tool === 'select') ? 'default' : 'crosshair';
+  canvas.forEachObject(obj => {
+    obj.selectable = (tool === 'select');
+    obj.evented    = (tool === 'select');
+  });
+  document.querySelectorAll('.tb-tool').forEach(b =>
+    b.classList.toggle('active', b.dataset.tool === tool));
+  const showFont = (tool === 'text');
+  document.getElementById('font-controls').style.display = showFont ? 'flex' : 'none';
+  if (tool === 'pencil') {
+    canvas.freeDrawingBrush.color = getStroke();
+    canvas.freeDrawingBrush.width = STROKE_WIDTH;
+  }
+  canvas.renderAll();
+}
+
+// ── Shape drawing ──────────────────────────────────────────
+canvas.on('mouse:down', function(opt) {
+  if (currentTool === 'select' || currentTool === 'pencil') return;
+  // If clicking an existing object in draw mode, ignore
+  if (opt.target && currentTool !== 'text') return;
+  const ptr = canvas.getPointer(opt.e);
+
+  if (currentTool === 'text') {
+    const tb = new fabric.Textbox('Text', {
+      left: ptr.x, top: ptr.y, width: 180,
+      fill: getStroke(), fontFamily, fontSize: 18, editable: true,
+    });
+    canvas.add(tb);
+    canvas.setActiveObject(tb);
+    tb.enterEditing();
+    tb.selectAll();
+    markDirty();
+    return;
+  }
+
+  isDrawing = true;
+  drawStart = { x: ptr.x, y: ptr.y };
+  const stroke = getStroke();
+  const fill   = (currentTool === 'line') ? 'transparent' : getFill();
+
+  if (currentTool === 'line') {
+    activeShape = new fabric.Line([ptr.x, ptr.y, ptr.x, ptr.y],
+      { stroke, strokeWidth: STROKE_WIDTH, selectable: false, evented: false });
+  } else if (currentTool === 'ellipse') {
+    activeShape = new fabric.Ellipse({
+      left: ptr.x, top: ptr.y, rx: 0, ry: 0,
+      stroke, strokeWidth: STROKE_WIDTH, fill, selectable: false, evented: false });
+  } else if (currentTool === 'rect') {
+    activeShape = new fabric.Rect({
+      left: ptr.x, top: ptr.y, width: 0, height: 0,
+      stroke, strokeWidth: STROKE_WIDTH, fill, selectable: false, evented: false });
+  }
+  if (activeShape) canvas.add(activeShape);
+});
+
+canvas.on('mouse:move', function(opt) {
+  if (!isDrawing || !activeShape) return;
+  const ptr = canvas.getPointer(opt.e);
+  if (currentTool === 'line') {
+    activeShape.set({ x2: ptr.x, y2: ptr.y });
+  } else if (currentTool === 'ellipse') {
+    const dx = ptr.x - drawStart.x, dy = ptr.y - drawStart.y;
+    activeShape.set({
+      rx: Math.abs(dx) / 2, ry: Math.abs(dy) / 2,
+      left: Math.min(drawStart.x, ptr.x), top: Math.min(drawStart.y, ptr.y),
+    });
+  } else if (currentTool === 'rect') {
+    activeShape.set({
+      width:  Math.abs(ptr.x - drawStart.x),
+      height: Math.abs(ptr.y - drawStart.y),
+      left:   Math.min(drawStart.x, ptr.x),
+      top:    Math.min(drawStart.y, ptr.y),
+    });
+  }
+  canvas.renderAll();
+});
+
+canvas.on('mouse:up', function() {
+  if (!isDrawing || !activeShape) return;
+  isDrawing = false;
+  activeShape.set({ selectable: true, evented: true });
+  canvas.setActiveObject(activeShape);
+  activeShape = null;
+  markDirty();
+  setTool('select');
+  canvas.requestRenderAll();
+});
+
+// ── Selection → update toolbar ────────────────────────────
+canvas.on('selection:created', syncToolbarToSelection);
+canvas.on('selection:updated', syncToolbarToSelection);
+canvas.on('selection:cleared', () => {
+  document.getElementById('font-controls').style.display =
+    (currentTool === 'text') ? 'flex' : 'none';
+});
+
+function syncToolbarToSelection() {
+  const obj = canvas.getActiveObject();
+  if (!obj) return;
+  const stroke = obj.stroke;
+  if (stroke && stroke !== 'transparent') {
+    document.getElementById('stroke-color').value = rgbaToHex(stroke);
+    document.getElementById('stroke-opacity').value = Math.round(rgbaToAlpha(stroke) * 100);
+    strokeHex     = rgbaToHex(stroke);
+    strokeOpacity = rgbaToAlpha(stroke);
+  }
+  const fill = obj.fill;
+  if (fill && fill !== 'transparent') {
+    document.getElementById('fill-color').value = rgbaToHex(fill);
+    document.getElementById('fill-opacity').value = Math.round(rgbaToAlpha(fill) * 100);
+    fillHex     = rgbaToHex(fill);
+    fillOpacity = rgbaToAlpha(fill);
+  }
+  const isText = obj.type === 'textbox' || obj.type === 'i-text';
+  document.getElementById('font-controls').style.display = isText ? 'flex' : 'none';
+  if (isText && obj.fontFamily)
+    document.getElementById('font-family').value = obj.fontFamily;
+}
+
+// ── Dirty tracking ─────────────────────────────────────────
+function markDirty() { isDirty = true; }
+canvas.on('object:modified', markDirty);
+canvas.on('object:removed',  markDirty);
+canvas.on('path:created',    markDirty);
+
+window.addEventListener('beforeunload', e => {
+  if (isDirty) { e.preventDefault(); e.returnValue = ''; }
+});
+
+// ── Keyboard shortcuts ─────────────────────────────────────
+document.addEventListener('keydown', e => {
+  const editing = canvas.getActiveObject()?.isEditing;
+  if (editing) return;
+  if (e.key === 'v' || e.key === 'V') { setTool('select'); return; }
+  if (e.key === 'l' || e.key === 'L') { setTool('line');   return; }
+  if (e.key === 'p' || e.key === 'P') { setTool('pencil'); return; }
+  if (e.key === 'e' || e.key === 'E') { setTool('ellipse');return; }
+  if (e.key === 'r' || e.key === 'R') { setTool('rect');   return; }
+  if (e.key === 't' || e.key === 'T') { setTool('text');   return; }
+  if (e.key === 'Escape') { canvas.discardActiveObject(); setTool('select'); canvas.renderAll(); }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    const obj = canvas.getActiveObject();
+    if (obj) { canvas.remove(obj); canvas.discardActiveObject(); markDirty(); }
+  }
+});
+
+// ── Toolbar wiring ─────────────────────────────────────────
+document.querySelectorAll('.tb-tool').forEach(btn =>
+  btn.addEventListener('click', () => setTool(btn.dataset.tool)));
+
+const strokeColorEl   = document.getElementById('stroke-color');
+const strokeOpacityEl = document.getElementById('stroke-opacity');
+const fillColorEl     = document.getElementById('fill-color');
+const fillOpacityEl   = document.getElementById('fill-opacity');
+
+function applyStroke() {
+  strokeHex     = strokeColorEl.value;
+  strokeOpacity = strokeOpacityEl.value / 100;
+  const rgba = getStroke();
+  const obj  = canvas.getActiveObject();
+  if (obj) { obj.set({ stroke: rgba }); canvas.renderAll(); markDirty(); }
+  if (canvas.isDrawingMode) canvas.freeDrawingBrush.color = rgba;
+}
+function applyFill() {
+  fillHex     = fillColorEl.value;
+  fillOpacity = fillOpacityEl.value / 100;
+  const rgba = getFill();
+  const obj  = canvas.getActiveObject();
+  if (obj && obj.type !== 'line' && obj.type !== 'path') {
+    obj.set({ fill: rgba }); canvas.renderAll(); markDirty();
+  }
+}
+strokeColorEl.addEventListener('input', applyStroke);
+strokeOpacityEl.addEventListener('input', applyStroke);
+fillColorEl.addEventListener('input', applyFill);
+fillOpacityEl.addEventListener('input', applyFill);
+
+document.getElementById('font-family').addEventListener('change', function() {
+  fontFamily = this.value;
+  const obj = canvas.getActiveObject();
+  if (obj && (obj.type === 'textbox' || obj.type === 'i-text')) {
+    obj.set({ fontFamily }); canvas.renderAll(); markDirty();
+  }
+});
+
+// ── Save ──────────────────────────────────────────────────
+async function saveAnnotations(page) {
+  const json = canvas.toJSON();
+  json.canvasWidth  = canvas.getWidth();
+  json.canvasHeight = canvas.getHeight();
+  delete json.backgroundImage;
+  const resp = await fetch(
+    `/tickets/${TICKET_ID}/attachments/${STORED_NAME}/annotations/${page}`,
+    { method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
+      body: JSON.stringify(json),
+      credentials: 'include' }
+  );
+  if (!resp.ok) throw new Error('Server returned ' + resp.status);
+}
+
+document.getElementById('save-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await saveAnnotations(currentPage);
+    isDirty = false;
+    setStatus('Saved.');
+  } catch (err) {
+    setStatus('Save failed: ' + err.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save';
+  }
+});
+
+document.getElementById('print-btn').addEventListener('click', () => window.print());
+
+// ── Load annotations ──────────────────────────────────────
+async function loadAnnotations(page) {
+  try {
+    const resp = await fetch(
+      `/tickets/${TICKET_ID}/attachments/${STORED_NAME}/annotations/${page}`,
+      { credentials: 'include' });
+    const data = await resp.json();
+
+    if (!data || !Array.isArray(data.objects) || data.objects.length === 0) {
+      isDirty = false;
+      hideLoading();
+      return;
+    }
+
+    // Scale coords if canvas dimensions differ from when annotations were saved
+    const scaleX = data.canvasWidth  ? canvas.getWidth()  / data.canvasWidth  : 1;
+    const scaleY = data.canvasHeight ? canvas.getHeight() / data.canvasHeight : 1;
+
+    // Don't restore background — we set it ourselves
+    const jsonToLoad = { ...data, backgroundImage: null };
+
+    canvas.loadFromJSON(jsonToLoad, () => {
+      if (scaleX !== 1 || scaleY !== 1) {
+        canvas.forEachObject(obj => {
+          obj.scaleX = (obj.scaleX || 1) * scaleX;
+          obj.scaleY = (obj.scaleY || 1) * scaleY;
+          obj.left   = (obj.left   || 0) * scaleX;
+          obj.top    = (obj.top    || 0) * scaleY;
+          obj.setCoords();
+        });
+      }
+      canvas.forEachObject(obj => { obj.selectable = true; obj.evented = true; });
+      isDirty = false;
+      canvas.renderAll();
+      hideLoading();
+    });
+  } catch (err) {
+    hideLoading();
+    setStatus('Could not load annotations: ' + err.message, true);
+  }
+}
+
+// ── Background loading ────────────────────────────────────
+async function loadBackground() {
+  showLoading();
+  try {
+    const resp = await fetch(FILE_URL, { credentials: 'include' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+    if (IS_PDF) {
+      const buf = await resp.arrayBuffer();
+      pdfDoc     = await pdfjsLib.getDocument({ data: buf }).promise;
+      totalPages = pdfDoc.numPages;
+      updatePageNav();
+      await renderPdfPage(1);
+    } else {
+      const blob   = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      await new Promise((resolve, reject) => {
+        fabric.Image.fromURL(blobUrl, img => {
+          if (!img) return reject(new Error('Image failed to load'));
+          canvas.setWidth(img.width || img.getScaledWidth());
+          canvas.setHeight(img.height || img.getScaledHeight());
+          canvas.setBackgroundImage(img, () => { canvas.renderAll(); resolve(); });
+        });
+      });
+      await loadAnnotations(1);
+    }
+  } catch (err) {
+    hideLoading();
+    setStatus('Failed to load file: ' + err.message, true);
+  }
+}
+
+// ── PDF rendering ─────────────────────────────────────────
+async function renderPdfPage(pageNum) {
+  showLoading();
+  canvas.clear();
+  try {
+    const page     = await pdfDoc.getPage(pageNum);
+    const viewport = page.getViewport({ scale: 1.5 });
+
+    const off = document.createElement('canvas');
+    off.width  = viewport.width;
+    off.height = viewport.height;
+    await page.render({ canvasContext: off.getContext('2d'), viewport }).promise;
+
+    canvas.setWidth(viewport.width);
+    canvas.setHeight(viewport.height);
+
+    fabric.Image.fromURL(off.toDataURL(), img => {
+      canvas.setBackgroundImage(img, async () => {
+        canvas.renderAll();
+        await loadAnnotations(pageNum);
+      });
+    });
+  } catch (err) {
+    hideLoading();
+    setStatus('Failed to render page: ' + err.message, true);
+  }
+}
+
+// ── PDF page navigation ───────────────────────────────────
+<% if (isPdf) { %>
+function updatePageNav() {
+  document.getElementById('page-info').textContent = `Page ${currentPage} / ${totalPages}`;
+  document.getElementById('prev-page').disabled = (currentPage <= 1);
+  document.getElementById('next-page').disabled = (currentPage >= totalPages);
+}
+
+async function navigatePage(delta) {
+  const newPage = currentPage + delta;
+  if (newPage < 1 || newPage > totalPages) return;
+  if (isDirty) {
+    const yes = confirm('You have unsaved annotations. Save before navigating?');
+    if (yes) {
+      try { await saveAnnotations(currentPage); isDirty = false; }
+      catch (err) { setStatus('Save failed: ' + err.message, true); return; }
+    }
+  }
+  currentPage = newPage;
+  updatePageNav();
+  await renderPdfPage(currentPage);
+}
+
+document.getElementById('prev-page').addEventListener('click', () => navigatePage(-1));
+document.getElementById('next-page').addEventListener('click', () => navigatePage(+1));
+<% } %>
+
+// ── Boot ──────────────────────────────────────────────────
+loadBackground();
+setTool('select');
+</script>
+</body>
+</html>

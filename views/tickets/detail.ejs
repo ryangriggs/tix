@@ -112,10 +112,23 @@
           <h3 class="section-title">Attachments (<%= attachments.length %>)</h3>
           <ul class="attachment-list">
             <% for (const a of attachments) { %>
+              <%
+                const _aExt = (a.original_name || '').split('.').pop().toLowerCase();
+                const _aAnnotatable = annotationExts.has(_aExt);
+                const _aHref = _aAnnotatable
+                  ? `/tickets/${ticket.id}/attachments/${a.stored_name}/annotate`
+                  : `/tickets/attachments/${a.stored_name}`;
+              %>
               <li>
-                <a href="/tickets/attachments/<%= a.stored_name %>" class="attachment-link" target="_blank">📎 <%= a.original_name %></a>
+                <a href="<%= _aHref %>" class="attachment-link" target="_blank">📎 <%= a.original_name %></a>
                 <span class="meta-item" style="margin-left:.25rem">(<%= (a.size/1024).toFixed(1) %> KB)</span>
                 <% if (a.uploader_name) { %><span class="meta-item"> — <%= a.uploader_name %></span><% } %>
+                <% if (_aAnnotatable) { %>
+                  <a href="/tickets/<%= ticket.id %>/attachments/<%= a.stored_name %>/annotate"
+                     target="_blank" class="btn-icon" title="Annotate" style="margin-left:.25rem;text-decoration:none">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                  </a>
+                <% } %>
                 <% if (user && user.role === 'admin') { %>
                   <form method="POST" action="/tickets/attachments/<%= a.stored_name %>/delete" style="display:inline;margin-left:.25rem">
                     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
