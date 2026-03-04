@@ -146,7 +146,11 @@ app.use((err, req, res, _next) => {
 // ============================================================
 async function start() {
   await initDb();
-  fs.mkdirSync(config.annotationsDir, { recursive: true });
+  try {
+    fs.mkdirSync(config.annotationsDir, { recursive: true });
+  } catch (err) {
+    console.error('[Annotate] Cannot create annotations directory:', err.message);
+  }
 
   // Seed configurable settings from .env defaults (INSERT OR IGNORE — won't overwrite DB values).
   // This runs once on first boot, migrating .env values into the DB.

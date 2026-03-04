@@ -602,6 +602,10 @@ async function loadAnnotations(page) {
     const resp = await fetch(
       `/tickets/${TICKET_ID}/attachments/${STORED_NAME}/annotations/${page}`,
       { credentials: 'include' });
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      throw new Error(body.error || `Server error ${resp.status}`);
+    }
     const data = await resp.json();
 
     if (!data || !Array.isArray(data.objects) || data.objects.length === 0) {
@@ -652,6 +656,7 @@ async function loadBackground() {
       pdfDoc     = await pdfjsLib.getDocument({ data: buf }).promise;
       totalPages = pdfDoc.numPages;
       updatePageNav();
+      hideLoading(); // balance loadBackground's showLoading; renderPdfPage adds its own
       await renderPdfPage(1);
     } else {
       const blob   = await resp.blob();

@@ -39,11 +39,12 @@ router.get('/:ticketId/attachments/:storedName/annotate', (req, res) => {
 router.get('/:ticketId/attachments/:storedName/annotations/:page', (req, res) => {
   const page     = Math.max(1, parseInt(req.params.page, 10) || 1);
   const filePath = annotationFile(req.params.storedName, page);
-  if (!fs.existsSync(filePath)) return res.json(null);
   try {
+    if (!fs.existsSync(filePath)) return res.json(null);
     res.json(JSON.parse(fs.readFileSync(filePath, 'utf8')));
-  } catch {
-    res.json(null);
+  } catch (err) {
+    console.error('[Annotate] Read error:', err.message);
+    res.status(503).json({ error: 'Annotation folder not available' });
   }
 });
 
