@@ -42,7 +42,6 @@
 
     .tb-back {
       color: #94a3b8;
-      text-decoration: none;
       font-size: .8rem;
       white-space: nowrap;
     }
@@ -64,7 +63,6 @@
       flex-shrink: 0;
     }
 
-    /* Tool buttons */
     .tb-tool {
       background: none;
       border: 1px solid transparent;
@@ -81,7 +79,6 @@
     .tb-tool:hover  { background: #334155; color: #f1f5f9; }
     .tb-tool.active { background: #2563eb; border-color: #3b82f6; color: #fff; }
 
-    /* Generic toolbar button */
     .tb-btn {
       background: #334155;
       border: 1px solid #475569;
@@ -98,7 +95,6 @@
     .tb-btn-primary  { background: #2563eb; border-color: #3b82f6; }
     .tb-btn-primary:hover { background: #1d4ed8; }
 
-    /* Color pickers */
     .color-group {
       display: flex;
       align-items: center;
@@ -107,22 +103,15 @@
     .color-label { font-size: 11px; color: #94a3b8; white-space: nowrap; }
 
     input[type="color"] {
-      width: 26px;
-      height: 24px;
-      border: 1px solid #475569;
-      border-radius: 3px;
-      padding: 1px;
-      background: #0f172a;
-      cursor: pointer;
+      width: 26px; height: 24px;
+      border: 1px solid #475569; border-radius: 3px;
+      padding: 1px; background: #0f172a; cursor: pointer;
     }
     input[type="range"] {
-      width: 64px;
-      height: 4px;
-      accent-color: #3b82f6;
-      cursor: pointer;
+      width: 64px; height: 4px;
+      accent-color: #3b82f6; cursor: pointer;
     }
 
-    /* Font controls */
     #font-controls {
       display: none;
       align-items: center;
@@ -138,15 +127,6 @@
       height: 26px;
     }
 
-    /* Page nav */
-    #page-nav {
-      display: flex;
-      align-items: center;
-      gap: .3rem;
-    }
-    #page-info { font-size: 11px; color: #94a3b8; white-space: nowrap; }
-
-    /* Status bar */
     #status-msg {
       font-size: 11px;
       color: #4ade80;
@@ -161,13 +141,17 @@
       overflow: auto;
       background: #475569;
       display: flex;
-      justify-content: center;
-      align-items: flex-start;
+      flex-direction: column;
+      align-items: center;
       padding: 1.5rem;
+      gap: 1.5rem;
     }
 
-    #canvas-wrap canvas {
-      display: block;
+    .page-block {
+      flex-shrink: 0;
+      line-height: 0;
+    }
+    .page-block .canvas-container {
       box-shadow: 0 4px 20px rgba(0,0,0,.5);
     }
 
@@ -182,8 +166,7 @@
       z-index: 9999;
     }
     .spinner {
-      width: 44px;
-      height: 44px;
+      width: 44px; height: 44px;
       border: 4px solid rgba(255,255,255,.2);
       border-top-color: #60a5fa;
       border-radius: 50%;
@@ -196,21 +179,20 @@
       #toolbar, #loading-overlay { display: none !important; }
       body { background: #fff; overflow: visible; height: auto; }
       #canvas-wrap { overflow: visible; padding: 0; background: none; display: block; }
-      #canvas-wrap canvas { max-width: 100%; box-shadow: none; }
+      .page-block { page-break-after: always; margin: 0; }
+      .page-block:last-child { page-break-after: auto; }
+      .page-block .canvas-container { box-shadow: none !important; }
+      .canvas-container canvas { max-width: 100%; }
     }
   </style>
 </head>
 <body>
 
-<!-- Loading overlay -->
 <div id="loading-overlay"><div class="spinner"></div></div>
 
-<!-- Toolbar -->
 <div id="toolbar">
-
-  <!-- Row 1: header -->
   <div class="tb-row tb-row-header">
-    <button class="tb-back" style="background:none;border:none;cursor:pointer;padding:0" onclick="window.close()">
+    <button class="tb-back tb-btn" style="background:none;border:none;cursor:pointer;padding:0" onclick="window.close()">
       ← #<%= formatTicketId(ticket.id) %>
     </button>
     <span class="tb-filename"><%= attachment.original_name %></span>
@@ -218,10 +200,7 @@
     <button id="print-btn" class="tb-btn">Print</button>
   </div>
 
-  <!-- Row 2: tools + colors + font + page nav -->
   <div class="tb-row">
-
-    <!-- Drawing tools -->
     <button class="tb-tool active" data-tool="select" title="Select / Move (V)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 0l16 12-7 2-4 9z"/></svg>
     </button>
@@ -243,7 +222,6 @@
 
     <div class="tb-sep"></div>
 
-    <!-- Stroke color -->
     <div class="color-group">
       <span class="color-label">Stroke</span>
       <input type="color"  id="stroke-color"   value="#000000" title="Stroke colour">
@@ -252,7 +230,6 @@
 
     <div class="tb-sep"></div>
 
-    <!-- Fill color -->
     <div class="color-group">
       <span class="color-label">Fill</span>
       <input type="color"  id="fill-color"   value="#ffff00" title="Fill colour">
@@ -261,7 +238,6 @@
 
     <div class="tb-sep"></div>
 
-    <!-- Font controls (text tool / text selected) -->
     <div id="font-controls">
       <span class="color-label">Font</span>
       <select id="font-family">
@@ -274,29 +250,15 @@
       <div class="tb-sep"></div>
     </div>
 
-    <% if (isPdf) { %>
-    <!-- PDF page nav -->
-    <div id="page-nav">
-      <button id="prev-page" class="tb-btn" disabled>&#8592;</button>
-      <span id="page-info">Page 1 / 1</span>
-      <button id="next-page" class="tb-btn" disabled>&#8594;</button>
-    </div>
-    <div class="tb-sep"></div>
-    <% } %>
-
     <span id="status-msg"></span>
   </div>
 </div>
 
-<!-- Canvas container -->
-<div id="canvas-wrap">
-  <canvas id="c"></canvas>
-</div>
+<!-- Pages injected here dynamically -->
+<div id="canvas-wrap"></div>
 
-<!-- Fabric.js (always) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js" crossorigin="anonymous"></script>
 <% if (isPdf) { %>
-<!-- PDF.js (PDF files only) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
 <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <% } %>
@@ -304,32 +266,23 @@
 <script>
 'use strict';
 
-// ── Constants injected from server ────────────────────────
 const TICKET_ID   = '<%= ticket.id %>';
 const STORED_NAME = '<%= attachment.stored_name %>';
 const CSRF        = '<%= csrfToken %>';
 const IS_PDF      = <%- isPdf ? 'true' : 'false' %>;
 const FILE_URL    = '/tickets/attachments/<%= attachment.stored_name %>';
 
-// ── Fabric canvas ──────────────────────────────────────────
-const canvas = new fabric.Canvas('c', {
-  selection:              true,
-  preserveObjectStacking: true,
-  enableRetinaScaling:    false,
-});
-
 // ── State ──────────────────────────────────────────────────
+const pages = [];         // { fc: fabric.Canvas, pageNum }
+let activeCanvas = null;  // canvas receiving the last interaction
 let currentTool  = 'select';
 let isDrawing    = false;
 let drawStart    = null;
 let activeShape  = null;
 let isDirty      = false;
-let currentPage  = 1;
-let totalPages   = 1;
 let pdfDoc       = null;
-let loadCount    = 0;   // tracks pending async loads
+let loadCount    = 0;
 
-// Default drawing styles
 let strokeHex     = '#000000';
 let strokeOpacity = 1.0;
 let fillHex       = '#ffff00';
@@ -377,107 +330,114 @@ function getFill()   { return hexToRgba(fillHex,   fillOpacity);   }
 // ── Tool management ────────────────────────────────────────
 function setTool(tool) {
   currentTool = tool;
-  canvas.isDrawingMode = (tool === 'pencil');
-  canvas.selection     = (tool === 'select');
-  canvas.defaultCursor = (tool === 'select') ? 'default' : 'crosshair';
-  canvas.forEachObject(obj => {
-    obj.selectable = (tool === 'select');
-    obj.evented    = (tool === 'select');
-  });
+  for (const { fc } of pages) {
+    fc.isDrawingMode = (tool === 'pencil');
+    fc.selection     = (tool === 'select');
+    fc.defaultCursor = (tool === 'select') ? 'default' : 'crosshair';
+    fc.forEachObject(obj => {
+      obj.selectable = (tool === 'select');
+      obj.evented    = (tool === 'select');
+    });
+    if (tool === 'pencil') {
+      fc.freeDrawingBrush.color = getStroke();
+      fc.freeDrawingBrush.width = STROKE_WIDTH;
+    }
+    fc.renderAll();
+  }
   document.querySelectorAll('.tb-tool').forEach(b =>
     b.classList.toggle('active', b.dataset.tool === tool));
-  const showFont = (tool === 'text');
-  document.getElementById('font-controls').style.display = showFont ? 'flex' : 'none';
-  if (tool === 'pencil') {
-    canvas.freeDrawingBrush.color = getStroke();
-    canvas.freeDrawingBrush.width = STROKE_WIDTH;
-  }
-  canvas.renderAll();
+  document.getElementById('font-controls').style.display =
+    (tool === 'text') ? 'flex' : 'none';
 }
 
-// ── Shape drawing ──────────────────────────────────────────
-canvas.on('mouse:down', function(opt) {
-  if (currentTool === 'select' || currentTool === 'pencil') return;
-  // If clicking an existing object in draw mode, ignore
-  if (opt.target && currentTool !== 'text') return;
-  const ptr = canvas.getPointer(opt.e);
+// ── Per-canvas event setup ─────────────────────────────────
+function setupCanvasEvents(fc) {
+  fc.on('mouse:down', function(opt) {
+    activeCanvas = fc;
+    if (currentTool === 'select' || currentTool === 'pencil') return;
+    if (opt.target && currentTool !== 'text') return;
+    const ptr = fc.getPointer(opt.e);
 
-  if (currentTool === 'text') {
-    const tb = new fabric.Textbox('Text', {
-      left: ptr.x, top: ptr.y, width: 180,
-      fill: getStroke(), fontFamily, fontSize: 18, editable: true,
-    });
-    canvas.add(tb);
-    canvas.setActiveObject(tb);
-    tb.enterEditing();
-    tb.selectAll();
+    if (currentTool === 'text') {
+      const tb = new fabric.Textbox('Text', {
+        left: ptr.x, top: ptr.y, width: 180,
+        fill: getStroke(), fontFamily, fontSize: 18, editable: true,
+      });
+      fc.add(tb);
+      fc.setActiveObject(tb);
+      tb.enterEditing();
+      tb.selectAll();
+      markDirty();
+      return;
+    }
+
+    isDrawing = true;
+    drawStart = { x: ptr.x, y: ptr.y };
+    const stroke = getStroke();
+    const fill   = (currentTool === 'line') ? 'transparent' : getFill();
+
+    if (currentTool === 'line') {
+      activeShape = new fabric.Line([ptr.x, ptr.y, ptr.x, ptr.y],
+        { stroke, strokeWidth: STROKE_WIDTH, selectable: false, evented: false });
+    } else if (currentTool === 'ellipse') {
+      activeShape = new fabric.Ellipse({
+        left: ptr.x, top: ptr.y, rx: 0, ry: 0,
+        stroke, strokeWidth: STROKE_WIDTH, fill, selectable: false, evented: false });
+    } else if (currentTool === 'rect') {
+      activeShape = new fabric.Rect({
+        left: ptr.x, top: ptr.y, width: 0, height: 0,
+        stroke, strokeWidth: STROKE_WIDTH, fill, selectable: false, evented: false });
+    }
+    if (activeShape) fc.add(activeShape);
+  });
+
+  fc.on('mouse:move', function(opt) {
+    if (!isDrawing || !activeShape) return;
+    const ptr = fc.getPointer(opt.e);
+    if (currentTool === 'line') {
+      activeShape.set({ x2: ptr.x, y2: ptr.y });
+    } else if (currentTool === 'ellipse') {
+      const dx = ptr.x - drawStart.x, dy = ptr.y - drawStart.y;
+      activeShape.set({
+        rx: Math.abs(dx) / 2, ry: Math.abs(dy) / 2,
+        left: Math.min(drawStart.x, ptr.x), top: Math.min(drawStart.y, ptr.y),
+      });
+    } else if (currentTool === 'rect') {
+      activeShape.set({
+        width:  Math.abs(ptr.x - drawStart.x),
+        height: Math.abs(ptr.y - drawStart.y),
+        left:   Math.min(drawStart.x, ptr.x),
+        top:    Math.min(drawStart.y, ptr.y),
+      });
+    }
+    fc.renderAll();
+  });
+
+  fc.on('mouse:up', function() {
+    if (!isDrawing || !activeShape) return;
+    isDrawing = false;
+    activeShape.set({ selectable: true, evented: true });
+    fc.setActiveObject(activeShape);
+    activeShape = null;
     markDirty();
-    return;
-  }
+    setTool('select');
+    fc.requestRenderAll();
+  });
 
-  isDrawing = true;
-  drawStart = { x: ptr.x, y: ptr.y };
-  const stroke = getStroke();
-  const fill   = (currentTool === 'line') ? 'transparent' : getFill();
+  fc.on('selection:created', () => { activeCanvas = fc; syncToolbarToSelection(fc); });
+  fc.on('selection:updated', () => { activeCanvas = fc; syncToolbarToSelection(fc); });
+  fc.on('selection:cleared', () => {
+    document.getElementById('font-controls').style.display =
+      (currentTool === 'text') ? 'flex' : 'none';
+  });
+  fc.on('object:modified', markDirty);
+  fc.on('object:removed',  markDirty);
+  fc.on('path:created',    markDirty);
+}
 
-  if (currentTool === 'line') {
-    activeShape = new fabric.Line([ptr.x, ptr.y, ptr.x, ptr.y],
-      { stroke, strokeWidth: STROKE_WIDTH, selectable: false, evented: false });
-  } else if (currentTool === 'ellipse') {
-    activeShape = new fabric.Ellipse({
-      left: ptr.x, top: ptr.y, rx: 0, ry: 0,
-      stroke, strokeWidth: STROKE_WIDTH, fill, selectable: false, evented: false });
-  } else if (currentTool === 'rect') {
-    activeShape = new fabric.Rect({
-      left: ptr.x, top: ptr.y, width: 0, height: 0,
-      stroke, strokeWidth: STROKE_WIDTH, fill, selectable: false, evented: false });
-  }
-  if (activeShape) canvas.add(activeShape);
-});
-
-canvas.on('mouse:move', function(opt) {
-  if (!isDrawing || !activeShape) return;
-  const ptr = canvas.getPointer(opt.e);
-  if (currentTool === 'line') {
-    activeShape.set({ x2: ptr.x, y2: ptr.y });
-  } else if (currentTool === 'ellipse') {
-    const dx = ptr.x - drawStart.x, dy = ptr.y - drawStart.y;
-    activeShape.set({
-      rx: Math.abs(dx) / 2, ry: Math.abs(dy) / 2,
-      left: Math.min(drawStart.x, ptr.x), top: Math.min(drawStart.y, ptr.y),
-    });
-  } else if (currentTool === 'rect') {
-    activeShape.set({
-      width:  Math.abs(ptr.x - drawStart.x),
-      height: Math.abs(ptr.y - drawStart.y),
-      left:   Math.min(drawStart.x, ptr.x),
-      top:    Math.min(drawStart.y, ptr.y),
-    });
-  }
-  canvas.renderAll();
-});
-
-canvas.on('mouse:up', function() {
-  if (!isDrawing || !activeShape) return;
-  isDrawing = false;
-  activeShape.set({ selectable: true, evented: true });
-  canvas.setActiveObject(activeShape);
-  activeShape = null;
-  markDirty();
-  setTool('select');
-  canvas.requestRenderAll();
-});
-
-// ── Selection → update toolbar ────────────────────────────
-canvas.on('selection:created', syncToolbarToSelection);
-canvas.on('selection:updated', syncToolbarToSelection);
-canvas.on('selection:cleared', () => {
-  document.getElementById('font-controls').style.display =
-    (currentTool === 'text') ? 'flex' : 'none';
-});
-
-function syncToolbarToSelection() {
-  const obj = canvas.getActiveObject();
+// ── Selection → sync toolbar ───────────────────────────────
+function syncToolbarToSelection(fc) {
+  const obj = fc.getActiveObject();
   if (!obj) return;
   const stroke = obj.stroke;
   if (stroke && stroke !== 'transparent') {
@@ -501,9 +461,6 @@ function syncToolbarToSelection() {
 
 // ── Dirty tracking ─────────────────────────────────────────
 function markDirty() { isDirty = true; }
-canvas.on('object:modified', markDirty);
-canvas.on('object:removed',  markDirty);
-canvas.on('path:created',    markDirty);
 
 window.addEventListener('beforeunload', e => {
   if (isDirty) { e.preventDefault(); e.returnValue = ''; }
@@ -511,7 +468,7 @@ window.addEventListener('beforeunload', e => {
 
 // ── Keyboard shortcuts ─────────────────────────────────────
 document.addEventListener('keydown', e => {
-  const editing = canvas.getActiveObject()?.isEditing;
+  const editing = activeCanvas?.getActiveObject()?.isEditing;
   if (editing) return;
   if (e.key === 'v' || e.key === 'V') { setTool('select'); return; }
   if (e.key === 'l' || e.key === 'L') { setTool('line');   return; }
@@ -519,10 +476,14 @@ document.addEventListener('keydown', e => {
   if (e.key === 'e' || e.key === 'E') { setTool('ellipse');return; }
   if (e.key === 'r' || e.key === 'R') { setTool('rect');   return; }
   if (e.key === 't' || e.key === 'T') { setTool('text');   return; }
-  if (e.key === 'Escape') { canvas.discardActiveObject(); setTool('select'); canvas.renderAll(); }
+  if (e.key === 'Escape') {
+    activeCanvas?.discardActiveObject();
+    setTool('select');
+    activeCanvas?.renderAll();
+  }
   if (e.key === 'Delete' || e.key === 'Backspace') {
-    const obj = canvas.getActiveObject();
-    if (obj) { canvas.remove(obj); canvas.discardActiveObject(); markDirty(); }
+    const obj = activeCanvas?.getActiveObject();
+    if (obj) { activeCanvas.remove(obj); activeCanvas.discardActiveObject(); markDirty(); }
   }
 });
 
@@ -539,17 +500,19 @@ function applyStroke() {
   strokeHex     = strokeColorEl.value;
   strokeOpacity = strokeOpacityEl.value / 100;
   const rgba = getStroke();
-  const obj  = canvas.getActiveObject();
-  if (obj) { obj.set({ stroke: rgba }); canvas.renderAll(); markDirty(); }
-  if (canvas.isDrawingMode) canvas.freeDrawingBrush.color = rgba;
+  const obj  = activeCanvas?.getActiveObject();
+  if (obj) { obj.set({ stroke: rgba }); activeCanvas.renderAll(); markDirty(); }
+  for (const { fc } of pages) {
+    if (fc.isDrawingMode) fc.freeDrawingBrush.color = rgba;
+  }
 }
 function applyFill() {
   fillHex     = fillColorEl.value;
   fillOpacity = fillOpacityEl.value / 100;
   const rgba = getFill();
-  const obj  = canvas.getActiveObject();
+  const obj  = activeCanvas?.getActiveObject();
   if (obj && obj.type !== 'line' && obj.type !== 'path') {
-    obj.set({ fill: rgba }); canvas.renderAll(); markDirty();
+    obj.set({ fill: rgba }); activeCanvas.renderAll(); markDirty();
   }
 }
 strokeColorEl.addEventListener('input', applyStroke);
@@ -559,33 +522,35 @@ fillOpacityEl.addEventListener('input', applyFill);
 
 document.getElementById('font-family').addEventListener('change', function() {
   fontFamily = this.value;
-  const obj = canvas.getActiveObject();
+  const obj = activeCanvas?.getActiveObject();
   if (obj && (obj.type === 'textbox' || obj.type === 'i-text')) {
-    obj.set({ fontFamily }); canvas.renderAll(); markDirty();
+    obj.set({ fontFamily }); activeCanvas.renderAll(); markDirty();
   }
 });
 
-// ── Save ──────────────────────────────────────────────────
-async function saveAnnotations(page) {
-  const json = canvas.toJSON();
-  json.canvasWidth  = canvas.getWidth();
-  json.canvasHeight = canvas.getHeight();
-  delete json.backgroundImage;
-  const resp = await fetch(
-    `/tickets/${TICKET_ID}/attachments/${STORED_NAME}/annotations/${page}`,
-    { method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
-      body: JSON.stringify(json),
-      credentials: 'include' }
-  );
-  if (!resp.ok) throw new Error('Server returned ' + resp.status);
+// ── Save all pages ─────────────────────────────────────────
+async function saveAllAnnotations() {
+  for (const { fc, pageNum } of pages) {
+    const json = fc.toJSON();
+    json.canvasWidth  = fc.getWidth();
+    json.canvasHeight = fc.getHeight();
+    delete json.backgroundImage;
+    const resp = await fetch(
+      `/tickets/${TICKET_ID}/attachments/${STORED_NAME}/annotations/${pageNum}`,
+      { method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
+        body: JSON.stringify(json),
+        credentials: 'include' }
+    );
+    if (!resp.ok) throw new Error('Server returned ' + resp.status + ' for page ' + pageNum);
+  }
 }
 
 document.getElementById('save-btn').addEventListener('click', async () => {
   const btn = document.getElementById('save-btn');
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
-    await saveAnnotations(currentPage);
+    await saveAllAnnotations();
     isDirty = false;
     window.close();
   } catch (err) {
@@ -596,11 +561,11 @@ document.getElementById('save-btn').addEventListener('click', async () => {
 
 document.getElementById('print-btn').addEventListener('click', () => window.print());
 
-// ── Load annotations ──────────────────────────────────────
-async function loadAnnotations(page) {
+// ── Load annotations for one page ─────────────────────────
+async function loadAnnotations(pageNum, fc) {
   try {
     const resp = await fetch(
-      `/tickets/${TICKET_ID}/attachments/${STORED_NAME}/annotations/${page}`,
+      `/tickets/${TICKET_ID}/attachments/${STORED_NAME}/annotations/${pageNum}`,
       { credentials: 'include' });
     if (!resp.ok) {
       const body = await resp.json().catch(() => ({}));
@@ -614,18 +579,15 @@ async function loadAnnotations(page) {
       return;
     }
 
-    // Scale coords if canvas dimensions differ from when annotations were saved
-    const scaleX = data.canvasWidth  ? canvas.getWidth()  / data.canvasWidth  : 1;
-    const scaleY = data.canvasHeight ? canvas.getHeight() / data.canvasHeight : 1;
-
-    // Save background ref — loadFromJSON calls canvas.clear() internally
-    const savedBg = canvas.backgroundImage;
+    const scaleX = data.canvasWidth  ? fc.getWidth()  / data.canvasWidth  : 1;
+    const scaleY = data.canvasHeight ? fc.getHeight() / data.canvasHeight : 1;
+    const savedBg = fc.backgroundImage;
     const jsonToLoad = { ...data, backgroundImage: null };
 
-    canvas.loadFromJSON(jsonToLoad, () => {
-      if (savedBg) canvas.backgroundImage = savedBg;
+    fc.loadFromJSON(jsonToLoad, () => {
+      if (savedBg) fc.backgroundImage = savedBg;
       if (scaleX !== 1 || scaleY !== 1) {
-        canvas.forEachObject(obj => {
+        fc.forEachObject(obj => {
           obj.scaleX = (obj.scaleX || 1) * scaleX;
           obj.scaleY = (obj.scaleY || 1) * scaleY;
           obj.left   = (obj.left   || 0) * scaleX;
@@ -633,9 +595,9 @@ async function loadAnnotations(page) {
           obj.setCoords();
         });
       }
-      canvas.forEachObject(obj => { obj.selectable = true; obj.evented = true; });
+      fc.forEachObject(obj => { obj.selectable = true; obj.evented = true; });
       isDirty = false;
-      canvas.renderAll();
+      fc.renderAll();
       hideLoading();
     });
   } catch (err) {
@@ -644,43 +606,29 @@ async function loadAnnotations(page) {
   }
 }
 
-// ── Background loading ────────────────────────────────────
-async function loadBackground() {
-  showLoading();
-  try {
-    const resp = await fetch(FILE_URL, { credentials: 'include' });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+// ── Create a page block with a new Fabric canvas ───────────
+function createPageCanvas(pageNum) {
+  const wrap     = document.getElementById('canvas-wrap');
+  const block    = document.createElement('div');
+  block.className   = 'page-block';
+  block.dataset.page = pageNum;
+  const canvasEl = document.createElement('canvas');
+  block.appendChild(canvasEl);
+  wrap.appendChild(block);
 
-    if (IS_PDF) {
-      const buf = await resp.arrayBuffer();
-      pdfDoc     = await pdfjsLib.getDocument({ data: buf }).promise;
-      totalPages = pdfDoc.numPages;
-      updatePageNav();
-      hideLoading(); // balance loadBackground's showLoading; renderPdfPage adds its own
-      await renderPdfPage(1);
-    } else {
-      const blob   = await resp.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      await new Promise((resolve, reject) => {
-        fabric.Image.fromURL(blobUrl, img => {
-          if (!img) return reject(new Error('Image failed to load'));
-          canvas.setWidth(img.width || img.getScaledWidth());
-          canvas.setHeight(img.height || img.getScaledHeight());
-          canvas.setBackgroundImage(img, () => { canvas.renderAll(); resolve(); });
-        });
-      });
-      await loadAnnotations(1);
-    }
-  } catch (err) {
-    hideLoading();
-    setStatus('Failed to load file: ' + err.message, true);
-  }
+  const fc = new fabric.Canvas(canvasEl, {
+    selection:              true,
+    preserveObjectStacking: true,
+    enableRetinaScaling:    false,
+  });
+  setupCanvasEvents(fc);
+  pages.push({ fc, pageNum });
+  return fc;
 }
 
-// ── PDF rendering ─────────────────────────────────────────
+// ── Render one PDF page ────────────────────────────────────
 async function renderPdfPage(pageNum) {
   showLoading();
-  canvas.clear();
   try {
     const page     = await pdfDoc.getPage(pageNum);
     const viewport = page.getViewport({ scale: 1.5 });
@@ -690,47 +638,55 @@ async function renderPdfPage(pageNum) {
     off.height = viewport.height;
     await page.render({ canvasContext: off.getContext('2d'), viewport }).promise;
 
-    canvas.setWidth(viewport.width);
-    canvas.setHeight(viewport.height);
+    const fc = createPageCanvas(pageNum);
+    fc.setWidth(viewport.width);
+    fc.setHeight(viewport.height);
 
     fabric.Image.fromURL(off.toDataURL(), img => {
-      canvas.setBackgroundImage(img, async () => {
-        canvas.renderAll();
-        await loadAnnotations(pageNum);
+      fc.setBackgroundImage(img, async () => {
+        fc.renderAll();
+        await loadAnnotations(pageNum, fc);
       });
     });
   } catch (err) {
     hideLoading();
-    setStatus('Failed to render page: ' + err.message, true);
+    setStatus(`Failed to render page ${pageNum}: ` + err.message, true);
   }
 }
 
-// ── PDF page navigation ───────────────────────────────────
-<% if (isPdf) { %>
-function updatePageNav() {
-  document.getElementById('page-info').textContent = `Page ${currentPage} / ${totalPages}`;
-  document.getElementById('prev-page').disabled = (currentPage <= 1);
-  document.getElementById('next-page').disabled = (currentPage >= totalPages);
-}
+// ── Load all content ───────────────────────────────────────
+async function loadBackground() {
+  showLoading();
+  try {
+    const resp = await fetch(FILE_URL, { credentials: 'include' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
 
-async function navigatePage(delta) {
-  const newPage = currentPage + delta;
-  if (newPage < 1 || newPage > totalPages) return;
-  if (isDirty) {
-    const yes = confirm('You have unsaved annotations. Save before navigating?');
-    if (yes) {
-      try { await saveAnnotations(currentPage); isDirty = false; }
-      catch (err) { setStatus('Save failed: ' + err.message, true); return; }
+    if (IS_PDF) {
+      const buf = await resp.arrayBuffer();
+      pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
+      hideLoading(); // balance loadBackground's showLoading; each renderPdfPage adds its own
+      for (let p = 1; p <= pdfDoc.numPages; p++) {
+        await renderPdfPage(p);
+      }
+    } else {
+      const blob    = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      await new Promise((resolve, reject) => {
+        fabric.Image.fromURL(blobUrl, img => {
+          if (!img) return reject(new Error('Image failed to load'));
+          const fc = createPageCanvas(1);
+          fc.setWidth(img.width || img.getScaledWidth());
+          fc.setHeight(img.height || img.getScaledHeight());
+          fc.setBackgroundImage(img, () => { fc.renderAll(); resolve(); });
+        });
+      });
+      await loadAnnotations(1, pages[0].fc);
     }
+  } catch (err) {
+    hideLoading();
+    setStatus('Failed to load file: ' + err.message, true);
   }
-  currentPage = newPage;
-  updatePageNav();
-  await renderPdfPage(currentPage);
 }
-
-document.getElementById('prev-page').addEventListener('click', () => navigatePage(-1));
-document.getElementById('next-page').addEventListener('click', () => navigatePage(+1));
-<% } %>
 
 // ── Boot ──────────────────────────────────────────────────
 loadBackground();
