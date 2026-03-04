@@ -8,6 +8,7 @@ const db = require('../db');
 const config = require('../config');
 const { issueSessionCookie } = require('../middleware/auth');
 const { resetMailTransport } = require('../services/mail');
+const updater = require('../services/updater');
 
 function maskSecret(val) {
   if (!val) return '(not set)';
@@ -329,7 +330,6 @@ router.get('/settings', (req, res) => {
   res.render('admin/settings', {
     title:   'Settings',
     s,
-    // Infrastructure (restart-required) — read-only display
     infra: {
       PORT:       config.port,
       SMTP_PORT:  config.smtpPort,
@@ -338,7 +338,8 @@ router.get('/settings', (req, res) => {
       EMAIL_LOG:  config.emailLog  || '(not set)',
       USER_LOG:   config.userLog   || '(not set)',
     },
-    message: req.query.message || null,
+    message:     req.query.message || null,
+    updateState: updater.getState(),
   });
 });
 
@@ -417,7 +418,10 @@ router.post('/settings', (req, res) => {
     notify_email_submitter:         req.body.notify_email_submitter    === '1' ? 'true' : 'false',
     notify_email_status_change:     req.body.notify_email_status_change === '1' ? 'true' : 'false',
     enable_billable_hours:          req.body.enable_billable_hours     === '1' ? 'true' : 'false',
-    enable_location:                req.body.enable_location         === '1' ? 'true' : 'false',
+    enable_location:                req.body.enable_location           === '1' ? 'true' : 'false',
+    update_check_enabled:           req.body.update_check_enabled      === '1' ? 'true' : 'false',
+    update_repo_url:                trim('update_repo_url') || 'https://github.com/ryangriggs/tix.git',
+    update_check_interval_hours:    String(Math.max(1, flt('update_check_interval_hours', 24))),
   };
 
   for (const [key, val] of Object.entries(updates)) {
@@ -430,7 +434,42 @@ router.post('/settings', (req, res) => {
   // Reset cached mail transport so new credentials take effect
   resetMailTransport();
 
+  // Reset update timer with new settings (takes effect immediately)
+  updater.resetTimer(
+    updates.update_check_enabled === 'true',
+    updates.update_repo_url,
+    parseFloat(updates.update_check_interval_hours)
+  );
+
   res.redirect('/admin/settings?message=Settings+saved');
+});
+
+// ── Update endpoints ─────────────────────────────────────────
+
+// POST /admin/update/check — immediate check, returns JSON
+router.post('/update/check', async (req, res) => {
+  try {
+    const repoUrl = db.getSetting('update_repo_url') || 'https://github.com/ryangriggs/tix.git';
+    const state = await updater.checkForUpdates(repoUrl);
+    res.json(state);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /admin/update/ping — liveness probe used by the install polling loop
+router.get('/update/ping', (req, res) => res.json({ ok: true }));
+
+// POST /admin/update/install — git reset + npm install + process.exit(0)
+router.post('/update/install', (req, res) => {
+  res.json({ ok: true });
+  setTimeout(() => {
+    try {
+      updater.installUpdate();
+    } catch (err) {
+      console.error('[Updater] Install failed:', err.message);
+    }
+  }, 200);
 });
 
 module.exports = router;

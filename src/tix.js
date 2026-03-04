@@ -13,6 +13,7 @@ const sse = require('./services/sse');
 const { initDb, getTicketsForReminders, setTicketRemindersSent, getSetting, seedSetting, getAllSettings,
         getTicketsForInactivityReminders, setInactivityReminderSent } = require('./db');
 const { sendDueReminder, sendInactivityReminder } = require('./services/mail');
+const updater = require('./services/updater');
 
 const app = express();
 
@@ -48,6 +49,13 @@ app.use((req, res, next) => {
   }
   try { res.locals.siteName = getSetting('site_name') || config.siteName; } catch (_) { res.locals.siteName = config.siteName; }
   res.locals.annotationExts = new Set(config.annotationExtensions.split(',').map(e => e.trim().toLowerCase()).filter(Boolean));
+
+  // Update banner — shown to admins only; dismissed per-version via cookie
+  const _us = updater.getState();
+  res.locals.updateAvailable = _us.available;
+  res.locals.updateVersion   = _us.latestVersion;
+  const _dismissed = req.cookies && req.cookies.update_dismissed;
+  res.locals.showUpdateBanner = _us.available && _dismissed !== _us.latestVersion;
 
   res.locals.formatDate = function (ts) {
     if (!ts) return '—';
@@ -192,6 +200,9 @@ async function start() {
     annotation_extensions:          'pdf,jpg,jpeg,gif,png,svg',
     enable_billable_hours:          'true',
     enable_location:                'true',
+    update_check_enabled:           'false',
+    update_repo_url:                'https://github.com/ryangriggs/tix.git',
+    update_check_interval_hours:    '24',
   };
   for (const [key, val] of Object.entries(seedDefaults)) {
     if (val !== null && val !== undefined) seedSetting(key, val);
@@ -199,6 +210,13 @@ async function start() {
 
   // Apply DB settings on top of config (DB values win over .env).
   config.applySettings(getAllSettings());
+
+  // Start update check timer if enabled
+  updater.resetTimer(
+    getSetting('update_check_enabled') === 'true',
+    getSetting('update_repo_url') || 'https://github.com/ryangriggs/tix.git',
+    parseFloat(getSetting('update_check_interval_hours') || '24')
+  );
 
   const server = app.listen(config.port, '0.0.0.0', () => {
     console.log(`[HTTP] Listening on port ${config.port} (${process.env.NODE_ENV || 'development'})`);

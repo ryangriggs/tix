@@ -1,3 +1,14 @@
+<% if (user && user.role === 'admin' && showUpdateBanner) { %>
+<div class="impersonation-banner" id="update-banner" data-version="<%= updateVersion %>">
+  <span>Tix update available &mdash; v<%= updateVersion %></span>
+  <button type="button" class="btn btn-sm"
+          style="background:#fff;color:#92400e;border:1px solid #92400e;padding:.2rem .6rem;font-size:.8rem;margin-left:.75rem"
+          onclick="startInstall()">Install</button>
+  <button type="button"
+          style="background:none;border:none;cursor:pointer;color:#92400e;font-size:.8rem;margin-left:.75rem;text-decoration:underline"
+          onclick="dismissUpdateBanner()">hide</button>
+</div>
+<% } %>
 <% if (impersonatingAdminEmail) { %>
 <div class="impersonation-banner">
   <span>Viewing as <strong><%= user ? user.email : '' %></strong> &mdash; signed in as admin (<%= impersonatingAdminEmail %>)</span>
@@ -52,3 +63,41 @@
   });
 })();
 </script>
+
+<% if (user && user.role === 'admin') { %>
+<div id="install-overlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.8);z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:1rem">
+  <div style="width:44px;height:44px;border:4px solid rgba(255,255,255,.2);border-top-color:#60a5fa;border-radius:50%;animation:spin .75s linear infinite"></div>
+  <p style="color:#f1f5f9;font-size:1rem">Updating&hellip; please wait</p>
+  <p style="color:#94a3b8;font-size:.8rem">The app will reload automatically when the update is complete.</p>
+</div>
+<script>
+function dismissUpdateBanner() {
+  var el = document.getElementById('update-banner');
+  if (!el) return;
+  document.cookie = 'update_dismissed=' + encodeURIComponent(el.dataset.version) + ';path=/;max-age=2592000';
+  el.style.display = 'none';
+}
+
+function startInstall() {
+  if (!confirm('Install the update now?\n\nAny local file customisations will be overwritten. The app will restart automatically.')) return;
+  var overlay = document.getElementById('install-overlay');
+  overlay.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(15,23,42,.8);z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:1rem';
+  fetch('/admin/update/install', {
+    method: 'POST',
+    headers: { 'X-CSRF-Token': '<%= csrfToken %>' },
+    credentials: 'include',
+  });
+  // Poll until the server is back up, then redirect
+  setTimeout(pollUntilUp, 4000);
+}
+
+function pollUntilUp() {
+  fetch('/admin/update/ping', { credentials: 'include' })
+    .then(function(r) {
+      if (r.ok) { window.location.href = '/tickets'; }
+      else { setTimeout(pollUntilUp, 2000); }
+    })
+    .catch(function() { setTimeout(pollUntilUp, 2000); });
+}
+</script>
+<% } %>

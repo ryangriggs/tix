@@ -329,10 +329,75 @@
       </div>
     </div>
 
+    <!-- ── Updates ──────────────────────────────────────────── -->
+    <div class="card" style="margin-bottom:1.5rem" id="updates">
+      <h2 class="settings-section-title">Updates</h2>
+
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" name="update_check_enabled" value="1"
+                 <%= s.update_check_enabled === 'true' ? 'checked' : '' %>>
+          Automatically check for updates
+        </label>
+      </div>
+
+      <div class="form-group">
+        <label for="update_repo_url">Repository URL</label>
+        <input type="url" id="update_repo_url" name="update_repo_url"
+               value="<%= s.update_repo_url || 'https://github.com/ryangriggs/tix.git' %>"
+               class="form-input">
+        <p class="form-hint">GitHub repository to check for updates. Only the <code>main</code> branch is used.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="update_check_interval_hours">Check every (hours)</label>
+        <input type="number" id="update_check_interval_hours" name="update_check_interval_hours"
+               value="<%= s.update_check_interval_hours || '24' %>" min="1" step="1"
+               class="form-input form-input-sm" style="width:6rem">
+      </div>
+
+      <p class="form-hint" style="margin-top:.5rem">
+        <strong>Note:</strong> Installing an update will run <code>git reset --hard origin/main</code> followed by
+        <code>npm install</code>. Any local file customisations will be overwritten.
+      </p>
+    </div>
+
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">Save settings</button>
     </div>
   </form>
+
+  <!-- ── Update status (outside main form) ────────────────────── -->
+  <div class="card" style="margin-top:1.5rem">
+    <h2 class="settings-section-title">Update Status</h2>
+
+    <p style="font-size:.9rem;margin-bottom:1rem">
+      Running version: <strong>v<%= appVersion %></strong>
+      <% if (updateState.checkedAt) { %>
+        &mdash; Latest: <strong>v<%= updateState.latestVersion %></strong>
+        <% if (updateState.available) { %>
+          <span style="color:#d97706;font-weight:600"> — update available</span>
+        <% } else { %>
+          <span style="color:#16a34a"> — up to date</span>
+        <% } %>
+        <br><span style="font-size:.8rem;color:var(--text-muted)">Last checked: <%= new Date(updateState.checkedAt).toLocaleString() %></span>
+      <% } else { %>
+        <span style="color:var(--text-muted)"> — not yet checked</span>
+      <% } %>
+      <% if (updateState.error) { %>
+        <br><span style="color:#dc2626;font-size:.8rem">Check error: <%= updateState.error %></span>
+      <% } %>
+    </p>
+
+    <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
+      <button type="button" class="btn btn-secondary" id="check-now-btn" onclick="checkNow()">Check Now</button>
+      <% if (updateState.available) { %>
+        <button type="button" class="btn btn-primary" style="background:#d97706;border-color:#b45309"
+                onclick="startInstall()">Install Update (v<%= updateState.latestVersion %>)</button>
+      <% } %>
+      <span id="check-result" style="font-size:.85rem"></span>
+    </div>
+  </div>
 
   <!-- ── Infrastructure (read-only) ──────────────────────────── -->
   <div class="card" style="margin-top:1.5rem">
@@ -383,6 +448,39 @@ async function clearSWCache(btn) {
     for (const k of keys) await caches.delete(k);
   }
   window.location.reload();
+}
+</script>
+
+<script>
+async function checkNow() {
+  const btn = document.getElementById('check-now-btn');
+  const result = document.getElementById('check-result');
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+  result.textContent = '';
+  try {
+    const resp = await fetch('/admin/update/check', {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': '<%= csrfToken %>' },
+      credentials: 'include',
+    });
+    const data = await resp.json();
+    if (data.error) {
+      result.style.color = '#dc2626';
+      result.textContent = 'Error: ' + data.error;
+    } else if (data.available) {
+      result.style.color = '#d97706';
+      result.innerHTML = 'Update available: <strong>v' + data.latestVersion + '</strong> &mdash; <a href="#updates" onclick="startInstall();return false">Install now</a>';
+    } else {
+      result.style.color = '#16a34a';
+      result.textContent = 'Up to date (v' + data.latestVersion + ')';
+    }
+  } catch (err) {
+    result.style.color = '#dc2626';
+    result.textContent = 'Request failed';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Check Now';
 }
 </script>
 
