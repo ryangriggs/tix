@@ -552,13 +552,6 @@ router.post('/:id/comments/:commentId/delete', (req, res) => {
 
   const commentId = parseInt(req.params.commentId, 10);
 
-  // Delete any files attached to this comment
-  const atts = db.getAttachmentsByComment(commentId);
-  for (const att of atts) {
-    db.deleteAttachment(att.stored_name);
-    try { fs.unlinkSync(path.join(config.uploadsDir, att.stored_name)); } catch (_) {}
-  }
-
   db.deleteComment(commentId);
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
 
