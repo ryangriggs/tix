@@ -140,7 +140,7 @@
     /* ── Canvas area ──────────────────────────────────── */
     #canvas-wrap {
       flex: 1;
-      overflow: auto;
+      overflow: hidden;
       background: #475569;
     }
     #canvas-wrap.hand-mode  { cursor: grab; }
@@ -153,6 +153,7 @@
       padding: 1.5rem;
       gap: 1.5rem;
       transform-origin: 0 0;
+      will-change: transform;
     }
 
     .page-block {
@@ -187,7 +188,7 @@
       #toolbar, #loading-overlay { display: none !important; }
       body { background: #fff; overflow: visible; height: auto; }
       #canvas-wrap { overflow: visible; background: none; display: block; }
-      #pages-container { padding: 0; gap: 0; zoom: 1 !important; display: block; }
+      #pages-container { padding: 0; gap: 0; transform: none !important; display: block; }
       .page-block { page-break-after: always; margin: 0; }
       .page-block:last-child { page-break-after: auto; }
       .page-block .canvas-container { box-shadow: none !important; }
@@ -308,6 +309,8 @@ let isDirty      = false;
 let pdfDoc       = null;
 let loadCount    = 0;
 let zoomLevel    = 1.0;
+let translateX   = 0;
+let translateY   = 0;
 let handPan      = null;
 let handPinch    = null;
 
@@ -366,38 +369,40 @@ function getStroke() { return hexToRgba(strokeHex, strokeOpacity); }
 function getFill()   { return hexToRgba(fillHex,   fillOpacity);   }
 
 // ── Hand / pan / zoom mode ─────────────────────────────────
-function applyZoom() {
-  pagesContainer.style.zoom = zoomLevel;
+function applyTransform() {
+  pagesContainer.style.transform =
+    `translate(${translateX}px,${translateY}px) scale(${zoomLevel})`;
 }
 
+// Zoom around a point (cx,cy) in canvas-wrap-relative viewport coordinates.
 function zoomAround(newZoom, cx, cy) {
-  const sl = canvasWrap.scrollLeft, st = canvasWrap.scrollTop;
   const ratio = newZoom / zoomLevel;
-  zoomLevel = newZoom;
-  applyZoom();
-  canvasWrap.scrollLeft = (sl + cx) * ratio - cx;
-  canvasWrap.scrollTop  = (st + cy) * ratio - cy;
+  translateX   = cx - (cx - translateX) * ratio;
+  translateY   = cy - (cy - translateY) * ratio;
+  zoomLevel    = newZoom;
+  applyTransform();
 }
 
 function onTouchStartHand(e) {
   e.preventDefault();
   if (e.touches.length === 1) {
-    handPan = { x: e.touches[0].clientX, y: e.touches[0].clientY,
-                scrollLeft: canvasWrap.scrollLeft, scrollTop: canvasWrap.scrollTop };
+    handPan   = { x: e.touches[0].clientX, y: e.touches[0].clientY,
+                  tx: translateX, ty: translateY };
     handPinch = null;
   } else if (e.touches.length >= 2) {
     const t1 = e.touches[0], t2 = e.touches[1];
     handPinch = { startDist: Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY),
                   startZoom: zoomLevel };
-    handPan = null;
+    handPan   = null;
   }
 }
 
 function onTouchMoveHand(e) {
   e.preventDefault();
   if (e.touches.length === 1 && handPan) {
-    canvasWrap.scrollLeft = handPan.scrollLeft - (e.touches[0].clientX - handPan.x);
-    canvasWrap.scrollTop  = handPan.scrollTop  - (e.touches[0].clientY - handPan.y);
+    translateX = handPan.tx + (e.touches[0].clientX - handPan.x);
+    translateY = handPan.ty + (e.touches[0].clientY - handPan.y);
+    applyTransform();
   } else if (e.touches.length >= 2 && handPinch) {
     const t1 = e.touches[0], t2 = e.touches[1];
     const dist    = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
@@ -411,21 +416,21 @@ function onTouchMoveHand(e) {
 
 function onTouchEndHand(e) {
   if (e.touches.length < 2) handPinch = null;
-  if (e.touches.length === 0) handPan = null;
+  if (e.touches.length === 0) handPan  = null;
 }
 
 function onMouseDownHand(e) {
   if (e.button !== 0) return;
-  handPan = { x: e.clientX, y: e.clientY,
-               scrollLeft: canvasWrap.scrollLeft, scrollTop: canvasWrap.scrollTop };
+  handPan = { x: e.clientX, y: e.clientY, tx: translateX, ty: translateY };
   canvasWrap.classList.add('hand-grab');
   e.preventDefault();
 }
 
 function onMouseMoveHand(e) {
   if (!handPan) return;
-  canvasWrap.scrollLeft = handPan.scrollLeft - (e.clientX - handPan.x);
-  canvasWrap.scrollTop  = handPan.scrollTop  - (e.clientY - handPan.y);
+  translateX = handPan.tx + (e.clientX - handPan.x);
+  translateY = handPan.ty + (e.clientY - handPan.y);
+  applyTransform();
 }
 
 function onMouseUpHand() {
@@ -436,8 +441,8 @@ function onMouseUpHand() {
 function onWheelHand(e) {
   if (!e.ctrlKey) return;
   e.preventDefault();
-  const rect    = canvasWrap.getBoundingClientRect();
-  const delta   = e.deltaY > 0 ? 0.9 : 1.1;
+  const rect  = canvasWrap.getBoundingClientRect();
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
   zoomAround(Math.min(4, Math.max(0.25, zoomLevel * delta)),
     e.clientX - rect.left, e.clientY - rect.top);
 }
