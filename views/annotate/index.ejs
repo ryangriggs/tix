@@ -210,11 +210,11 @@
 
   <!-- Row 1: header -->
   <div class="tb-row tb-row-header">
-    <a href="/tickets/<%= ticket.id %>" class="tb-back" target="_self">
+    <button class="tb-back" style="background:none;border:none;cursor:pointer;padding:0" onclick="window.close()">
       ← #<%= formatTicketId(ticket.id) %>
-    </a>
+    </button>
     <span class="tb-filename"><%= attachment.original_name %></span>
-    <button id="save-btn" class="tb-btn tb-btn-primary">Save</button>
+    <button id="save-btn" class="tb-btn tb-btn-primary">Save and close</button>
     <button id="print-btn" class="tb-btn">Print</button>
   </div>
 
@@ -587,11 +587,10 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   try {
     await saveAnnotations(currentPage);
     isDirty = false;
-    setStatus('Saved.');
+    window.close();
   } catch (err) {
     setStatus('Save failed: ' + err.message, true);
-  } finally {
-    btn.disabled = false; btn.textContent = 'Save';
+    btn.disabled = false; btn.textContent = 'Save and close';
   }
 });
 
@@ -615,10 +614,12 @@ async function loadAnnotations(page) {
     const scaleX = data.canvasWidth  ? canvas.getWidth()  / data.canvasWidth  : 1;
     const scaleY = data.canvasHeight ? canvas.getHeight() / data.canvasHeight : 1;
 
-    // Don't restore background — we set it ourselves
+    // Save background ref — loadFromJSON calls canvas.clear() internally
+    const savedBg = canvas.backgroundImage;
     const jsonToLoad = { ...data, backgroundImage: null };
 
     canvas.loadFromJSON(jsonToLoad, () => {
+      if (savedBg) canvas.backgroundImage = savedBg;
       if (scaleX !== 1 || scaleY !== 1) {
         canvas.forEachObject(obj => {
           obj.scaleX = (obj.scaleX || 1) * scaleX;
