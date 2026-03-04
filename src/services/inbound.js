@@ -365,6 +365,7 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
     const email = (addr.address || '').toLowerCase();
     if (!email) continue;
     if (isTicketSystemAddress(email)) continue;  // skip ourselves
+    if (config.ticketSilentEmail && email === config.ticketSilentEmail.toLowerCase()) continue; // skip silent address
     if (email === fromEmail) continue;            // skip sender (already submitter)
     const u = db.findOrCreateUser(email, addr.name || null);
     if (u.blocked_at) continue;
