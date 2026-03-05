@@ -564,4 +564,83 @@ router.post('/update/install', async (req, res) => {
   }, 200);
 });
 
+// ── Server stats ─────────────────────────────────────────────
+
+function dirSizeBytes(dirPath) {
+  let total = 0;
+  try {
+    for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === '.git') continue;
+      const full = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) total += dirSizeBytes(full);
+      else try { total += fs.statSync(full).size; } catch (_) {}
+    }
+  } catch (_) {}
+  return total;
+}
+
+function toMb(bytes) { return Math.round(bytes / 1024 / 1024 * 10) / 10; }
+
+// GET /admin/stats — on-demand server statistics
+router.get('/stats', (req, res) => {
+  // Ticket counts
+  const tickets = db.getTicketCountsByStatus();
+
+  // Attachment count + storage
+  const attCount = db.getAttachmentCount();
+  let attSizeMb = 0;
+  if (fs.existsSync(config.uploadsDir)) {
+    let total = 0;
+    for (const f of fs.readdirSync(config.uploadsDir)) {
+      try { total += fs.statSync(path.join(config.uploadsDir, f)).size; } catch (_) {}
+    }
+    attSizeMb = toMb(total);
+  }
+
+  // Database size
+  let dbSizeMb = 0;
+  try { dbSizeMb = toMb(fs.statSync(path.join(config.dataDir, 'db.sqlite')).size); } catch (_) {}
+
+  // Log files total size
+  let logBytes = 0;
+  for (const p of [config.emailLog, config.userLog, config.auditLog].filter(Boolean)) {
+    try { logBytes += fs.statSync(p).size; } catch (_) {}
+  }
+  const logSizeMb = toMb(logBytes);
+
+  // App directory size (excluding node_modules and .git)
+  const appSizeMb = toMb(dirSizeBytes(process.cwd()));
+
+  // Email counts from log (timestamps are UTC ISO)
+  let emailsSentToday = null;
+  let emailsSentThisMonth = null;
+  if (config.emailLog) {
+    try {
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10);   // YYYY-MM-DD UTC
+      const monthStr = now.toISOString().slice(0, 7);    // YYYY-MM UTC
+      let today = 0, month = 0;
+      const lines = fs.readFileSync(config.emailLog, 'utf8').split('\n');
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const ts = line.split(' | ')[0] || '';
+        if (line.includes(' | [ERROR] ')) continue;  // skip errors
+        if (ts.startsWith(monthStr)) { month++; if (ts.startsWith(todayStr)) today++; }
+      }
+      emailsSentToday = today;
+      emailsSentThisMonth = month;
+    } catch (_) {}
+  }
+
+  res.json({
+    tickets,
+    attachments: { count: attCount, sizeMb: attSizeMb },
+    dbSizeMb,
+    logSizeMb,
+    appSizeMb,
+    emailsSentToday,
+    emailsSentThisMonth,
+  });
+});
+
 module.exports = router;

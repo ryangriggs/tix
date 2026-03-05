@@ -548,6 +548,69 @@
     </table>
   </div>
 
+  <!-- ── Server Stats ─────────────────────────────────────── -->
+  <div class="card" style="margin-top:1.5rem">
+    <h2 class="settings-section-title">Server Stats</h2>
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap">
+      <button type="button" class="btn btn-secondary btn-sm" id="stats-load-btn" onclick="loadStats()">Load Stats</button>
+      <span id="stats-load-status" style="font-size:.85rem;color:var(--text-muted)"></span>
+    </div>
+    <div id="stats-content" style="display:none">
+      <table style="width:100%;border-collapse:collapse" id="stats-table"></table>
+    </div>
+  </div>
+
+  <script>
+  async function loadStats() {
+    var btn    = document.getElementById('stats-load-btn');
+    var status = document.getElementById('stats-load-status');
+    var content = document.getElementById('stats-content');
+    var table  = document.getElementById('stats-table');
+    btn.disabled = true;
+    btn.textContent = 'Loading\u2026';
+    status.textContent = '';
+    try {
+      var resp = await fetch('/admin/stats', { credentials: 'include' });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      var d = await resp.json();
+
+      var rows = [
+        ['Tickets \u2014 New',     d.tickets.new],
+        ['Tickets \u2014 Open',    d.tickets.open],
+        ['Tickets \u2014 On Hold', d.tickets.on_hold],
+        ['Tickets \u2014 Closed',  d.tickets.closed],
+        ['Tickets \u2014 Total',   d.tickets.total],
+        null,
+        ['Attachments',          d.attachments.count + ' files'],
+        ['Attachment storage',   d.attachments.sizeMb + ' MB'],
+        ['Database size',        d.dbSizeMb + ' MB'],
+        ['Log files size',       d.logSizeMb + ' MB'],
+        ['App directory size',   d.appSizeMb + ' MB (excl. node_modules)'],
+        null,
+        ['Emails sent today',        d.emailsSentToday !== null ? d.emailsSentToday : '\u2014 (no log configured)'],
+        ['Emails sent this month',   d.emailsSentThisMonth !== null ? d.emailsSentThisMonth : '\u2014 (no log configured)'],
+      ];
+
+      var html = '';
+      for (var r of rows) {
+        if (!r) { html += '<tr><td colspan="2" style="padding:.4rem 0"></td></tr>'; continue; }
+        html += '<tr style="border-bottom:1px solid var(--border)">'
+          + '<td style="padding:.35rem .5rem .35rem 0;font-size:.85rem;color:var(--text-muted);white-space:nowrap;width:50%">' + r[0] + '</td>'
+          + '<td style="padding:.35rem 0;font-size:.85rem">' + r[1] + '</td>'
+          + '</tr>';
+      }
+      table.innerHTML = html;
+      content.style.display = '';
+      btn.textContent = 'Refresh';
+    } catch (err) {
+      status.textContent = 'Failed: ' + err.message;
+    } finally {
+      btn.disabled = false;
+      if (!status.textContent) btn.textContent = 'Refresh';
+    }
+  }
+  </script>
+
   <!-- ── Browser cache ─────────────────────────────────────── -->
   <div class="card" style="margin-top:1.5rem">
     <h2 class="settings-section-title">Browser Cache</h2>

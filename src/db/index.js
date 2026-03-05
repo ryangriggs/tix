@@ -998,6 +998,18 @@ function getTicketsDueSoon(withinHours = 24) {
   `).all(now, cutoff);
 }
 
+function getTicketCountsByStatus() {
+  const rows = prepare('SELECT status, COUNT(*) AS count FROM tickets GROUP BY status').all();
+  const total = prepare('SELECT COUNT(*) AS count FROM tickets').get().count;
+  const byStatus = { new: 0, open: 0, on_hold: 0, closed: 0 };
+  for (const r of rows) byStatus[r.status] = r.count;
+  return { ...byStatus, total };
+}
+
+function getAttachmentCount() {
+  return prepare('SELECT COUNT(*) AS count FROM attachments').get().count || 0;
+}
+
 function getBillingReport(fromTs, toTs) {
   return prepare(`
     SELECT t.id, t.subject, t.created_at, t.status,
@@ -1078,7 +1090,7 @@ module.exports = {
   getOpenTicketsForInactivityCheck, setInactivityReminderSent,
   getTicketByReplyToken, disableAllPartyNotifications, disablePartyNotifications, togglePartyNotifications,
   // Reports
-  getBillingReport,
+  getBillingReport, getTicketCountsByStatus, getAttachmentCount,
   // Organizations
   findOrCreateOrganization, getAllOrganizations, getOrganizationsByIds, searchOrganizations,
   renameOrganization, deleteOrganization, getOrganizationById,

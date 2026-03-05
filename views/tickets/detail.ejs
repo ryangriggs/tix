@@ -93,9 +93,9 @@
           <div class="form-actions" style="flex-wrap:wrap;gap:.5rem">
             <% if (canManage) { %>
               <select name="status_change" class="form-select form-select-sm" style="width:auto">
-                <option value="">Keep status</option>
+                <option value=""        <%= ticket.status!=='closed'  ? 'selected':'' %>>Keep status</option>
                 <option value="new"     <%= ticket.status==='new'     ? 'disabled':'' %>>New</option>
-                <option value="open"    <%= ticket.status==='open'    ? 'disabled':'' %>>Open</option>
+                <option value="open"    <%= ticket.status==='closed'  ? 'selected':'' %> <%= ticket.status==='open' ? 'disabled':'' %>>Open</option>
                 <option value="on_hold" <%= ticket.status==='on_hold' ? 'disabled':'' %>>On Hold</option>
                 <% if (canClose) { %>
                 <option value="closed"  <%= ticket.status==='closed'  ? 'disabled':'' %>>Closed</option>
