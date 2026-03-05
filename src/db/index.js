@@ -25,6 +25,10 @@ function save() {
   fs.writeFileSync(DB_PATH, Buffer.from(data));
 }
 
+function getDbBuffer() {
+  return Buffer.from(_db.export());
+}
+
 // Returns an object with .get(), .all(), .run() — same as better-sqlite3
 function prepare(sql) {
   return {
@@ -1071,7 +1075,7 @@ module.exports = {
   recordEmailMessage, findTicketByMessageId, findTicketByReplyToken,
   // Settings
   getDistinctOwners,
-  getSetting, setSetting, seedSetting, getAllSettings, getUserPrefs, setUserPrefs,
+  getSetting, setSetting, seedSetting, getAllSettings, getUserPrefs, setUserPrefs, getDbBuffer,
   // Reminders
   getTicketsDueSoon, getTicketsForReminders, setTicketRemindersSent,
   getTicketsForInactivityReminders, setInactivityReminderSent,

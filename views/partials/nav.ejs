@@ -1,3 +1,18 @@
+<% if (showBackupDirMissingBanner) { %>
+<div class="impersonation-banner" style="background:#fee2e2;color:#991b1b;border-bottom:1px solid #fca5a5">
+  Backup directory does not exist. Automatic backups are not being made.
+</div>
+<% } %>
+<% if (showBackupFailedBanner) { %>
+<div class="impersonation-banner" id="backup-failed-banner"
+     style="background:#fee2e2;color:#991b1b;border-bottom:1px solid #fca5a5"
+     data-failed-at="<%= backupFailedAt %>">
+  Last automatic backup failed.
+  <button type="button"
+          style="background:none;border:none;cursor:pointer;color:#991b1b;font-size:.8rem;margin-left:.75rem;text-decoration:underline"
+          onclick="dismissBackupFailedBanner()">hide</button>
+</div>
+<% } %>
 <% if (user && user.role === 'admin' && showUpdateBanner) { %>
 <div class="impersonation-banner" id="update-banner" data-version="<%= updateVersion %>">
   <span>Tix update available &mdash; v<%= updateVersion %></span>
@@ -79,16 +94,32 @@ function dismissUpdateBanner() {
 }
 
 function startInstall() {
-  if (!confirm('Install the update now?\n\nAny local file customisations will be overwritten. The app will restart automatically.')) return;
+  if (!confirm('Install the update now?\n\nThe database will be backed up first. The app will restart automatically.')) return;
   var overlay = document.getElementById('install-overlay');
   overlay.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(15,23,42,.8);z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:1rem';
   fetch('/admin/update/install', {
     method: 'POST',
     headers: { 'X-CSRF-Token': '<%= csrfToken %>' },
     credentials: 'include',
+  }).then(function(r) {
+    if (!r.ok) {
+      return r.json().then(function(d) {
+        overlay.style.display = 'none';
+        alert('Update blocked: ' + (d.error || 'Backup failed before update.'));
+      });
+    }
+    setTimeout(pollUntilUp, 4000);
+  }).catch(function() {
+    overlay.style.display = 'none';
+    alert('Update request failed. Please try again.');
   });
-  // Poll until the server is back up, then redirect
-  setTimeout(pollUntilUp, 4000);
+}
+
+function dismissBackupFailedBanner() {
+  var el = document.getElementById('backup-failed-banner');
+  if (!el) return;
+  document.cookie = 'backup_failed_dismissed=' + encodeURIComponent(el.dataset.failedAt) + ';path=/;max-age=2592000';
+  el.style.display = 'none';
 }
 
 function pollUntilUp() {

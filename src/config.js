@@ -41,6 +41,7 @@ const config = {
   appUrl: (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, ''),
 
   dataDir: process.env.DATA_DIR || '/app/data',
+  backupDir: process.env.BACKUP_DIR || '',
   uploadsDir:     process.env.UPLOADS_DIR     || '/app/data/uploads',
   annotationsDir: process.env.ANNOTATIONS_DIR || '/app/data/annotations',
   annotationExtensions: 'pdf,jpg,jpeg,gif,png,svg',

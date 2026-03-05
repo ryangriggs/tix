@@ -2,6 +2,7 @@
 
 const express = require('express');
 const fs      = require('fs');
+const path    = require('path');
 const router  = express.Router();
 
 const db = require('../db');
@@ -9,6 +10,7 @@ const config = require('../config');
 const { issueSessionCookie } = require('../middleware/auth');
 const { resetMailTransport } = require('../services/mail');
 const updater = require('../services/updater');
+const backup  = require('../services/backup');
 const audit   = require('../services/audit');
 
 function maskSecret(val) {
@@ -371,10 +373,23 @@ router.get('/settings', (req, res) => {
       SMTP_PORT:  config.smtpPort,
       DATA_DIR:   config.dataDir,
       UPLOADS_DIR: config.uploadsDir,
+      BACKUP_DIR: config.backupDir || '(not set)',
       EMAIL_LOG:  config.emailLog  || '(not set)',
       USER_LOG:   config.userLog   || '(not set)',
       AUDIT_LOG:  config.auditLog  || '(not set)',
     },
+    backupStatus: (() => {
+      let dbSizeMb = 0;
+      try { dbSizeMb = Math.round(fs.statSync(path.join(config.dataDir, 'db.sqlite')).size / 1024 / 1024 * 10) / 10; } catch (_) {}
+      return {
+        dbSizeMb,
+        dirSizeMb:   backup.getBackupDirSizeMb(),
+        recentFiles: backup.getRecentBackups(5),
+        lastBackupAt: db.getSetting('last_backup_at') || null,
+        backupDir:   config.backupDir || '',
+        dirExists:   !!(config.backupDir && fs.existsSync(config.backupDir)),
+      };
+    })(),
     message:     req.query.message || null,
     updateState: updater.getState(),
   });
@@ -459,6 +474,8 @@ router.post('/settings', (req, res) => {
     update_check_enabled:           req.body.update_check_enabled      === '1' ? 'true' : 'false',
     update_repo_url:                trim('update_repo_url') || 'https://github.com/ryangriggs/tix.git',
     update_check_interval_hours:    String(Math.max(1, flt('update_check_interval_hours', 24))),
+    backup_frequency_hours:         String(Math.max(0, int('backup_frequency_hours', 0))),
+    backup_retention_days:          String(Math.max(0, int('backup_retention_days', 30))),
   };
 
   for (const [key, val] of Object.entries(updates)) {
@@ -482,6 +499,33 @@ router.post('/settings', (req, res) => {
   res.redirect('/admin/settings?message=Settings+saved');
 });
 
+// ── Backup endpoints ─────────────────────────────────────────
+
+// POST /admin/backup/now
+router.post('/backup/now', async (req, res) => {
+  try {
+    const { filename } = await backup.createBackup();
+    db.setSetting('last_backup_at',     String(Math.floor(Date.now() / 1000)));
+    db.setSetting('last_backup_failed', 'false');
+    const retDays = parseInt(db.getSetting('backup_retention_days') || '0', 10);
+    if (retDays > 0) backup.purgeOldBackups(retDays);
+    audit.log(req, 'created manual backup');
+    res.json({ ok: true, filename });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /admin/backup/download/:filename
+router.get('/backup/download/:filename', (req, res) => {
+  const filename = req.params.filename;
+  if (!/^backup-[\d-]+\.zip$/.test(filename)) return res.status(400).send('Invalid filename');
+  if (!config.backupDir) return res.status(404).send('Backup directory not configured');
+  const filePath = path.join(config.backupDir, filename);
+  if (!fs.existsSync(filePath)) return res.status(404).send('File not found');
+  res.download(filePath, filename);
+});
+
 // ── Update endpoints ─────────────────────────────────────────
 
 // POST /admin/update/check — immediate check, returns JSON
@@ -499,14 +543,20 @@ router.post('/update/check', async (req, res) => {
 router.get('/update/ping', (req, res) => res.json({ ok: true }));
 
 // POST /admin/update/install — git reset + npm install + process.exit(0)
-router.post('/update/install', (req, res) => {
+router.post('/update/install', async (req, res) => {
+  if (config.backupDir) {
+    try {
+      await backup.createBackup();
+      db.setSetting('last_backup_at',     String(Math.floor(Date.now() / 1000)));
+      db.setSetting('last_backup_failed', 'false');
+    } catch (err) {
+      return res.status(500).json({ error: 'Pre-update backup failed: ' + err.message });
+    }
+  }
   res.json({ ok: true });
   setTimeout(() => {
-    try {
-      updater.installUpdate();
-    } catch (err) {
-      console.error('[Updater] Install failed:', err.message);
-    }
+    try { updater.installUpdate(); }
+    catch (err) { console.error('[Updater] Install failed:', err.message); }
   }, 200);
 });
 

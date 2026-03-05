@@ -362,6 +362,24 @@
       </p>
     </div>
 
+    <!-- ── Backups ──────────────────────────────────────────── -->
+    <div class="card" style="margin-bottom:1.5rem">
+      <h2 class="settings-section-title">Backups</h2>
+      <div class="form-group">
+        <label class="form-label">Backup Frequency (hours, 0 = disabled)</label>
+        <input type="number" name="backup_frequency_hours" min="0"
+               class="form-input" style="width:8rem"
+               value="<%= s.backup_frequency_hours || '0' %>">
+        <p class="form-hint">Set BACKUP_DIR in .env to enable. Backups are stored as .zip files.</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Retention Period (days, 0 = keep forever)</label>
+        <input type="number" name="backup_retention_days" min="0"
+               class="form-input" style="width:8rem"
+               value="<%= s.backup_retention_days || '30' %>">
+      </div>
+    </div>
+
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">Save settings</button>
     </div>
@@ -398,6 +416,87 @@
       <span id="check-result" style="font-size:.85rem"></span>
     </div>
   </div>
+
+  <!-- ── Backup Status (outside main form) ───────────────────── -->
+  <div class="card" style="margin-top:1.5rem">
+    <h2 class="settings-section-title">Backup Status</h2>
+
+    <table style="border-collapse:collapse;margin-bottom:1rem;width:100%">
+      <tr>
+        <td style="color:var(--text-muted);font-size:.875rem;padding:.3rem .5rem;white-space:nowrap">Database size</td>
+        <td style="font-size:.875rem;padding:.3rem .5rem"><%= backupStatus.dbSizeMb %> MB</td>
+      </tr>
+      <tr>
+        <td style="color:var(--text-muted);font-size:.875rem;padding:.3rem .5rem;white-space:nowrap">Backup directory</td>
+        <td style="font-size:.875rem;padding:.3rem .5rem">
+          <% if (!backupStatus.backupDir) { %>
+            <span style="color:var(--text-muted)">(not configured &mdash; set BACKUP_DIR in .env)</span>
+          <% } else if (!backupStatus.dirExists) { %>
+            <span style="color:#b91c1c"><%= backupStatus.backupDir %> &mdash; does not exist</span>
+          <% } else { %>
+            <%= backupStatus.backupDir %> &mdash; <%= backupStatus.dirSizeMb %> MB used
+          <% } %>
+        </td>
+      </tr>
+      <tr>
+        <td style="color:var(--text-muted);font-size:.875rem;padding:.3rem .5rem;white-space:nowrap">Last backup</td>
+        <td style="font-size:.875rem;padding:.3rem .5rem">
+          <%= backupStatus.lastBackupAt ? formatDateFull(parseInt(backupStatus.lastBackupAt)) : 'Never' %>
+        </td>
+      </tr>
+    </table>
+
+    <% if (backupStatus.recentFiles.length) { %>
+    <div style="margin-bottom:1rem">
+      <div style="font-size:.875rem;font-weight:500;margin-bottom:.4rem">Recent backups</div>
+      <% for (const f of backupStatus.recentFiles) { %>
+        <div style="font-size:.85rem;margin:.2rem 0">
+          <a href="/admin/backup/download/<%= encodeURIComponent(f) %>"><%= f %></a>
+        </div>
+      <% } %>
+    </div>
+    <% } %>
+
+    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+      <button id="backup-now-btn" type="button" class="btn btn-secondary btn-sm">Backup Now</button>
+      <span id="backup-now-status" style="font-size:.875rem"></span>
+    </div>
+  </div>
+
+  <script>
+  (function() {
+    var btn    = document.getElementById('backup-now-btn');
+    var status = document.getElementById('backup-now-status');
+    if (!btn) return;
+    btn.addEventListener('click', async function() {
+      btn.disabled = true;
+      btn.textContent = 'Backing up\u2026';
+      status.textContent = '';
+      status.style.color = '';
+      try {
+        var resp = await fetch('/admin/backup/now', {
+          method: 'POST',
+          headers: { 'X-CSRF-Token': '<%= csrfToken %>' },
+          credentials: 'include',
+        });
+        var data = await resp.json();
+        if (data.ok) {
+          status.textContent = 'Created: ' + data.filename;
+          status.style.color = 'var(--success, #15803d)';
+        } else {
+          status.textContent = 'Failed: ' + (data.error || 'Unknown error');
+          status.style.color = '#b91c1c';
+        }
+      } catch (err) {
+        status.textContent = 'Failed: ' + err.message;
+        status.style.color = '#b91c1c';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Backup Now';
+      }
+    });
+  })();
+  </script>
 
   <!-- ── Infrastructure (read-only) ──────────────────────────── -->
   <div class="card" style="margin-top:1.5rem">

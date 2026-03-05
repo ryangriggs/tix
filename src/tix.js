@@ -10,10 +10,11 @@ const config = require('./config');
 const { requireAuth, requireAdmin, optionalAuth, verifyCsrf } = require('./middleware/auth');
 const { startSMTPServer } = require('./smtp');
 const sse = require('./services/sse');
-const { initDb, getTicketsForReminders, setTicketRemindersSent, getSetting, seedSetting, getAllSettings,
+const { initDb, getTicketsForReminders, setTicketRemindersSent, getSetting, setSetting, seedSetting, getAllSettings,
         getTicketsForInactivityReminders, setInactivityReminderSent } = require('./db');
 const { sendDueReminder, sendInactivityReminder } = require('./services/mail');
 const updater = require('./services/updater');
+const backup  = require('./services/backup');
 
 const app = express();
 
@@ -56,6 +57,24 @@ app.use((req, res, next) => {
   res.locals.updateVersion   = _us.latestVersion;
   const _dismissed = req.cookies && req.cookies.update_dismissed;
   res.locals.showUpdateBanner = _us.available && _dismissed !== _us.latestVersion;
+
+  // Backup banners — shown to all authenticated users
+  try {
+    const backupFreq = parseInt(getSetting('backup_frequency_hours') || '0', 10);
+    const bDir = config.backupDir;
+    res.locals.showBackupDirMissingBanner =
+      backupFreq > 0 && !!bDir && !fs.existsSync(bDir);
+
+    const lastFailed  = getSetting('last_backup_failed') === 'true';
+    const failedAt    = getSetting('last_backup_failed_at') || '';
+    const dismissedAt = req.cookies && req.cookies.backup_failed_dismissed;
+    res.locals.showBackupFailedBanner = lastFailed && dismissedAt !== failedAt;
+    res.locals.backupFailedAt = failedAt;
+  } catch (_) {
+    res.locals.showBackupDirMissingBanner = false;
+    res.locals.showBackupFailedBanner = false;
+    res.locals.backupFailedAt = '';
+  }
 
   res.locals.formatDate = function (ts) {
     if (!ts) return '—';
@@ -203,6 +222,8 @@ async function start() {
     update_check_enabled:           'false',
     update_repo_url:                'https://github.com/ryangriggs/tix.git',
     update_check_interval_hours:    '24',
+    backup_frequency_hours:         '0',
+    backup_retention_days:          '30',
   };
   for (const [key, val] of Object.entries(seedDefaults)) {
     if (val !== null && val !== undefined) seedSetting(key, val);
@@ -293,6 +314,28 @@ async function start() {
       console.error('[Inactivity Reminders] Error:', err);
     }
   }, 60 * 60 * 1000);
+
+  // Backup cron — check every minute
+  setInterval(async () => {
+    try {
+      const hours = parseInt(getSetting('backup_frequency_hours') || '0', 10);
+      if (!hours) return;
+      const lastAt = parseInt(getSetting('last_backup_at') || '0', 10);
+      if (Math.floor(Date.now() / 1000) < lastAt + hours * 3600) return;
+
+      await backup.createBackup();
+      setSetting('last_backup_at',     String(Math.floor(Date.now() / 1000)));
+      setSetting('last_backup_failed', 'false');
+
+      const retDays = parseInt(getSetting('backup_retention_days') || '0', 10);
+      if (retDays > 0) backup.purgeOldBackups(retDays);
+      console.log('[Backup] Auto-backup completed');
+    } catch (err) {
+      console.error('[Backup] Auto-backup failed:', err.message);
+      setSetting('last_backup_failed',    'true');
+      setSetting('last_backup_failed_at', String(Date.now()));
+    }
+  }, 60_000);
 }
 
 start().catch(err => {
