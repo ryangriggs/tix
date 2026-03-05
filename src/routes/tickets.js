@@ -476,7 +476,6 @@ router.get('/:id', (req, res) => {
     enableLocation:      config.enableLocation,
     canClose:  canCloseTicket(req.user),
     canReopen: canReopenTicket(req.user),
-    inactivityReminderDays: ticket.inactivity_reminder_days || null,
     ticketUrl:        `${config.appUrl}/tickets/${ticket.id}`,
     ticketReplyEmail: `${_localPart}+${ticket.reply_token}@${_domain}`,
   });
@@ -685,18 +684,6 @@ router.post('/:id/organization', (req, res) => {
   res.redirect(`/tickets/${ticket.id}`);
 });
 
-// POST /tickets/:id/reminder — set inactivity reminder (admin/tech only)
-router.post('/:id/reminder', (req, res) => {
-  const ticket = db.getTicketById(req.params.id);
-  if (!ticket) return res.status(404).json({ error: 'Not found' });
-  if (!['admin', 'technician'].includes(req.user.role)) return res.status(403).json({ error: 'Forbidden' });
-
-  const raw  = parseInt(req.body.days, 10);
-  const days = (!isNaN(raw) && raw >= 1 && raw <= 365) ? raw : null;
-  db.updateTicket(ticket.id, { inactivity_reminder_days: days });
-  audit.log(req, days ? `changed inactivity reminder to ${days} days` : 'cleared inactivity reminder', ticket.id);
-  return res.json({ ok: true, days });
-});
 
 // POST /tickets/:id/parties — add a party
 router.post('/:id/parties', async (req, res) => {

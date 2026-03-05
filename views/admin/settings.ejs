@@ -362,6 +362,42 @@
       </p>
     </div>
 
+    <!-- ── Inactivity Reminders ─────────────────────────────── -->
+    <div class="card" style="margin-bottom:1.5rem">
+      <h2 class="settings-section-title">Inactivity Reminders</h2>
+      <p class="form-hint" style="margin-bottom:1rem">
+        Send a reminder email to ticket owners when an open ticket has had no activity for the specified time.
+        Set to 0 to disable for that priority. Reminders repeat each time the period elapses until the ticket is updated or closed.
+        Only tickets with <strong>open</strong> status and at least one <strong>owner</strong> are notified.
+      </p>
+      <div class="form-row" style="gap:1.5rem;flex-wrap:wrap">
+        <div class="form-group" style="flex:0 0 auto">
+          <label class="form-label">Urgent (hours, 0 = off)</label>
+          <input type="number" name="inactivity_hours_urgent" min="0" step="0.5"
+                 class="form-input" style="width:8rem"
+                 value="<%= s.inactivity_hours_urgent || '0' %>">
+        </div>
+        <div class="form-group" style="flex:0 0 auto">
+          <label class="form-label">High (hours, 0 = off)</label>
+          <input type="number" name="inactivity_hours_high" min="0" step="0.5"
+                 class="form-input" style="width:8rem"
+                 value="<%= s.inactivity_hours_high || '0' %>">
+        </div>
+        <div class="form-group" style="flex:0 0 auto">
+          <label class="form-label">Medium (hours, 0 = off)</label>
+          <input type="number" name="inactivity_hours_medium" min="0" step="0.5"
+                 class="form-input" style="width:8rem"
+                 value="<%= s.inactivity_hours_medium || '0' %>">
+        </div>
+        <div class="form-group" style="flex:0 0 auto">
+          <label class="form-label">Low (hours, 0 = off)</label>
+          <input type="number" name="inactivity_hours_low" min="0" step="0.5"
+                 class="form-input" style="width:8rem"
+                 value="<%= s.inactivity_hours_low || '0' %>">
+        </div>
+      </div>
+    </div>
+
     <!-- ── Backups ──────────────────────────────────────────── -->
     <div class="card" style="margin-bottom:1.5rem">
       <h2 class="settings-section-title">Backups</h2>

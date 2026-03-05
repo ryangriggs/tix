@@ -326,19 +326,20 @@ async function sendDueReminder(email, ticket) {
   });
 }
 
-async function sendInactivityReminder(email, ticket) {
+async function sendInactivityReminder(email, ticket, hours) {
   let replyTo;
   if (ticket.reply_token) {
     const mailDomain = config.ticketEmail.includes('@') ? config.ticketEmail.split('@')[1] : 'tix.local';
     const localPart  = config.ticketEmail.split('@')[0];
     replyTo = `${config.mailFromName} <${localPart}+${ticket.reply_token}@${mailDomain}>`;
   }
-  const html = await renderEmail('inactivity-reminder', { ticket });
+  const html = await renderEmail('inactivity-reminder', { ticket, hours });
+  const hoursLabel = hours === 1 ? '1 hour' : `${hours} hours`;
   await send({
     to:      email,
     subject: `Reminder: no recent activity [Ticket #${config.ticketPrefix}${ticket.id}]`,
     html,
-    text:    `Ticket #${config.ticketPrefix}${ticket.id} "${ticket.subject}" has had no activity for ${ticket.inactivity_reminder_days} day(s). Reply to add a comment.`,
+    text:    `Ticket #${config.ticketPrefix}${ticket.id} "${ticket.subject}" has had no activity for ${hoursLabel}. Reply to add a comment.`,
     replyTo,
   });
 }

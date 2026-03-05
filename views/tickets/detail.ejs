@@ -258,30 +258,6 @@
       </div>
       <% } %>
 
-      <!-- Inactivity Reminder (admin/tech only) -->
-      <% if (isTechOrAdmin) { %>
-      <div class="sidebar-section">
-        <div class="sidebar-label">Reminder</div>
-        <% if (ticket.status === 'closed') { %>
-          <span style="font-size:.85rem;color:var(--text-muted)"><%= inactivityReminderDays ? inactivityReminderDays + ' day' + (inactivityReminderDays === 1 ? '' : 's') + ' (paused \u2014 closed)' : 'None' %></span>
-        <% } else { %>
-          <select id="reminder-select" class="form-select form-select-sm" style="width:100%">
-            <option value="0"      <%= !inactivityReminderDays ? 'selected' : '' %>>No reminder</option>
-            <option value="1"      <%= inactivityReminderDays === 1  ? 'selected' : '' %>>1 day</option>
-            <option value="7"      <%= inactivityReminderDays === 7  ? 'selected' : '' %>>1 week</option>
-            <option value="14"     <%= inactivityReminderDays === 14 ? 'selected' : '' %>>2 weeks</option>
-            <option value="30"     <%= inactivityReminderDays === 30 ? 'selected' : '' %>>1 month</option>
-            <option value="custom" <%= (inactivityReminderDays && ![1,7,14,30].includes(inactivityReminderDays)) ? 'selected' : '' %>>Custom...</option>
-          </select>
-          <div id="reminder-custom-row" style="display:none;margin-top:.4rem;gap:.4rem;align-items:center">
-            <input type="number" id="reminder-custom-days" min="1" max="365"
-                   class="form-input form-input-sm" style="width:5rem" placeholder="days">
-            <button id="reminder-custom-set" class="btn btn-sm btn-secondary">Set</button>
-          </div>
-        <% } %>
-      </div>
-      <% } %>
-
       <!-- Parties -->
       <div class="sidebar-section">
         <div class="sidebar-label">People</div>
@@ -786,43 +762,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // --- Inactivity reminder ---
-  (function() {
-    const sel = document.getElementById('reminder-select');
-    if (!sel) return;
-    const customRow   = document.getElementById('reminder-custom-row');
-    const customInput = document.getElementById('reminder-custom-days');
-    const customSet   = document.getElementById('reminder-custom-set');
-
-    <% if (inactivityReminderDays && ![1,7,14,30].includes(inactivityReminderDays)) { %>
-    customRow.style.display = 'flex';
-    customInput.value = '<%= inactivityReminderDays %>';
-    <% } %>
-
-    async function setReminder(days) {
-      try { await sidebarPost(`/tickets/${TICKET_ID}/reminder`, { days: days || 0 }); }
-      catch (err) { alert('Could not update reminder: ' + err.message); }
-    }
-
-    sel.addEventListener('change', async () => {
-      if (sel.value === 'custom') {
-        customRow.style.display = 'flex';
-        customInput.focus();
-      } else {
-        customRow.style.display = 'none';
-        await setReminder(parseInt(sel.value, 10));
-      }
-    });
-
-    customSet.addEventListener('click', async () => {
-      const days = parseInt(customInput.value, 10);
-      if (isNaN(days) || days < 1 || days > 365) {
-        alert('Please enter a number between 1 and 365.');
-        customInput.focus(); return;
-      }
-      await setReminder(days);
-    });
-  })();
 })();
 </script>
 

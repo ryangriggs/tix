@@ -476,6 +476,10 @@ router.post('/settings', (req, res) => {
     update_check_interval_hours:    String(Math.max(1, flt('update_check_interval_hours', 24))),
     backup_frequency_hours:         String(Math.max(0, int('backup_frequency_hours', 0))),
     backup_retention_days:          String(Math.max(0, int('backup_retention_days', 30))),
+    inactivity_hours_urgent:        String(Math.max(0, flt('inactivity_hours_urgent', 0))),
+    inactivity_hours_high:          String(Math.max(0, flt('inactivity_hours_high',   0))),
+    inactivity_hours_medium:        String(Math.max(0, flt('inactivity_hours_medium', 0))),
+    inactivity_hours_low:           String(Math.max(0, flt('inactivity_hours_low',    0))),
   };
 
   for (const [key, val] of Object.entries(updates)) {

@@ -1,6 +1,6 @@
 <%- include('_header') %>
 
-<p>This ticket has had no activity for <strong><%= ticket.inactivity_reminder_days %> day<%= ticket.inactivity_reminder_days === 1 ? '' : 's' %></strong>:</p>
+<p>This ticket has had no activity for <strong><%= hours === 1 ? '1 hour' : hours + ' hours' %></strong> and needs attention:</p>
 
 <p style="margin:16px 0">
   <a href="<%= appUrl %>/tickets/<%= ticket.id %>" style="font-weight:600">

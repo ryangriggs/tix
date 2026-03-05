@@ -11,8 +11,9 @@ const { requireAuth, requireAdmin, optionalAuth, verifyCsrf } = require('./middl
 const { startSMTPServer } = require('./smtp');
 const sse = require('./services/sse');
 const { initDb, getTicketsForReminders, setTicketRemindersSent, getSetting, setSetting, seedSetting, getAllSettings,
-        getTicketsForInactivityReminders, setInactivityReminderSent } = require('./db');
+        getOpenTicketsForInactivityCheck, setInactivityReminderSent } = require('./db');
 const { sendDueReminder, sendInactivityReminder } = require('./services/mail');
+
 const updater = require('./services/updater');
 const backup  = require('./services/backup');
 
@@ -224,6 +225,10 @@ async function start() {
     update_check_interval_hours:    '24',
     backup_frequency_hours:         '0',
     backup_retention_days:          '30',
+    inactivity_hours_urgent:        '0',
+    inactivity_hours_high:          '0',
+    inactivity_hours_medium:        '0',
+    inactivity_hours_low:           '0',
   };
   for (const [key, val] of Object.entries(seedDefaults)) {
     if (val !== null && val !== undefined) seedSetting(key, val);
@@ -295,25 +300,58 @@ async function start() {
     }
   }, 60 * 60 * 1000);
 
-  // Inactivity reminders — check every hour
+  // Inactivity reminders — check every 10 minutes (supports sub-hour thresholds)
   setInterval(async () => {
     try {
-      const rows = getTicketsForInactivityReminders();
+      const hoursMap = {
+        urgent: parseFloat(getSetting('inactivity_hours_urgent') || '0'),
+        high:   parseFloat(getSetting('inactivity_hours_high')   || '0'),
+        medium: parseFloat(getSetting('inactivity_hours_medium') || '0'),
+        low:    parseFloat(getSetting('inactivity_hours_low')    || '0'),
+      };
+      // Skip entirely if all priorities are disabled
+      if (!Object.values(hoursMap).some(h => h > 0)) return;
+
+      const now  = Math.floor(Date.now() / 1000);
+      const rows = getOpenTicketsForInactivityCheck();
+
+      // Group rows by ticket id
       const ticketMap = new Map();
       for (const row of rows) {
-        if (!ticketMap.has(row.id)) ticketMap.set(row.id, { ...row, emails: [] });
-        if (row.party_email) ticketMap.get(row.id).emails.push(row.party_email);
+        if (!ticketMap.has(row.id)) {
+          ticketMap.set(row.id, { ...row, ownerEmails: [] });
+        }
+        ticketMap.get(row.id).ownerEmails.push(row.owner_email);
       }
+
       for (const t of ticketMap.values()) {
-        for (const email of t.emails) {
-          await sendInactivityReminder(email, t).catch(console.error);
+        const hours = hoursMap[t.priority] || 0;
+        if (!(hours > 0)) continue;
+        const intervalSecs = Math.round(hours * 3600);
+
+        const lastSent    = t.inactivity_reminder_sent_at || 0;
+        const lastUpdated = t.updated_at;
+
+        let nextDue;
+        if (lastSent <= lastUpdated) {
+          // No reminder sent since last ticket update — first reminder due at updated_at + interval
+          nextDue = lastUpdated + intervalSecs;
+        } else {
+          // Already sent at least once; repeat every interval from last send
+          nextDue = lastSent + intervalSecs;
+        }
+
+        if (now < nextDue) continue;
+
+        for (const email of t.ownerEmails) {
+          await sendInactivityReminder(email, t, hours).catch(console.error);
         }
         setInactivityReminderSent(t.id);
       }
     } catch (err) {
       console.error('[Inactivity Reminders] Error:', err);
     }
-  }, 60 * 60 * 1000);
+  }, 10 * 60 * 1000);
 
   // Backup cron — check every minute
   setInterval(async () => {

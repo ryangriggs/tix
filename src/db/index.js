@@ -513,7 +513,7 @@ function getTicketById(id) {
 }
 
 function updateTicket(id, fields) {
-  const allowed = ['subject', 'body', 'status', 'priority', 'due_date', 'organization_id', 'close_date', 'inactivity_reminder_days'];
+  const allowed = ['subject', 'body', 'status', 'priority', 'due_date', 'organization_id', 'close_date'];
   const keys = Object.keys(fields).filter(k => allowed.includes(k));
   if (keys.length === 0) return;
 
@@ -1032,19 +1032,16 @@ function setTicketRemindersSent(ticketId, count) {
   prepare('UPDATE tickets SET reminders_sent = ? WHERE id = ?').run(count, ticketId);
 }
 
-function getTicketsForInactivityReminders() {
+function getOpenTicketsForInactivityCheck() {
   return prepare(`
-    SELECT t.id, t.subject, t.reply_token, t.updated_at, t.inactivity_reminder_days,
-           u.email AS party_email
+    SELECT t.id, t.subject, t.reply_token, t.updated_at, t.priority,
+           t.inactivity_reminder_sent_at,
+           u.email AS owner_email
     FROM tickets t
-    JOIN ticket_parties tp ON tp.ticket_id = t.id
+    JOIN ticket_parties tp ON tp.ticket_id = t.id AND tp.role = 'owner'
     JOIN users u ON u.id = tp.user_id
-    WHERE t.status != 'closed'
-      AND t.inactivity_reminder_days > 0
-      AND (unixepoch() - t.updated_at) >= t.inactivity_reminder_days * 86400
-      AND (t.inactivity_reminder_sent_at IS NULL
-           OR t.inactivity_reminder_sent_at <= t.updated_at)
-      AND tp.role != 'submitter'
+    WHERE t.status = 'open'
+      AND tp.notifications_disabled = 0
     ORDER BY t.id ASC
   `).all();
 }
@@ -1078,7 +1075,7 @@ module.exports = {
   getSetting, setSetting, seedSetting, getAllSettings, getUserPrefs, setUserPrefs, getDbBuffer,
   // Reminders
   getTicketsDueSoon, getTicketsForReminders, setTicketRemindersSent,
-  getTicketsForInactivityReminders, setInactivityReminderSent,
+  getOpenTicketsForInactivityCheck, setInactivityReminderSent,
   getTicketByReplyToken, disableAllPartyNotifications, disablePartyNotifications, togglePartyNotifications,
   // Reports
   getBillingReport,
