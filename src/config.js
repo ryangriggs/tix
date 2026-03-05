@@ -44,8 +44,9 @@ const config = {
   uploadsDir:     process.env.UPLOADS_DIR     || '/app/data/uploads',
   annotationsDir: process.env.ANNOTATIONS_DIR || '/app/data/annotations',
   annotationExtensions: 'pdf,jpg,jpeg,gif,png,svg',
-  emailLog: process.env.EMAIL_LOG || '',
-  userLog:  process.env.USER_LOG  || '',
+  emailLog:  process.env.EMAIL_LOG  || '',
+  userLog:   process.env.USER_LOG   || '',
+  auditLog:  process.env.AUDIT_LOG  || '',
 
   mailgun: {
     apiKey: process.env.MAILGUN_API_KEY || '',

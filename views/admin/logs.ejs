@@ -15,9 +15,57 @@
        style="padding:.5rem 1.25rem;font-size:.9rem;font-weight:500;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:<%= tab==='users' ? 'var(--primary)' : 'var(--text-muted)' %>;border-bottom-color:<%= tab==='users' ? 'var(--primary)' : 'transparent' %>">
       User Log
     </a>
+    <a href="/admin/logs?tab=audit"
+       class="tab-link<% if (tab === 'audit') { %> tab-active<% } %>"
+       style="padding:.5rem 1.25rem;font-size:.9rem;font-weight:500;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:<%= tab==='audit' ? 'var(--primary)' : 'var(--text-muted)' %>;border-bottom-color:<%= tab==='audit' ? 'var(--primary)' : 'transparent' %>">
+      Audit Log
+    </a>
   </div>
 
-  <% if (tab === 'email') { %>
+  <% if (tab === 'audit') { %>
+
+    <% if (!auditLogPath) { %>
+      <div class="card" style="color:var(--text-muted)">
+        <p>Audit logging is not configured. Set <code>AUDIT_LOG=/path/to/audit.log</code> in your <code>.env</code> file and restart the server.</p>
+      </div>
+    <% } else if (!auditEntries.length) { %>
+      <div class="card" style="color:var(--text-muted)">
+        <p>No audit log entries yet. Log file: <code><%= auditLogPath %></code></p>
+      </div>
+    <% } else { %>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:.75rem">
+        <p style="margin:0;font-size:.875rem;color:var(--text-muted)">
+          Showing last <%= auditEntries.length %> of <%= auditTotal %> entries &mdash; <code><%= auditLogPath %></code>
+        </p>
+        <span style="font-size:.8rem;color:var(--text-muted)">Newest first</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="white-space:nowrap">Time</th>
+              <th>IP</th>
+              <th>User</th>
+              <th>Ticket</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% for (const e of auditEntries) { %>
+              <tr>
+                <td style="white-space:nowrap;font-size:.8rem;font-family:monospace;color:var(--text-muted)" data-ts="<%= e.ts %>" data-fmt="full"><%= e.timestamp %></td>
+                <td style="font-size:.8rem;font-family:monospace;color:var(--text-muted)"><%= e.ip %></td>
+                <td style="font-size:.875rem"><%= e.email %></td>
+                <td style="font-size:.875rem;white-space:nowrap"><%= e.ticket %></td>
+                <td style="font-size:.875rem"><%= e.action %></td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+  <% } else if (tab === 'email') { %>
 
     <% if (!emailLogPath) { %>
       <div class="card" style="color:var(--text-muted)">

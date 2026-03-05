@@ -9,6 +9,7 @@ const config = require('../config');
 const { issueSessionCookie } = require('../middleware/auth');
 const { resetMailTransport } = require('../services/mail');
 const updater = require('../services/updater');
+const audit   = require('../services/audit');
 
 function maskSecret(val) {
   if (!val) return '(not set)';
@@ -50,7 +51,8 @@ router.get('/users/:id/tech-orgs', (req, res) => {
 
 // POST /admin/users/:id/edit — combined property update from dialog
 router.post('/users/:id/edit', (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id         = parseInt(req.params.id, 10);
+  const editTarget = db.getUserById(id);
   const name = (req.body.name || '').trim();
   const role = req.body.role;
   const orgName = (req.body.organization_name || '').trim();
@@ -77,6 +79,7 @@ router.post('/users/:id/edit', (req, res) => {
     if (isActive) db.unblockUser(id); else db.blockUser(id);
   }
 
+  audit.log(req, `edited user ${editTarget?.email || id}`);
   res.redirect('/admin/users?message=User+updated');
 });
 
@@ -107,6 +110,7 @@ router.post('/users/pre-add', (req, res) => {
     return res.redirect('/admin/users?message=Invalid+email');
   }
   db.findOrCreateUser(email, name || null);
+  audit.log(req, `added user ${email}`);
   res.redirect('/admin/users?message=User+added');
 });
 
@@ -175,22 +179,28 @@ router.post('/users/:id/tech-orgs/remove', (req, res) => {
 router.post('/users/:id/block', (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (id === req.user.id) return res.redirect('/admin/users?message=Cannot+block+yourself');
+  const blockTarget = db.getUserById(id);
   db.blockUser(id);
+  audit.log(req, `blocked user ${blockTarget?.email || id}`);
   res.redirect('/admin/users?message=User+blocked');
 });
 
 // POST /admin/users/:id/unblock
 router.post('/users/:id/unblock', (req, res) => {
   const id = parseInt(req.params.id, 10);
+  const unblockTarget = db.getUserById(id);
   db.unblockUser(id);
+  audit.log(req, `unblocked user ${unblockTarget?.email || id}`);
   res.redirect('/admin/users?message=User+unblocked');
 });
 
 // POST /admin/users/:id/delete
 router.post('/users/:id/delete', (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id         = parseInt(req.params.id, 10);
   if (id === req.user.id) return res.redirect('/admin/users?message=Cannot+delete+yourself');
+  const delTarget  = db.getUserById(id);
   db.deleteUser(id);
+  audit.log(req, `deleted user ${delTarget?.email || id}`);
   res.redirect('/admin/users?message=User+deleted');
 });
 
@@ -217,14 +227,18 @@ router.post('/organizations/:id/rename', (req, res) => {
   const id   = parseInt(req.params.id, 10);
   const name = (req.body.name || '').trim();
   if (!name) return res.redirect('/admin/organizations?message=Name+required');
+  const renameOrg = db.getOrganizationById(id);
   db.renameOrganization(id, name);
+  audit.log(req, `renamed organization "${renameOrg?.name || id}" to "${name}"`);
   res.redirect('/admin/organizations?message=Organization+renamed');
 });
 
 // POST /admin/organizations/:id/delete
 router.post('/organizations/:id/delete', (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id      = parseInt(req.params.id, 10);
+  const delOrg  = db.getOrganizationById(id);
   db.deleteOrganization(id);
+  audit.log(req, `deleted organization "${delOrg?.name || id}"`);
   res.redirect('/admin/organizations?message=Organization+deleted');
 });
 
@@ -271,9 +285,10 @@ function readLogFile(filePath, limit = 100) {
   }
 }
 
-// GET /admin/logs?tab=email|users
+// GET /admin/logs?tab=email|users|audit
 router.get('/logs', (req, res) => {
-  const tab = req.query.tab === 'users' ? 'users' : 'email';
+  const validTabs = ['email', 'users', 'audit'];
+  const tab = validTabs.includes(req.query.tab) ? req.query.tab : 'email';
 
   // Email log
   let emailEntries = [];
@@ -316,11 +331,32 @@ router.get('/logs', (req, res) => {
     });
   }
 
+  // Audit log
+  let auditEntries = [];
+  let auditTotal = 0;
+  if (config.auditLog) {
+    const { total, lines } = readLogFile(config.auditLog);
+    auditTotal = total;
+    auditEntries = lines.map(line => {
+      const parts = line.split(' | ');
+      const ts = Math.floor(Date.parse((parts[0] || '').replace(' ', 'T') + 'Z') / 1000) || 0;
+      return {
+        timestamp: parts[0] || '',
+        ts,
+        ip:       parts[1] || '',
+        email:    parts[2] || '',
+        ticket:   parts[3] || '',
+        action:   parts[4] || '',
+      };
+    });
+  }
+
   res.render('admin/logs', {
     title: 'Logs',
     tab,
     emailEntries, emailTotal, emailLogPath: config.emailLog || '',
     userEntries,  userTotal,  userLogPath:  config.userLog  || '',
+    auditEntries, auditTotal, auditLogPath: config.auditLog || '',
   });
 });
 
@@ -337,6 +373,7 @@ router.get('/settings', (req, res) => {
       UPLOADS_DIR: config.uploadsDir,
       EMAIL_LOG:  config.emailLog  || '(not set)',
       USER_LOG:   config.userLog   || '(not set)',
+      AUDIT_LOG:  config.auditLog  || '(not set)',
     },
     message:     req.query.message || null,
     updateState: updater.getState(),
@@ -441,6 +478,7 @@ router.post('/settings', (req, res) => {
     parseFloat(updates.update_check_interval_hours)
   );
 
+  audit.log(req, 'changed Settings');
   res.redirect('/admin/settings?message=Settings+saved');
 });
 

@@ -12,6 +12,7 @@ const config = require('../config');
 const db = require('../db');
 const { sendTicketNotification } = require('../services/mail');
 const sse = require('../services/sse');
+const audit = require('../services/audit');
 
 // ============================================================
 // Multer — uploads to data/uploads with UUID filenames
@@ -145,7 +146,7 @@ async function notifyParties(ticket, actorEmail, messageBody, commentId, inReply
 // ============================================================
 
 const SINCE_SECONDS    = { '1d': 86400, '7d': 7 * 86400, '30d': 30 * 86400 };
-const DEFAULT_PREFS    = { status: 'new,open,on_hold', priority: '', sort: 'priority', order: 'desc', since: '1d', org: '', q: '', owner: 'me' };
+const DEFAULT_PREFS    = { status: 'new,open,on_hold', priority: '', sort: 'priority', order: 'desc', since: '', org: '', q: '', owner: 'me' };
 const VALID_STATUSES   = ['new', 'open', 'on_hold', 'closed'];
 const VALID_PRIORITIES = ['urgent', 'high', 'medium', 'low'];
 const FILTER_COOKIE  = 'tix_filters';
@@ -328,6 +329,7 @@ router.post('/', upload, async (req, res) => {
     db.addParty(ticket.id, assignee.id, 'owner');
   }
 
+  audit.log(req, `created ticket "${ticket.subject}"`, ticket.id);
   sse.broadcastToAll({ type: 'ticket_created', ticketId: ticket.id });
 
   // Notify default assignee and collaborators (creator is excluded — they just submitted it)
@@ -373,6 +375,7 @@ router.post('/attachments/:storedName/delete', (req, res) => {
   db.deleteAttachment(att.stored_name);
   try { fs.unlinkSync(path.join(config.uploadsDir, att.stored_name)); } catch (_) {}
 
+  audit.log(req, `deleted attachment "${att.original_name}"`, att.ticket_id);
   res.redirect(`/tickets/${att.ticket_id}`);
 });
 
@@ -409,17 +412,20 @@ router.post('/bulk', (req, res) => {
   const { action, bulkStatus, bulkPriority, bulkAssignee } = req.body;
   if (action === 'delete') {
     db.bulkDeleteTickets(ids);
+    audit.log(req, `bulk deleted ${ids.length} ticket(s): ${ids.join(', ')}`);
     sse.broadcastToAll({ type: 'tickets_deleted', ticketIds: ids });
   } else if (action === 'status') {
     const validStatuses = ['new', 'open', 'on_hold', 'closed'];
     if (validStatuses.includes(bulkStatus)) {
       db.bulkUpdateStatus(ids, bulkStatus);
+      audit.log(req, `bulk changed status to ${bulkStatus} on ${ids.length} ticket(s): ${ids.join(', ')}`);
       sse.broadcastToAll({ type: 'tickets_updated', ticketIds: ids });
     }
   } else if (action === 'priority') {
     const validPriorities = ['low', 'medium', 'high', 'urgent'];
     if (validPriorities.includes(bulkPriority)) {
       db.bulkUpdatePriority(ids, bulkPriority);
+      audit.log(req, `bulk changed priority to ${bulkPriority} on ${ids.length} ticket(s): ${ids.join(', ')}`);
       sse.broadcastToAll({ type: 'tickets_updated', ticketIds: ids });
     }
   } else if (action === 'assign') {
@@ -430,6 +436,7 @@ router.post('/bulk', (req, res) => {
         for (const id of ids) {
           db.addParty(id, assignee.id, 'owner');
         }
+        audit.log(req, `bulk assigned ${assignee.email} as owner on ${ids.length} ticket(s): ${ids.join(', ')}`);
         sse.broadcastToAll({ type: 'tickets_updated', ticketIds: ids });
       }
     }
@@ -539,6 +546,7 @@ router.post('/:id/comments', upload, async (req, res) => {
     console.error('[Tickets] Notification error:', err);
   }
 
+  audit.log(req, willChangeStatus ? `added comment, changed status to ${statusChange}` : 'added comment', ticket.id);
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'comment_added', ticketId: ticket.id, commentId: comment.id });
   if (willChangeStatus) {
     sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'status', value: statusChange });
@@ -557,6 +565,7 @@ router.post('/:id/comments/:commentId/delete', (req, res) => {
   const commentId = parseInt(req.params.commentId, 10);
 
   db.deleteComment(commentId);
+  audit.log(req, 'deleted comment', ticket.id);
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
 
   res.redirect(`/tickets/${ticket.id}`);
@@ -575,6 +584,7 @@ router.post('/:id/subject', async (req, res) => {
   }
 
   db.updateTicket(ticket.id, { subject });
+  audit.log(req, `changed subject to "${subject}"`, ticket.id);
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'subject', value: subject });
 
   if (req.accepts('json')) return res.json({ ok: true, subject });
@@ -611,6 +621,7 @@ router.post('/:id/status', async (req, res) => {
     } catch (err) { console.error('[Tickets] Notification error:', err); }
   }
 
+  audit.log(req, `changed status to ${status}`, ticket.id);
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'status', value: status });
 
   if (req.accepts('json')) return res.json({ ok: true, status });
@@ -628,7 +639,7 @@ router.post('/:id/priority', async (req, res) => {
   if (!validPriorities.includes(priority)) return res.status(400).json({ error: 'Invalid priority' });
 
   db.updateTicket(ticket.id, { priority });
-
+  audit.log(req, `changed priority to ${priority}`, ticket.id);
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'priority', value: priority });
 
   if (req.accepts('json')) return res.json({ ok: true, priority });
@@ -644,7 +655,7 @@ router.post('/:id/due-date', (req, res) => {
   const dueDate = req.body.due_date ? Math.floor(new Date(req.body.due_date).getTime() / 1000) : null;
   db.updateTicket(ticket.id, { due_date: dueDate });
   if (dueDate !== ticket.due_date) db.setTicketRemindersSent(ticket.id, 0);
-
+  audit.log(req, dueDate ? `changed due date to ${req.body.due_date}` : 'cleared due date', ticket.id);
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'due_date', value: dueDate });
 
   if (req.accepts('json')) {
@@ -668,6 +679,7 @@ router.post('/:id/organization', (req, res) => {
     resolvedOrgName = org ? org.name : null;
   }
   db.updateTicket(ticket.id, { organization_id: orgId });
+  audit.log(req, orgId ? `changed organization to "${resolvedOrgName}"` : 'cleared organization', ticket.id);
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'org', value: resolvedOrgName });
   if (req.accepts('json')) return res.json({ ok: true, orgName: resolvedOrgName, orgId: orgId || null });
   res.redirect(`/tickets/${ticket.id}`);
@@ -682,6 +694,7 @@ router.post('/:id/reminder', (req, res) => {
   const raw  = parseInt(req.body.days, 10);
   const days = (!isNaN(raw) && raw >= 1 && raw <= 365) ? raw : null;
   db.updateTicket(ticket.id, { inactivity_reminder_days: days });
+  audit.log(req, days ? `changed inactivity reminder to ${days} days` : 'cleared inactivity reminder', ticket.id);
   return res.json({ ok: true, days });
 });
 
@@ -707,6 +720,7 @@ router.post('/:id/parties', async (req, res) => {
   }
   const full = db.getUserById(newUser.id); // includes organization_name via JOIN
   db.addParty(ticket.id, full.id, role);
+  audit.log(req, `added ${full.email} as ${role}`, ticket.id);
 
   // Notify the newly added party
   try {
@@ -742,6 +756,7 @@ router.post('/:id/parties/role', async (req, res) => {
 
   const affected = db.getUserById(userId);
   db.addParty(ticket.id, userId, role);
+  audit.log(req, `changed ${affected?.email || userId}'s role to ${role}`, ticket.id);
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'party_updated', userId, role });
 
   // Notify the affected user (skip if they made the change themselves)
@@ -786,7 +801,9 @@ router.post('/:id/parties/remove', (req, res) => {
   const userId = parseInt(req.body.userId, 10);
   if (!userId) return res.redirect(`/tickets/${ticket.id}`);
 
+  const removedUser = db.getUserById(userId);
   db.removeParty(ticket.id, userId);
+  audit.log(req, `removed ${removedUser?.email || userId}`, ticket.id);
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'party_removed', userId });
 
   if (req.accepts('json')) return res.json({ ok: true });
@@ -800,6 +817,7 @@ router.post('/:id/delete', (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).render('error', { title: '403', message: 'Forbidden.' });
 
   db.deleteTicket(ticket.id);
+  audit.log(req, `deleted ticket "${ticket.subject}"`, ticket.id);
   sse.broadcastToAll({ type: 'ticket_deleted', ticketId: ticket.id });
   res.redirect('/tickets');
 });

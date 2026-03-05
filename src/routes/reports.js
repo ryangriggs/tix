@@ -5,6 +5,7 @@ const router  = express.Router();
 const { requireAdmin } = require('../middleware/auth');
 const db = require('../db');
 const config = require('../config');
+const audit = require('../services/audit');
 const { ticketPrefix } = config;
 
 // GET /reports
@@ -28,6 +29,7 @@ router.get('/billing.csv', requireAdmin, (req, res) => {
 
   const rows = db.getBillingReport(fromTs, toTs);
   console.log(`[Reports] Billing: from=${from}(${fromTs}) to=${to}(${toTs}), rows=${rows.length}`);
+  audit.log(req, `ran Billing report (${from} to ${to})`);
 
   const escape  = v => `"${String(v || '').replace(/"/g, '""')}"`;
   const fmtDate = ts => ts ? new Date(ts * 1000).toISOString().slice(0, 10) : '';
@@ -60,6 +62,7 @@ router.get('/travel.csv', requireAdmin, (req, res) => {
 
   const rows = db.getTravelReport(fromTs, toTs);
   console.log(`[Reports] Travel: from=${from}(${fromTs}) to=${to}(${toTs}), rows=${rows.length}`);
+  audit.log(req, `ran Travel report (${from} to ${to})`);
 
   const escape = v => `"${String(v || '').replace(/"/g, '""')}"`;
 
