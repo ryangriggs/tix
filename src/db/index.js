@@ -1000,18 +1000,18 @@ function getTicketsDueSoon(withinHours = 24) {
 
 function getBillingReport(fromTs, toTs) {
   return prepare(`
-    SELECT t.id, t.subject, t.created_at, t.close_date,
+    SELECT t.id, t.subject, t.created_at, t.status,
            o.name AS organization_name,
-           COALESCE(SUM(c.billable_hours), 0) AS total_hours
+           COALESCE(SUM(c.billable_hours), 0) AS period_hours,
+           MIN(c.created_at) AS first_reply_in_period
     FROM tickets t
     LEFT JOIN organizations o ON o.id = t.organization_id
-    LEFT JOIN comments c ON c.ticket_id = t.id
-    WHERE t.status = 'closed'
-      AND t.close_date IS NOT NULL
-      AND t.close_date >= ? AND t.close_date <= ?
+    JOIN comments c ON c.ticket_id = t.id
+    WHERE c.created_at >= ? AND c.created_at <= ?
+      AND c.billable_hours > 0
     GROUP BY t.id
-    HAVING COALESCE(SUM(c.billable_hours), 0) > 0
-    ORDER BY t.close_date ASC
+    HAVING period_hours > 0
+    ORDER BY first_reply_in_period ASC
   `).all(fromTs, toTs);
 }
 

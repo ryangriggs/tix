@@ -73,7 +73,7 @@
               <label for="billable-hours">Billable Hours <span class="optional">(optional)</span></label>
               <input type="number" id="billable-hours" name="billable_hours"
                      min="0" step="0.25" placeholder="0.00" class="form-input form-input-sm"
-                     style="width:6rem" <%= ticket.status === 'closed' ? 'disabled' : '' %>>
+                     style="width:6rem">
             </div>
             <% } %>
             <% if (enableLocation) { %>
@@ -84,14 +84,11 @@
                      class="form-input form-input-sm"
                      autocomplete="off"
                      data-org-id="<%= ticket.organization_id || '' %>"
-                     <%= (!ticket.organization_id || ticket.status === 'closed') ? 'disabled' : '' %>>
+                     <%= !ticket.organization_id ? 'disabled' : '' %>>
               <input type="hidden" id="location-id" name="location_id">
             </div>
             <% } %>
           </div>
-          <% if (ticket.status === 'closed') { %>
-            <p class="form-hint"><%= [enableBillableHours ? 'Billable hours' : '', enableLocation ? 'location' : ''].filter(Boolean).join(' and ') %> cannot be added to a closed ticket.</p>
-          <% } %>
           <% } %>
           <div class="form-actions" style="flex-wrap:wrap;gap:.5rem">
             <% if (canManage) { %>
@@ -380,12 +377,6 @@
     }
     document.getElementById('comment-required-err')?.remove();
 
-    const sc = document.querySelector('[name="status_change"]');
-    if (<%= enableBillableHours ? 'true' : 'false' %> && sc && sc.value === 'closed') {
-      if (!confirm('Once closed, no further billable hours can be added. Close this ticket?')) {
-        e.preventDefault(); return;
-      }
-    }
     document.getElementById('comment-body').value = quill.root.innerHTML;
     _quillDirty = false;
   });
@@ -582,8 +573,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('#status-pills .pill-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const sv = btn.dataset.status;
-      if (BILLABLE_ENABLED && sv === 'closed' && !confirm('Once closed, no further billable hours can be added. Close this ticket?')) return;
-      if (BILLABLE_ENABLED && _currentStatus === 'closed' && sv !== 'closed' && !confirm('Warning: Reopening a closed ticket may cause missed or double-billed hours. Reopen anyway?')) return;
       try {
         await sidebarPost(`/tickets/${TICKET_ID}/status`, { status: sv });
         document.querySelectorAll('#status-pills .pill-btn').forEach(b => b.classList.remove('pill-active'));

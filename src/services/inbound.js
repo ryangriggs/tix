@@ -300,6 +300,13 @@ async function handleReply(ticketId, fromEmail, parsed, subjectFallback = false)
   const comment = db.addComment(ticketId, user.id, body, true);
   commitAttachments(prepared, ticketId, comment.id);
 
+  // Auto-reopen closed tickets when a reply arrives
+  const wasReopened = ticket.status === 'closed';
+  if (wasReopened) {
+    db.updateTicket(ticketId, { status: 'open', close_date: null });
+    console.log(`[Inbound] Ticket #${ticketId} reopened by reply from ${fromEmail}`);
+  }
+
   // Email all other parties
   const parties = db.getParties(ticketId);
   const notifyEmails = parties.filter(p => p.email !== fromEmail).map(p => p.email);
@@ -309,10 +316,14 @@ async function handleReply(ticketId, fromEmail, parsed, subjectFallback = false)
     const msgId = `<ticket-${ticketId}-c${comment.id}-${Date.now()}@${domain}>`;
     db.recordEmailMessage(ticketId, msgId, 'out');
 
+    const notifyBody = wasReopened
+      ? `<p><strong>${fromEmail}</strong> replied and reopened this ticket:</p>${body}`
+      : `<p><strong>${fromEmail}</strong> replied:</p>${body}`;
+
     await sendTicketNotification({
       to: notifyEmails,
       ticketSubject: ticket.subject,
-      body: `<p><strong>${fromEmail}</strong> replied:</p>${body}`,
+      body: notifyBody,
       ticketId,
       messageId: msgId,
       inReplyTo: `<ticket-${ticketId}@${domain}>`,
@@ -322,8 +333,11 @@ async function handleReply(ticketId, fromEmail, parsed, subjectFallback = false)
 
   // Push SSE update to connected clients who are parties
   sse.broadcast(db.getPartyUserIds(ticketId), { type: 'comment_added', ticketId, commentId: comment.id });
+  if (wasReopened) {
+    sse.broadcast(db.getPartyUserIds(ticketId), { type: 'ticket_updated', ticketId });
+  }
 
-  audit.logEmail(fromEmail, 'added comment via email', ticketId);
+  audit.logEmail(fromEmail, wasReopened ? 'replied and reopened ticket' : 'added comment via email', ticketId);
   console.log(`[Inbound] Comment added to ticket #${ticketId} from ${fromEmail}`);
 }
 

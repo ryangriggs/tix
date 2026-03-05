@@ -88,7 +88,17 @@ function sanitize(html) {
   return sanitizeHtml(html || '', {
     allowedTags: ALLOWED_TAGS,
     allowedAttributes: { a: ['href', 'target'], img: ['src', 'alt'] },
-    allowedSchemes: ['http', 'https', 'mailto'],
+    allowedSchemes: ['http', 'https', 'mailto', 'data'],
+    transformTags: {
+      // Strip data: URIs that are not safe raster image types (SVG can contain scripts)
+      img(tagName, attribs) {
+        const src = attribs.src || '';
+        if (src.startsWith('data:') && !/^data:image\/(png|jpe?g|gif|webp|bmp|ico);base64,/i.test(src)) {
+          return false; // remove the tag
+        }
+        return { tagName, attribs };
+      },
+    },
   });
 }
 
@@ -502,10 +512,10 @@ router.post('/:id/comments', upload, async (req, res) => {
   if (willChangeStatus && statusChange === 'closed' && !canCloseTicket(req.user)) willChangeStatus = false;
   if (willChangeStatus && ticket.status === 'closed' && !canReopenTicket(req.user)) willChangeStatus = false;
 
-  // Billable hours and location (admin/tech only, disabled on closed tickets)
+  // Billable hours and location (admin/tech only)
   const isTechOrAdmin = req.user.role === 'admin' || req.user.role === 'technician';
   const rawHours = parseFloat(req.body.billable_hours);
-  const billableHours = isTechOrAdmin && config.enableBillableHours && ticket.status !== 'closed' && rawHours > 0 ? rawHours : null;
+  const billableHours = isTechOrAdmin && config.enableBillableHours && rawHours > 0 ? rawHours : null;
 
   let locationId = null;
   if (isTechOrAdmin && config.enableLocation && ticket.organization_id) {

@@ -34,14 +34,13 @@ router.get('/billing.csv', requireAdmin, (req, res) => {
   const escape  = v => `"${String(v || '').replace(/"/g, '""')}"`;
   const fmtDate = ts => ts ? new Date(ts * 1000).toISOString().slice(0, 10) : '';
 
-  const header = 'Ticket ID,Ticket Title,Creation Date,Close Date,Organization,Total Billable Hours';
+  const header = 'Ticket ID,Ticket Title,Status,Organization,Billable Hours (Period)';
   const lines  = rows.map(r => [
     escape(`${ticketPrefix}${r.id}`),
     escape(r.subject),
-    escape(fmtDate(r.created_at)),
-    escape(fmtDate(r.close_date)),
+    escape(r.status || ''),
     escape(r.organization_name || ''),
-    r.total_hours,
+    r.period_hours,
   ].join(','));
 
   const csv = [header, ...lines].join('\r\n');
