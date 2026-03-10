@@ -10,10 +10,10 @@ function formatStamp(d) {
   return `${p(d.getMonth()+1)}-${p(d.getDate())}-${d.getFullYear()}-${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
 }
 
-// Creates a zip containing db.sqlite + .env, returns { filename, path }
+// Creates a zip containing db.sqlite + .env + attachments dir, returns { filename, path }
 async function createBackup() {
   const dir = config.backupDir;
-  if (!dir)               throw new Error('BACKUP_DIR is not configured');
+  if (!dir)                throw new Error('BACKUP_DIR is not configured');
   if (!fs.existsSync(dir)) throw new Error(`Backup directory does not exist: ${dir}`);
 
   const { getDbBuffer } = require('../db');
@@ -33,6 +33,9 @@ async function createBackup() {
     archive.pipe(output);
     archive.append(dbBuffer,  { name: 'db.sqlite' });
     archive.append(envBuffer, { name: '.env' });
+    if (config.uploadsDir && fs.existsSync(config.uploadsDir)) {
+      archive.directory(config.uploadsDir, 'attachments');
+    }
     archive.finalize();
   });
 

@@ -406,7 +406,7 @@
         <input type="number" name="backup_frequency_hours" min="0"
                class="form-input" style="width:8rem"
                value="<%= s.backup_frequency_hours || '0' %>">
-        <p class="form-hint">Set BACKUP_DIR in .env to enable. Backups are stored as .zip files.</p>
+        <p class="form-hint">Set BACKUP_DIR in .env to enable. Each backup is a .zip containing the database, .env, and all attachments.</p>
       </div>
       <div class="form-group">
         <label class="form-label">Retention Period (days, 0 = keep forever)</label>
