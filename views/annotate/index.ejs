@@ -142,9 +142,34 @@
       flex: 1;
       overflow: hidden;
       background: #475569;
+      position: relative;
     }
     #canvas-wrap.hand-mode  { cursor: grab; }
     #canvas-wrap.hand-grab  { cursor: grabbing !important; }
+
+    /* ── Scrollbar ────────────────────────────────────── */
+    #scrollbar-track {
+      position: absolute;
+      right: 4px;
+      top: 4px;
+      bottom: 4px;
+      width: 6px;
+      background: rgba(255,255,255,.15);
+      border-radius: 3px;
+      display: none;
+      z-index: 10;
+    }
+    #scrollbar-thumb {
+      position: absolute;
+      left: 0; right: 0;
+      min-height: 24px;
+      background: rgba(255,255,255,.45);
+      border-radius: 3px;
+      cursor: grab;
+      transition: background .1s;
+    }
+    #scrollbar-thumb:hover   { background: rgba(255,255,255,.65); }
+    #scrollbar-thumb.grabbing { background: rgba(255,255,255,.85); cursor: grabbing; }
 
     #pages-container {
       display: flex;
@@ -277,6 +302,7 @@
 <!-- Scroll container → zoom container → pages injected here -->
 <div id="canvas-wrap">
   <div id="pages-container"></div>
+  <div id="scrollbar-track"><div id="scrollbar-thumb"></div></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js" crossorigin="anonymous"></script>
@@ -372,6 +398,23 @@ function getFill()   { return hexToRgba(fillHex,   fillOpacity);   }
 function applyTransform() {
   pagesContainer.style.transform =
     `translate(${translateX}px,${translateY}px) scale(${zoomLevel})`;
+  updateScrollbar();
+}
+
+function updateScrollbar() {
+  const track  = document.getElementById('scrollbar-track');
+  const thumb  = document.getElementById('scrollbar-thumb');
+  if (!track || !thumb) return;
+  const totalH = pagesContainer.offsetHeight * zoomLevel;
+  const wrapH  = canvasWrap.clientHeight;
+  if (totalH <= wrapH) { track.style.display = 'none'; return; }
+  track.style.display = '';
+  const trackH     = track.clientHeight;
+  const thumbH     = Math.max(24, (wrapH / totalH) * trackH);
+  const scrolled   = Math.max(0, -translateY);
+  const thumbTop   = (scrolled / (totalH - wrapH)) * (trackH - thumbH);
+  thumb.style.height = thumbH + 'px';
+  thumb.style.top    = Math.min(trackH - thumbH, thumbTop) + 'px';
 }
 
 // Zoom around a point (cx,cy) in canvas-wrap-relative viewport coordinates.
@@ -438,13 +481,21 @@ function onMouseUpHand() {
   canvasWrap.classList.remove('hand-grab');
 }
 
-function onWheelHand(e) {
-  if (!e.ctrlKey) return;
+// Single wheel handler — always active.
+// Ctrl+wheel → zoom around cursor; plain wheel → scroll vertically.
+function onWheel(e) {
   e.preventDefault();
-  const rect  = canvasWrap.getBoundingClientRect();
-  const delta = e.deltaY > 0 ? 0.9 : 1.1;
-  zoomAround(Math.min(4, Math.max(0.25, zoomLevel * delta)),
-    e.clientX - rect.left, e.clientY - rect.top);
+  if (e.ctrlKey) {
+    const rect  = canvasWrap.getBoundingClientRect();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    zoomAround(Math.min(4, Math.max(0.25, zoomLevel * delta)),
+      e.clientX - rect.left, e.clientY - rect.top);
+  } else {
+    const totalH = pagesContainer.offsetHeight * zoomLevel;
+    const wrapH  = canvasWrap.clientHeight;
+    translateY = Math.max(Math.min(translateY - e.deltaY, 0), wrapH - totalH);
+    applyTransform();
+  }
 }
 
 function activateHandMode() {
@@ -453,7 +504,6 @@ function activateHandMode() {
   canvasWrap.addEventListener('touchmove',  onTouchMoveHand,  { passive: false });
   canvasWrap.addEventListener('touchend',   onTouchEndHand);
   canvasWrap.addEventListener('mousedown',  onMouseDownHand);
-  canvasWrap.addEventListener('wheel',      onWheelHand, { passive: false });
   document.addEventListener('mousemove', onMouseMoveHand);
   document.addEventListener('mouseup',   onMouseUpHand);
   canvasWrap.classList.add('hand-mode');
@@ -465,7 +515,6 @@ function deactivateHandMode() {
   canvasWrap.removeEventListener('touchmove',  onTouchMoveHand);
   canvasWrap.removeEventListener('touchend',   onTouchEndHand);
   canvasWrap.removeEventListener('mousedown',  onMouseDownHand);
-  canvasWrap.removeEventListener('wheel',      onWheelHand);
   document.removeEventListener('mousemove', onMouseMoveHand);
   document.removeEventListener('mouseup',   onMouseUpHand);
   handPan = null; handPinch = null;
@@ -865,6 +914,41 @@ async function loadBackground() {
 }
 
 // ── Boot ──────────────────────────────────────────────────
+
+// Wheel: always-on (scroll or zoom depending on Ctrl key)
+canvasWrap.addEventListener('wheel', onWheel, { passive: false });
+
+// Scrollbar thumb drag
+(function() {
+  const track = document.getElementById('scrollbar-track');
+  const thumb = document.getElementById('scrollbar-thumb');
+  let drag = null;
+
+  thumb.addEventListener('mousedown', e => {
+    e.stopPropagation();
+    drag = { startY: e.clientY, startTY: translateY };
+    thumb.classList.add('grabbing');
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!drag) return;
+    const totalH     = pagesContainer.offsetHeight * zoomLevel;
+    const wrapH      = canvasWrap.clientHeight;
+    const trackH     = track.clientHeight;
+    const thumbH     = thumb.offsetHeight;
+    const scrollRange = totalH - wrapH;
+    const ratio       = scrollRange / Math.max(1, trackH - thumbH);
+    translateY = Math.max(Math.min(drag.startTY - (e.clientY - drag.startY) * ratio, 0), wrapH - totalH);
+    applyTransform();
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!drag) return;
+    drag = null;
+    thumb.classList.remove('grabbing');
+  });
+})();
+
 loadBackground();
 setTool('select');
 </script>

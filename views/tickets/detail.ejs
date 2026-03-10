@@ -116,12 +116,9 @@
               <%
                 const _aExt = (a.original_name || '').split('.').pop().toLowerCase();
                 const _aAnnotatable = annotationExts.has(_aExt);
-                const _aHref = _aAnnotatable
-                  ? `/tickets/${ticket.id}/attachments/${a.stored_name}/annotate`
-                  : `/tickets/attachments/${a.stored_name}`;
               %>
               <li>
-                <a href="<%= _aHref %>" class="attachment-link" target="_blank">📎 <%= a.original_name %></a>
+                <a href="/tickets/attachments/<%= a.stored_name %>" class="attachment-link" target="_blank">📎 <%= a.original_name %></a>
                 <span class="meta-item" style="margin-left:.25rem">(<%= (a.size/1024).toFixed(1) %> KB)</span>
                 <% if (a.uploader_name) { %><span class="meta-item"> — <%= a.uploader_name %></span><% } %>
                 <% if (_aAnnotatable) { %>
