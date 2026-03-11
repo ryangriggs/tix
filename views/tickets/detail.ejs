@@ -95,6 +95,7 @@
               <select name="status_change" class="form-select form-select-sm" style="width:auto">
                 <option value=""        <%= ticket.status!=='closed'  ? 'selected':'' %>>Keep status</option>
                 <option value="new"     <%= ticket.status==='new'     ? 'disabled':'' %>>New</option>
+                <option value="pending" <%= ticket.status==='pending' ? 'disabled':'' %>>Pending</option>
                 <option value="open"    <%= ticket.status==='closed'  ? 'selected':'' %> <%= ticket.status==='open' ? 'disabled':'' %>>Open</option>
                 <option value="on_hold" <%= ticket.status==='on_hold' ? 'disabled':'' %>>On Hold</option>
                 <% if (canClose) { %>
@@ -181,7 +182,7 @@
         <div class="sidebar-section">
           <div class="sidebar-label">Status</div>
           <div class="pill-group" id="status-pills">
-            <% for (const [sv, sl] of [['new','New'],['open','Open'],['on_hold','On Hold'],['closed','Closed']]) { %>
+            <% for (const [sv, sl] of [['new','New'],['pending','Pending'],['open','Open'],['on_hold','On Hold'],['closed','Closed']]) { %>
               <button type="button"
                 class="pill-btn pill-status-<%= sv %><%= ticket.status===sv ? ' pill-active' : '' %>"
                 data-status="<%= sv %>"><%= sl %></button>

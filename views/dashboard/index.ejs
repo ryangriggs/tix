@@ -1,0 +1,86 @@
+<%- include('../partials/head', { title: 'Dashboard' }) %>
+<%- include('../partials/nav') %>
+
+<main class="container">
+  <div class="page-toolbar">
+    <h1 class="page-title">Dashboard</h1>
+    <a href="/tickets/new" class="btn btn-primary btn-sm">+ New Ticket</a>
+  </div>
+
+  <!-- Status overview -->
+  <div class="dash-status-grid">
+    <a href="/tickets?status=new&sort=priority&order=desc" class="dash-stat-card ds-new">
+      <div class="dash-stat-count"><%= stats.byStatus.new %></div>
+      <div class="dash-stat-label">New</div>
+    </a>
+    <a href="/tickets?status=pending&sort=priority&order=desc" class="dash-stat-card ds-pending">
+      <div class="dash-stat-count"><%= stats.byStatus.pending %></div>
+      <div class="dash-stat-label">Pending</div>
+    </a>
+    <a href="/tickets?status=open&sort=updated_at&order=desc" class="dash-stat-card ds-open">
+      <div class="dash-stat-count"><%= stats.byStatus.open %></div>
+      <div class="dash-stat-label">Open</div>
+    </a>
+    <a href="/tickets?status=on_hold&sort=updated_at&order=desc" class="dash-stat-card ds-on_hold">
+      <div class="dash-stat-count"><%= stats.byStatus.on_hold %></div>
+      <div class="dash-stat-label">On Hold</div>
+    </a>
+    <a href="/tickets?status=closed&sort=updated_at&order=desc" class="dash-stat-card ds-closed">
+      <div class="dash-stat-count"><%= stats.byStatus.closed %></div>
+      <div class="dash-stat-label">Closed</div>
+    </a>
+  </div>
+
+  <div class="dash-row">
+
+    <!-- Oldest open tickets -->
+    <div class="dash-panel">
+      <p class="dash-section-title">Oldest active tickets</p>
+      <% const activeStatuses = [['new','New','#d97706'],['pending','Pending','#2563eb'],['open','Open','#16a34a'],['on_hold','On Hold','#f97316']]; %>
+      <% let anyOldest = false; %>
+      <% for (const [sv, sl, sc] of activeStatuses) { %>
+        <% if (stats.oldestByStatus[sv]) { %>
+          <% anyOldest = true; %>
+          <div class="dash-oldest-item">
+            <span class="badge dash-oldest-badge" style="color:<%= sc %>;border:1px solid <%= sc %>;background:transparent"><%= sl %></span>
+            <a href="/tickets/<%= stats.oldestByStatus[sv].id %>" title="#<%= stats.oldestByStatus[sv].id %> — <%= stats.oldestByStatus[sv].subject %>">
+              <%= stats.oldestByStatus[sv].subject %>
+            </a>
+            <span class="dash-oldest-age"><%= formatDate(stats.oldestByStatus[sv].created_at) %></span>
+          </div>
+        <% } %>
+      <% } %>
+      <% if (!anyOldest) { %>
+        <p style="font-size:.85rem;color:var(--text-muted);margin:0">No active tickets.</p>
+      <% } %>
+    </div>
+
+    <!-- Priority breakdown + inactivity -->
+    <div class="dash-panel">
+      <p class="dash-section-title">Open by priority</p>
+      <div class="dash-priority-row" style="margin-bottom:1.25rem">
+        <% const prioColors = { urgent:'#6d28d9', high:'#ea580c', medium:'#2563eb', low:'#6b7280' }; %>
+        <% for (const [pv, pl] of [['urgent','Urgent'],['high','High'],['medium','Medium'],['low','Low']]) { %>
+          <a href="/tickets?status=new,pending,open,on_hold&priority=<%= pv %>&sort=priority&order=desc" class="dash-priority-chip" style="text-decoration:none;color:var(--text)">
+            <span class="priority-dot priority-dot-<%= pv %>"></span>
+            <span style="font-weight:600"><%= stats.byPriority[pv] %></span>
+            <span style="color:var(--text-muted)"><%= pl %></span>
+          </a>
+        <% } %>
+      </div>
+
+      <p class="dash-section-title">Alerts</p>
+      <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+        <a href="/tickets?status=new,pending,open,on_hold&since=1d&sort=updated_at&order=asc" class="dash-alert-chip"
+           title="Non-closed tickets with no activity in the last 24 hours">
+          <span style="font-weight:600"><%= stats.inactiveCount %></span>
+          <span style="color:var(--text-muted)">inactive &gt;24h</span>
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<%- include('../partials/foot') %>

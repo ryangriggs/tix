@@ -552,7 +552,7 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
     updated_at:    't.updated_at',
     due_date:      't.due_date',
     priority:      "CASE t.priority WHEN 'urgent' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END",
-    status:        "CASE t.status WHEN 'new' THEN 4 WHEN 'open' THEN 3 WHEN 'on_hold' THEN 2 WHEN 'closed' THEN 1 ELSE 0 END",
+    status:        "CASE t.status WHEN 'new' THEN 5 WHEN 'pending' THEN 4 WHEN 'open' THEN 3 WHEN 'on_hold' THEN 2 WHEN 'closed' THEN 1 ELSE 0 END",
     comment_count: 'comment_count',
     id:            't.id',
     subject:       't.subject',
@@ -1001,9 +1001,43 @@ function getTicketsDueSoon(withinHours = 24) {
 function getTicketCountsByStatus() {
   const rows = prepare('SELECT status, COUNT(*) AS count FROM tickets GROUP BY status').all();
   const total = prepare('SELECT COUNT(*) AS count FROM tickets').get().count;
-  const byStatus = { new: 0, open: 0, on_hold: 0, closed: 0 };
-  for (const r of rows) byStatus[r.status] = r.count;
+  const byStatus = { new: 0, pending: 0, open: 0, on_hold: 0, closed: 0 };
+  for (const r of rows) { if (r.status in byStatus) byStatus[r.status] = r.count; }
   return { ...byStatus, total };
+}
+
+function getDashboardStats() {
+  const ago24h = Math.floor(Date.now() / 1000) - 86400;
+
+  const statusRows = prepare('SELECT status, COUNT(*) AS count FROM tickets GROUP BY status').all();
+  const byStatus = { new: 0, pending: 0, open: 0, on_hold: 0, closed: 0 };
+  for (const r of statusRows) { if (r.status in byStatus) byStatus[r.status] = r.count; }
+
+  // Oldest ticket per active status
+  const oldestRows = prepare(`
+    SELECT id, subject, status, created_at
+    FROM tickets
+    WHERE status IN ('new','pending','open','on_hold')
+    ORDER BY created_at ASC
+  `).all();
+  const oldestByStatus = {};
+  for (const r of oldestRows) {
+    if (!oldestByStatus[r.status]) oldestByStatus[r.status] = r;
+  }
+
+  // Non-closed tickets with no activity in last 24h
+  const inactiveCount = prepare(
+    `SELECT COUNT(*) AS count FROM tickets WHERE status NOT IN ('closed') AND updated_at < ?`
+  ).get(ago24h).count;
+
+  // Priority breakdown (non-closed)
+  const priorityRows = prepare(
+    `SELECT priority, COUNT(*) AS count FROM tickets WHERE status NOT IN ('closed') GROUP BY priority`
+  ).all();
+  const byPriority = { urgent: 0, high: 0, medium: 0, low: 0 };
+  for (const r of priorityRows) { if (r.priority in byPriority) byPriority[r.priority] = r.count; }
+
+  return { byStatus, oldestByStatus, inactiveCount, byPriority };
 }
 
 function getAttachmentCount() {
@@ -1090,7 +1124,7 @@ module.exports = {
   getOpenTicketsForInactivityCheck, setInactivityReminderSent,
   getTicketByReplyToken, disableAllPartyNotifications, disablePartyNotifications, togglePartyNotifications,
   // Reports
-  getBillingReport, getTicketCountsByStatus, getAttachmentCount,
+  getBillingReport, getTicketCountsByStatus, getDashboardStats, getAttachmentCount,
   // Organizations
   findOrCreateOrganization, getAllOrganizations, getOrganizationsByIds, searchOrganizations,
   renameOrganization, deleteOrganization, getOrganizationById,

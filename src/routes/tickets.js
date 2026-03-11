@@ -156,8 +156,8 @@ async function notifyParties(ticket, actorEmail, messageBody, commentId, inReply
 // ============================================================
 
 const SINCE_SECONDS    = { '1d': 86400, '7d': 7 * 86400, '30d': 30 * 86400 };
-const DEFAULT_PREFS    = { status: 'new,open,on_hold', priority: '', sort: 'priority', order: 'desc', since: '', org: '', q: '', owner: 'me' };
-const VALID_STATUSES   = ['new', 'open', 'on_hold', 'closed'];
+const DEFAULT_PREFS    = { status: 'new,pending,open,on_hold', priority: '', sort: 'priority', order: 'desc', since: '', org: '', q: '', owner: 'me' };
+const VALID_STATUSES   = ['new', 'pending', 'open', 'on_hold', 'closed'];
 const VALID_PRIORITIES = ['urgent', 'high', 'medium', 'low'];
 const FILTER_COOKIE  = 'tix_filters';
 
@@ -425,7 +425,7 @@ router.post('/bulk', (req, res) => {
     audit.log(req, `bulk deleted ${ids.length} ticket(s): ${ids.join(', ')}`);
     sse.broadcastToAll({ type: 'tickets_deleted', ticketIds: ids });
   } else if (action === 'status') {
-    const validStatuses = ['new', 'open', 'on_hold', 'closed'];
+    const validStatuses = ['new', 'pending', 'open', 'on_hold', 'closed'];
     if (validStatuses.includes(bulkStatus)) {
       db.bulkUpdateStatus(ids, bulkStatus);
       audit.log(req, `bulk changed status to ${bulkStatus} on ${ids.length} ticket(s): ${ids.join(', ')}`);
@@ -503,7 +503,7 @@ router.post('/:id/comments', upload, async (req, res) => {
   if (!body.trim()) return res.redirect(`/tickets/${ticket.id}`);
 
   // Optional status change submitted alongside the comment
-  const validStatuses = ['new', 'open', 'on_hold', 'closed'];
+  const validStatuses = ['new', 'pending', 'open', 'on_hold', 'closed'];
   const statusChange = req.body.status_change;
   let willChangeStatus = statusChange && validStatuses.includes(statusChange) &&
                          statusChange !== ticket.status && canManage(ticket, req.user);
@@ -606,7 +606,7 @@ router.post('/:id/status', async (req, res) => {
   if (!ticket) return res.status(404).json({ error: 'Not found' });
   if (!canManage(ticket, req.user)) return res.status(403).json({ error: 'Forbidden' });
 
-  const validStatuses = ['new', 'open', 'on_hold', 'closed'];
+  const validStatuses = ['new', 'pending', 'open', 'on_hold', 'closed'];
   const status = req.body.status;
   if (!validStatuses.includes(status)) return res.status(400).json({ error: 'Invalid status' });
 
