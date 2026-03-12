@@ -1496,3 +1496,45 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 .settings-section-title { font-size: 1rem; font-weight: 600; margin-bottom: 1.25rem; }
 .settings-sub-title { font-size: .875rem; font-weight: 600; margin: 1rem 0 .5rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
 .settings-transport-section { border-top: 1px solid var(--border); margin-top: 1rem; padding-top: .75rem; }
+
+/* Settings floating side-nav */
+.settings-sidenav {
+  position: fixed;
+  top: 5rem;
+  right: 1.25rem;
+  width: 155px;
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0;
+  z-index: 50;
+  display: none;
+  box-shadow: var(--shadow-md);
+}
+@media (min-width: 1060px) { .settings-sidenav { display: block; } }
+.settings-sidenav-title {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--text-muted);
+  padding: 0 0.75rem 0.4rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.3rem;
+}
+.settings-sidenav-link {
+  display: block;
+  font-size: 0.78rem;
+  padding: 0.28rem 0.75rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: color .1s, border-color .1s, background .1s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.settings-sidenav-link:hover { color: var(--text); background: var(--bg); }
+.settings-sidenav-link.active { color: var(--accent); border-left-color: var(--accent); font-weight: 500; }

@@ -1,6 +1,24 @@
 <%- include('../partials/head', { title: 'Settings' }) %>
 <%- include('../partials/nav') %>
 
+<aside class="settings-sidenav" id="settings-sidenav" aria-label="Settings sections">
+  <div class="settings-sidenav-title">Sections</div>
+  <a href="#s-general"        class="settings-sidenav-link">General</a>
+  <a href="#s-security"       class="settings-sidenav-link">Security</a>
+  <a href="#s-due-reminders"  class="settings-sidenav-link">Due-date Reminders</a>
+  <a href="#s-email"          class="settings-sidenav-link">Email Transport</a>
+  <a href="#s-uploads"        class="settings-sidenav-link">Uploads &amp; Rate Limits</a>
+  <a href="#s-features"       class="settings-sidenav-link">Features</a>
+  <a href="#s-updates"        class="settings-sidenav-link">Updates</a>
+  <a href="#s-inactivity"     class="settings-sidenav-link">Inactivity Reminders</a>
+  <a href="#s-backups"        class="settings-sidenav-link">Backups</a>
+  <a href="#s-update-status"  class="settings-sidenav-link">Update Status</a>
+  <a href="#s-backup-status"  class="settings-sidenav-link">Backup Status</a>
+  <a href="#s-infrastructure" class="settings-sidenav-link">Infrastructure</a>
+  <a href="#s-server-stats"   class="settings-sidenav-link">Server Stats</a>
+  <a href="#s-browser-cache"  class="settings-sidenav-link">Browser Cache</a>
+</aside>
+
 <main class="container container-narrow">
   <h1 class="page-title">Settings</h1>
 
@@ -12,7 +30,7 @@
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 
     <!-- ── General ─────────────────────────────────────────── -->
-    <div class="card" style="margin-bottom:1.5rem">
+    <div class="card" id="s-general" style="margin-bottom:1.5rem">
       <h2 class="settings-section-title">General</h2>
 
       <div class="form-group">
@@ -91,7 +109,7 @@
     </div>
 
     <!-- ── Security ──────────────────────────────────────────── -->
-    <div class="card" style="margin-bottom:1.5rem">
+    <div class="card" id="s-security" style="margin-bottom:1.5rem">
       <h2 class="settings-section-title">Security</h2>
 
       <div class="form-group">
@@ -128,7 +146,7 @@
     </div>
 
     <!-- ── Due-date reminders ─────────────────────────────────── -->
-    <div class="card" style="margin-bottom:1.5rem">
+    <div class="card" id="s-due-reminders" style="margin-bottom:1.5rem">
       <h2 class="settings-section-title">Due-date reminders</h2>
 
       <div class="form-row" style="gap:.75rem;flex-wrap:wrap">
@@ -154,7 +172,7 @@
     </div>
 
     <!-- ── Email transport ──────────────────────────────────── -->
-    <div class="card" style="margin-bottom:1.5rem">
+    <div class="card" id="s-email" style="margin-bottom:1.5rem">
       <h2 class="settings-section-title">Email Transport</h2>
 
       <div class="form-group">
@@ -258,7 +276,7 @@
     </div>
 
     <!-- ── Uploads & Rate Limits ─────────────────────────────── -->
-    <div class="card" style="margin-bottom:1.5rem">
+    <div class="card" id="s-uploads" style="margin-bottom:1.5rem">
       <h2 class="settings-section-title">Uploads &amp; Rate Limits</h2>
 
       <div class="form-group">
@@ -307,7 +325,7 @@
     </div>
 
     <!-- ── Features ─────────────────────────────────────────── -->
-    <div class="card" style="margin-bottom:1.5rem">
+    <div class="card" id="s-features" style="margin-bottom:1.5rem">
       <h2 class="settings-section-title">Features</h2>
 
       <div class="form-group">
@@ -330,7 +348,7 @@
     </div>
 
     <!-- ── Updates ──────────────────────────────────────────── -->
-    <div class="card" style="margin-bottom:1.5rem" id="updates">
+    <div class="card" id="s-updates" style="margin-bottom:1.5rem">
       <h2 class="settings-section-title">Updates</h2>
 
       <div class="form-group">
@@ -363,7 +381,7 @@
     </div>
 
     <!-- ── Inactivity Reminders ─────────────────────────────── -->
-    <div class="card" style="margin-bottom:1.5rem">
+    <div class="card" id="s-inactivity" style="margin-bottom:1.5rem">
       <h2 class="settings-section-title">Inactivity Reminders</h2>
       <p class="form-hint" style="margin-bottom:1rem">
         Send a reminder email to ticket owners when an open ticket has had no activity for the specified time.
@@ -399,7 +417,7 @@
     </div>
 
     <!-- ── Backups ──────────────────────────────────────────── -->
-    <div class="card" style="margin-bottom:1.5rem">
+    <div class="card" id="s-backups" style="margin-bottom:1.5rem">
       <h2 class="settings-section-title">Backups</h2>
       <div class="form-group">
         <label class="form-label">Backup Frequency (hours, 0 = disabled)</label>
@@ -422,7 +440,7 @@
   </form>
 
   <!-- ── Update status (outside main form) ────────────────────── -->
-  <div class="card" style="margin-top:1.5rem">
+  <div class="card" id="s-update-status" style="margin-top:1.5rem">
     <h2 class="settings-section-title">Update Status</h2>
 
     <p style="font-size:.9rem;margin-bottom:1rem">
@@ -454,7 +472,7 @@
   </div>
 
   <!-- ── Backup Status (outside main form) ───────────────────── -->
-  <div class="card" style="margin-top:1.5rem">
+  <div class="card" id="s-backup-status" style="margin-top:1.5rem">
     <h2 class="settings-section-title">Backup Status</h2>
 
     <table style="border-collapse:collapse;margin-bottom:1rem;width:100%">
@@ -535,7 +553,7 @@
   </script>
 
   <!-- ── Infrastructure (read-only) ──────────────────────────── -->
-  <div class="card" style="margin-top:1.5rem">
+  <div class="card" id="s-infrastructure" style="margin-top:1.5rem">
     <h2 class="settings-section-title">Infrastructure</h2>
     <p class="form-hint" style="margin-bottom:1rem">These values come from your <code>.env</code> file and require a server restart to change.</p>
     <table style="width:100%;border-collapse:collapse">
@@ -549,7 +567,7 @@
   </div>
 
   <!-- ── Server Stats ─────────────────────────────────────── -->
-  <div class="card" style="margin-top:1.5rem">
+  <div class="card" id="s-server-stats" style="margin-top:1.5rem">
     <h2 class="settings-section-title">Server Stats</h2>
     <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap">
       <button type="button" class="btn btn-secondary btn-sm" id="stats-load-btn" onclick="loadStats()">Load Stats</button>
@@ -612,7 +630,7 @@
   </script>
 
   <!-- ── Browser cache ─────────────────────────────────────── -->
-  <div class="card" style="margin-top:1.5rem">
+  <div class="card" id="s-browser-cache" style="margin-top:1.5rem">
     <h2 class="settings-section-title">Browser Cache</h2>
     <p class="form-hint" style="margin-bottom:1.25rem">
       If users report stale UI after an update, they can clear their local service-worker cache and reload.
@@ -620,6 +638,61 @@
     <button type="button" class="btn btn-secondary" onclick="clearSWCache(this)">Clear cached files &amp; reload</button>
   </div>
 </main>
+
+<script>
+(function () {
+  const nav = document.getElementById('settings-sidenav');
+  if (!nav) return;
+
+  const sectionIds = [
+    's-general','s-security','s-due-reminders','s-email','s-uploads','s-features',
+    's-updates','s-inactivity','s-backups','s-update-status','s-backup-status',
+    's-infrastructure','s-server-stats','s-browser-cache',
+  ];
+
+  // Smooth scroll on link click
+  nav.querySelectorAll('.settings-sidenav-link').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      const target = document.querySelector(link.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  // Highlight active section via IntersectionObserver
+  const linkMap = {};
+  nav.querySelectorAll('.settings-sidenav-link').forEach(a => {
+    const id = a.getAttribute('href').slice(1);
+    linkMap[id] = a;
+  });
+
+  let activeId = null;
+  function setActive(id) {
+    if (id === activeId) return;
+    if (activeId && linkMap[activeId]) linkMap[activeId].classList.remove('active');
+    activeId = id;
+    if (id && linkMap[id]) linkMap[id].classList.add('active');
+  }
+
+  const observer = new IntersectionObserver(entries => {
+    // Pick the topmost visible section
+    let topEntry = null;
+    for (const e of entries) {
+      if (e.isIntersecting) {
+        if (!topEntry || e.boundingClientRect.top < topEntry.boundingClientRect.top) {
+          topEntry = e;
+        }
+      }
+    }
+    if (topEntry) setActive(topEntry.target.id);
+  }, { threshold: 0, rootMargin: '-10% 0px -60% 0px' });
+
+  sectionIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) observer.observe(el);
+  });
+})();
+</script>
 
 <script>
 // Show only the active transport section
@@ -668,7 +741,7 @@ async function checkNow() {
       result.textContent = 'Error: ' + data.error;
     } else if (data.available) {
       result.style.color = '#d97706';
-      result.innerHTML = 'Update available: <strong>v' + data.latestVersion + '</strong> &mdash; <a href="#updates" onclick="startInstall();return false">Install now</a>';
+      result.innerHTML = 'Update available: <strong>v' + data.latestVersion + '</strong> &mdash; <a href="#s-updates" onclick="startInstall();return false">Install now</a>';
     } else {
       result.style.color = '#16a34a';
       result.textContent = 'Up to date (v' + data.latestVersion + ')';
