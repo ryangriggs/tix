@@ -298,14 +298,14 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
   if (!usePopover) styleArr.unshift('display:none');
   dropdown.style.cssText = styleArr.join(';');
 
-  if (usePopover) {
-    dropdown.setAttribute('popover', 'manual');
-    document.body.appendChild(dropdown);
-  } else {
-    // Append inside the dialog (if present) so it isn't made inert by showModal()
-    const host = inputEl.closest('dialog') || document.body;
-    host.appendChild(dropdown);
-  }
+  // Always append inside the closest <dialog> when present — showModal() marks
+  // everything outside the dialog as inert (no pointer events), so a dropdown
+  // attached to document.body is visible but completely non-interactive.
+  // The Popover API still works correctly when the popover element is a
+  // descendant of the dialog; showPopover() promotes it to the top layer above it.
+  if (usePopover) dropdown.setAttribute('popover', 'manual');
+  const host = inputEl.closest('dialog') || document.body;
+  host.appendChild(dropdown);
 
   // Suppress blur-close while the user is interacting with the dropdown
   let suppressBlur = false;
