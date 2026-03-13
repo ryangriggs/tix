@@ -282,7 +282,8 @@ document.addEventListener('DOMContentLoaded', () => localiseTimestamps());
 function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars = 1, showOnFocus = false } = {}) {
   // Use the Popover API when available: popover elements are placed in the browser
   // top layer, which sits above showModal() dialogs regardless of z-index.
-  // Fallback: body-attached position:fixed (works fine outside dialogs).
+  // Fallback: append inside the closest <dialog> (if any) so the dropdown is not
+  // made inert by showModal(), otherwise fall back to document.body.
   const usePopover = typeof HTMLElement.prototype.showPopover === 'function';
 
   const dropdown = document.createElement('ul');
@@ -297,8 +298,17 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
   if (!usePopover) styleArr.unshift('display:none');
   dropdown.style.cssText = styleArr.join(';');
 
-  if (usePopover) dropdown.setAttribute('popover', 'manual');
-  document.body.appendChild(dropdown);
+  if (usePopover) {
+    dropdown.setAttribute('popover', 'manual');
+    document.body.appendChild(dropdown);
+  } else {
+    // Append inside the dialog (if present) so it isn't made inert by showModal()
+    const host = inputEl.closest('dialog') || document.body;
+    host.appendChild(dropdown);
+  }
+
+  // Suppress blur-close while the user is interacting with the dropdown
+  let suppressBlur = false;
 
   function isOpen()  {
     return usePopover ? dropdown.matches(':popover-open') : dropdown.style.display !== 'none';
@@ -328,6 +338,11 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
   let currentItems = [];
   let debounceTimer = null;
 
+  // Set suppressBlur on the whole dropdown so any pointer/touch into it blocks blur-close
+  dropdown.addEventListener('pointerdown', e => { suppressBlur = true; e.preventDefault(); });
+  dropdown.addEventListener('pointerup',   () => { suppressBlur = false; });
+  dropdown.addEventListener('pointercancel', () => { suppressBlur = false; });
+
   function render(items) {
     currentItems = items;
     activeIdx = -1;
@@ -338,7 +353,7 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
       li.style.cssText = 'padding:.4rem .75rem;cursor:pointer;font-size:.875rem;white-space:nowrap;';
       li.innerHTML = formatItem(item);
       li.addEventListener('mouseenter', () => setActive(i));
-      li.addEventListener('mousedown', e => { e.preventDefault(); choose(item); });
+      li.addEventListener('click', () => choose(item));
       dropdown.appendChild(li);
     });
     positionDropdown();
@@ -390,7 +405,7 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
     else if (e.key === 'Escape') close();
   });
 
-  inputEl.addEventListener('blur', () => setTimeout(close, 150));
+  inputEl.addEventListener('blur', () => { if (!suppressBlur) setTimeout(close, 150); });
 }
 
 // ============================================================
