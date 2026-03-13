@@ -338,9 +338,11 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
   let currentItems = [];
   let debounceTimer = null;
 
-  // Set suppressBlur on the whole dropdown so any pointer/touch into it blocks blur-close
-  dropdown.addEventListener('pointerdown', e => { suppressBlur = true; e.preventDefault(); });
-  dropdown.addEventListener('pointerup',   () => { suppressBlur = false; });
+  // Set suppressBlur when the user presses on the dropdown so the blur handler
+  // (which fires before click) doesn't close it before choose() runs.
+  // Do NOT call e.preventDefault() here — cancelling pointerdown suppresses click.
+  dropdown.addEventListener('pointerdown',   () => { suppressBlur = true; });
+  dropdown.addEventListener('pointerup',     () => { suppressBlur = false; });
   dropdown.addEventListener('pointercancel', () => { suppressBlur = false; });
 
   function render(items) {
