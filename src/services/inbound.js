@@ -16,6 +16,16 @@ const audit = require('./audit');
 // getHeader(name) — case-insensitive header lookup (returns string or falsy)
 // ============================================================
 
+// mailparser can return strings, structured objects, or arrays for header values.
+// Normalise whatever it gives us into a plain string.
+function headerString(val) {
+  if (!val) return '';
+  if (typeof val === 'string') return val;
+  if (Array.isArray(val)) return headerString(val[0]);
+  if (typeof val === 'object') return typeof val.text === 'string' ? val.text : String(val);
+  return String(val);
+}
+
 function isAutoResponse(fromEmail, getHeader) {
   // Never process mail sent by our own ticketing address
   if (fromEmail === config.ticketEmail.trim().toLowerCase()) return true;
@@ -24,15 +34,15 @@ function isAutoResponse(fromEmail, getHeader) {
   if (/^(mailer-daemon|postmaster)@/i.test(fromEmail)) return true;
 
   // RFC 3834 — Auto-Submitted: anything other than "no" means automated
-  const autoSubmitted = (getHeader('auto-submitted') || '').toLowerCase().trim();
+  const autoSubmitted = getHeader('auto-submitted').toLowerCase().trim();
   if (autoSubmitted && autoSubmitted !== 'no') return true;
 
   // Precedence: bulk / list / junk
-  const precedence = (getHeader('precedence') || '').toLowerCase().trim();
+  const precedence = getHeader('precedence').toLowerCase().trim();
   if (['bulk', 'list', 'junk'].includes(precedence)) return true;
 
   // Empty Return-Path (<>) is the RFC 5321 indicator for a bounce / NDR
-  if ((getHeader('return-path') || '').trim() === '<>') return true;
+  if (getHeader('return-path').trim() === '<>') return true;
 
   // Microsoft Exchange: if present on an inbound message it's an auto-response
   if (getHeader('x-auto-response-suppress')) return true;
@@ -195,63 +205,70 @@ function extractReplyToken(addressValues) {
 // ============================================================
 
 async function processInboundEmail(rawEmail) {
-  const parsed = await simpleParser(rawEmail);
+  let fromEmail = null;
+  try {
+    const parsed = await simpleParser(rawEmail);
 
-  const fromAddr = parsed.from?.value?.[0];
-  if (!fromAddr?.address) {
-    console.log('[Inbound] Ignoring email with no From address');
-    return;
-  }
-  const fromEmail = fromAddr.address.toLowerCase();
-
-  // Drop auto-responses and bounces before doing anything else
-  if (isAutoResponse(fromEmail, name => parsed.headers?.get(name))) {
-    console.log(`[Inbound] Auto-response/bounce from ${fromEmail} — ignoring`);
-    return;
-  }
-
-  // --- Reply detection ---
-  // 1. Reply-To token in To/CC (survives forwarding — primary mechanism)
-  // 2. In-Reply-To / References Message-ID lookup (legacy fallback)
-  // 3. Subject tag [Ticket #N] — only trusted for existing parties
-  let existingTicketId = null;
-  let subjectFallback  = false;
-
-  const toAddrs = [
-    ...(parsed.to?.value  || []),
-    ...(parsed.cc?.value  || []),
-  ];
-  const replyToken = extractReplyToken(toAddrs);
-  if (replyToken) {
-    existingTicketId = db.findTicketByReplyToken(replyToken);
-  }
-
-  if (!existingTicketId && parsed.inReplyTo) {
-    existingTicketId = db.findTicketByMessageId(parsed.inReplyTo);
-  }
-
-  if (!existingTicketId && parsed.references) {
-    const refs = Array.isArray(parsed.references) ? parsed.references : [parsed.references];
-    for (const ref of refs) {
-      existingTicketId = db.findTicketByMessageId(ref);
-      if (existingTicketId) break;
+    const fromAddr = parsed.from?.value?.[0];
+    if (!fromAddr?.address) {
+      console.log('[Inbound] Ignoring email with no From address');
+      return;
     }
-  }
+    fromEmail = fromAddr.address.toLowerCase();
 
-  if (!existingTicketId && parsed.subject) {
-    const pfx = config.ticketPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const m = parsed.subject.match(new RegExp(`\\[Ticket\\s*#${pfx}(\\d+)\\]`, 'i'))
-           || parsed.subject.match(new RegExp(`\\[#${pfx}(\\d+)\\]`, 'i'));
-    if (m) { existingTicketId = parseInt(m[1], 10); subjectFallback = true; }
-  }
+    // Drop auto-responses and bounces before doing anything else
+    if (isAutoResponse(fromEmail, name => headerString(parsed.headers?.get(name)))) {
+      console.log(`[Inbound] Auto-response/bounce from ${fromEmail} — ignoring`);
+      return;
+    }
 
-  const isSilent = !!(config.ticketSilentEmail &&
-    toAddrs.some(a => (a.address || '').toLowerCase() === config.ticketSilentEmail.toLowerCase()));
+    // --- Reply detection ---
+    // 1. Reply-To token in To/CC (survives forwarding — primary mechanism)
+    // 2. In-Reply-To / References Message-ID lookup (legacy fallback)
+    // 3. Subject tag [Ticket #N] — only trusted for existing parties
+    let existingTicketId = null;
+    let subjectFallback  = false;
 
-  if (existingTicketId) {
-    await handleReply(existingTicketId, fromEmail, parsed, subjectFallback);
-  } else {
-    await handleNewTicket(fromEmail, parsed, { silent: isSilent });
+    const toAddrs = [
+      ...(parsed.to?.value  || []),
+      ...(parsed.cc?.value  || []),
+    ];
+    const replyToken = extractReplyToken(toAddrs);
+    if (replyToken) {
+      existingTicketId = db.findTicketByReplyToken(replyToken);
+    }
+
+    if (!existingTicketId && parsed.inReplyTo) {
+      existingTicketId = db.findTicketByMessageId(parsed.inReplyTo);
+    }
+
+    if (!existingTicketId && parsed.references) {
+      const refs = Array.isArray(parsed.references) ? parsed.references : [parsed.references];
+      for (const ref of refs) {
+        existingTicketId = db.findTicketByMessageId(ref);
+        if (existingTicketId) break;
+      }
+    }
+
+    if (!existingTicketId && parsed.subject) {
+      const pfx = config.ticketPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const m = parsed.subject.match(new RegExp(`\\[Ticket\\s*#${pfx}(\\d+)\\]`, 'i'))
+             || parsed.subject.match(new RegExp(`\\[#${pfx}(\\d+)\\]`, 'i'));
+      if (m) { existingTicketId = parseInt(m[1], 10); subjectFallback = true; }
+    }
+
+    const isSilent = !!(config.ticketSilentEmail &&
+      toAddrs.some(a => (a.address || '').toLowerCase() === config.ticketSilentEmail.toLowerCase()));
+
+    if (existingTicketId) {
+      await handleReply(existingTicketId, fromEmail, parsed, subjectFallback);
+    } else {
+      await handleNewTicket(fromEmail, parsed, { silent: isSilent });
+    }
+
+  } catch (err) {
+    console.error(`[Inbound] Failed to process email${fromEmail ? ` from ${fromEmail}` : ''}: ${err.message}`, err);
+    throw err; // propagate to SMTP layer for protocol-level rejection
   }
 }
 

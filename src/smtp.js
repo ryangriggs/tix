@@ -27,10 +27,14 @@ function startSMTPServer() {
         const rawEmail = Buffer.concat(chunks);
         try {
           await processInboundEmail(rawEmail);
+          callback();
         } catch (err) {
-          console.error('[SMTP] Failed to process email:', err);
+          // Reject at the SMTP protocol level so the sender's MTA logs the failure
+          // and their postmaster is notified — no outbound email needed on our side.
+          const smtpErr = new Error('Message processing failed. Please contact support.');
+          smtpErr.responseCode = 451; // temporary local error — sender will retry
+          callback(smtpErr);
         }
-        callback(); // always ACK to the sender so they don't retry
       });
       stream.on('error', err => {
         console.error('[SMTP] Stream error:', err);

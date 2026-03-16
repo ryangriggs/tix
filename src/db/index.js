@@ -1046,18 +1046,16 @@ function getAttachmentCount() {
 
 function getBillingReport(fromTs, toTs) {
   return prepare(`
-    SELECT t.id, t.subject, t.created_at, t.status,
+    SELECT t.id, t.subject, t.status,
            o.name AS organization_name,
-           COALESCE(SUM(c.billable_hours), 0) AS period_hours,
-           MIN(c.created_at) AS first_reply_in_period
+           c.created_at AS comment_ts,
+           c.billable_hours
     FROM tickets t
     LEFT JOIN organizations o ON o.id = t.organization_id
     JOIN comments c ON c.ticket_id = t.id
     WHERE c.created_at >= ? AND c.created_at <= ?
       AND c.billable_hours > 0
-    GROUP BY t.id
-    HAVING period_hours > 0
-    ORDER BY first_reply_in_period ASC
+    ORDER BY t.id ASC, c.created_at ASC
   `).all(fromTs, toTs);
 }
 

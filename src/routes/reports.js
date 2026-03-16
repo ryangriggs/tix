@@ -31,16 +31,27 @@ router.get('/billing.csv', requireAdmin, (req, res) => {
   console.log(`[Reports] Billing: from=${from}(${fromTs}) to=${to}(${toTs}), rows=${rows.length}`);
   audit.log(req, `ran Billing report (${from} to ${to})`);
 
-  const escape  = v => `"${String(v || '').replace(/"/g, '""')}"`;
-  const fmtDate = ts => ts ? new Date(ts * 1000).toISOString().slice(0, 10) : '';
+  const escape = v => `"${String(v || '').replace(/"/g, '""')}"`;
 
-  const header = 'Ticket ID,Ticket Title,Status,Organization,Billable Hours (Period)';
-  const lines  = rows.map(r => [
-    escape(`${ticketPrefix}${r.id}`),
-    escape(r.subject),
-    escape(r.status || ''),
-    escape(r.organization_name || ''),
-    r.period_hours,
+  // One output row per (ticket, calendar date). Same-day comments are summed.
+  // Use a Map keyed by "ticketId|YYYY-MM-DD" to preserve insertion order per ticket.
+  const dayMap = new Map();
+  for (const r of rows) {
+    const dateStr = new Date(r.comment_ts * 1000).toLocaleDateString('en-CA'); // YYYY-MM-DD, local tz
+    const key     = `${r.id}|${dateStr}`;
+    if (!dayMap.has(key)) {
+      dayMap.set(key, { id: r.id, subject: r.subject, organization_name: r.organization_name, dateStr, hours: 0 });
+    }
+    dayMap.get(key).hours += r.billable_hours;
+  }
+
+  const header = 'Organization Name,Ticket Title,Billable Hours,Ticket Number,Date of Work';
+  const lines  = [...dayMap.values()].map(e => [
+    escape(e.organization_name || ''),
+    escape(e.subject),
+    e.hours,
+    escape(`${ticketPrefix}${e.id}`),
+    escape(e.dateStr),
   ].join(','));
 
   const csv = [header, ...lines].join('\r\n');
