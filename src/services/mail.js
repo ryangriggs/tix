@@ -346,4 +346,4 @@ async function sendInactivityReminder(email, ticket, hours) {
 
 function resetMailTransport() { _transport = null; }
 
-module.exports = { send, sendMagicLink, sendTicketNotification, sendDueReminder, sendInactivityReminder, resetMailTransport, makeUnsubToken, parseUnsubToken };
+module.exports = { send, sendMagicLink, sendTicketNotification, sendDueReminder, sendInactivityReminder, resetMailTransport, makeUnsubToken, parseUnsubToken, logEmail };

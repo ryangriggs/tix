@@ -7,7 +7,7 @@ const fs = require('fs');
 
 const config = require('../config');
 const db = require('../db');
-const { sendTicketNotification } = require('./mail');
+const { sendTicketNotification, logEmail } = require('./mail');
 const sse = require('./sse');
 const audit = require('./audit');
 
@@ -218,7 +218,9 @@ async function processInboundEmail(rawEmail) {
 
     // Drop auto-responses and bounces before doing anything else
     if (isAutoResponse(fromEmail, name => headerString(parsed.headers?.get(name)))) {
+      const subject = parsed.subject || '(no subject)';
       console.log(`[Inbound] Auto-response/bounce from ${fromEmail} — ignoring`);
+      logEmail(`[BOUNCE] ${fromEmail}`, subject);
       return;
     }
 
