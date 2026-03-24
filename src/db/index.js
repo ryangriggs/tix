@@ -274,6 +274,7 @@ async function initDb() {
   try { _db.exec('ALTER TABLE tickets ADD COLUMN inactivity_reminder_days    INTEGER'); } catch (_) {}
   try { _db.exec('ALTER TABLE tickets ADD COLUMN inactivity_reminder_sent_at INTEGER'); } catch (_) {}
   try { _db.exec('ALTER TABLE ticket_parties ADD COLUMN notifications_disabled INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
+  try { _db.exec('ALTER TABLE users ADD COLUMN notifications_muted INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   _db.exec('CREATE INDEX IF NOT EXISTS idx_comments_location ON comments(location_id)');
   // Back-fill close_date for tickets closed before this column existed
   _db.exec(`UPDATE tickets SET close_date = updated_at WHERE status = 'closed' AND close_date IS NULL`);
@@ -387,6 +388,20 @@ function updateUserOrganization(userId, orgId) {
 
 function updateUserSuperuser(userId, val) {
   prepare('UPDATE users SET is_group_superuser = ? WHERE id = ?').run(val ? 1 : 0, userId);
+}
+
+function setUserNotificationsMuted(userId, val) {
+  prepare('UPDATE users SET notifications_muted = ? WHERE id = ?').run(val ? 1 : 0, userId);
+}
+
+// Returns a filtered copy of the emails array, excluding addresses whose user
+// has notifications_muted set. Unknown emails (no account yet) are kept.
+function filterNotificationRecipients(emails) {
+  if (!emails || !emails.length) return [];
+  return emails.filter(email => {
+    const u = prepare('SELECT notifications_muted FROM users WHERE email = ? COLLATE NOCASE').get(email);
+    return !u || !u.notifications_muted;
+  });
 }
 
 function searchUsers(q, scopeOrgId = null) {
@@ -1100,7 +1115,8 @@ module.exports = {
   // Users
   findOrCreateUser, getUserById, getUserByEmail, getAllUsers, getUsersSorted, getAssignableUsers,
   updateUserRole, updateUserName, blockUser, unblockUser, deleteUser,
-  updateUserOrganization, updateUserSuperuser, searchUsers,
+  updateUserOrganization, updateUserSuperuser, setUserNotificationsMuted,
+  filterNotificationRecipients, searchUsers,
   // Auth
   createAuthToken, verifyAuthToken, verifyOTPByTokenId, getAuthTokenEmail,
   // Tickets

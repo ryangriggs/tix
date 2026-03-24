@@ -529,8 +529,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addPartyDetails = document.querySelector('.add-party-details');
     if (addPartyDetails) {
       addPartyDetails.addEventListener('toggle', () => {
-        const _isTouch = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
-        if (addPartyDetails.open && !_isTouch) setTimeout(() => addPartyInput.focus(), 50);
+        if (addPartyDetails.open) setTimeout(() => addPartyInput.focus(), 50);
       });
     }
   }
@@ -549,16 +548,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const IS_ADMIN           = <%= user.role === 'admin' ? 'true' : 'false' %>;
   const BILLABLE_ENABLED   = <%= enableBillableHours ? 'true' : 'false' %>;
 
-  async function sidebarPost(path, data) {
+  async function sidebarPost(path, data, spinEl) {
+    if (spinEl) window.spinButton(spinEl);
     const body = new URLSearchParams({ _csrf: CSRF, ...data });
-    const res = await fetch(path, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
-      body:    body.toString(),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.error || `Request failed (${res.status})`);
-    return json;
+    try {
+      const res = await fetch(path, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+        body:    body.toString(),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || `Request failed (${res.status})`);
+      return json;
+    } finally {
+      if (spinEl) window.restoreButton(spinEl);
+    }
   }
 
   function flashBtn(btn, ok) {
@@ -573,7 +577,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', async () => {
       const sv = btn.dataset.status;
       try {
-        await sidebarPost(`/tickets/${TICKET_ID}/status`, { status: sv });
+        await sidebarPost(`/tickets/${TICKET_ID}/status`, { status: sv }, btn);
         document.querySelectorAll('#status-pills .pill-btn').forEach(b => b.classList.remove('pill-active'));
         btn.classList.add('pill-active');
         const badge = document.getElementById('badge-status');
@@ -587,7 +591,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', async () => {
       const pv = btn.dataset.priority;
       try {
-        await sidebarPost(`/tickets/${TICKET_ID}/priority`, { priority: pv });
+        await sidebarPost(`/tickets/${TICKET_ID}/priority`, { priority: pv }, btn);
         document.querySelectorAll('#priority-pills .pill-btn').forEach(b => b.classList.remove('pill-active'));
         btn.classList.add('pill-active');
         const badge = document.getElementById('badge-priority');
@@ -604,7 +608,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const input = dueDateForm.querySelector('[name="due_date"]');
       const setBtn = dueDateForm.querySelector('[type="submit"]');
       try {
-        const data = await sidebarPost(`/tickets/${TICKET_ID}/due-date`, { due_date: input.value });
+        const data = await sidebarPost(`/tickets/${TICKET_ID}/due-date`, { due_date: input.value }, setBtn);
         const meta = document.getElementById('due-date-meta');
         if (data.dueDate) {
           const dtEl = document.getElementById('due-date-text');
@@ -629,7 +633,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const input  = orgForm.querySelector('[name="organization_name"]');
       const setBtn = orgForm.querySelector('[type="submit"]');
       try {
-        const data = await sidebarPost(`/tickets/${TICKET_ID}/organization`, { organization_name: input.value });
+        const data = await sidebarPost(`/tickets/${TICKET_ID}/organization`, { organization_name: input.value }, setBtn);
         if (data.orgName) input.value = data.orgName; // normalise capitalisation
         flashBtn(setBtn, true);
 
@@ -686,7 +690,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (removeBtn) {
       const userId = removeBtn.dataset.userId;
       try {
-        await sidebarPost(`/tickets/${TICKET_ID}/parties/remove`, { userId });
+        await sidebarPost(`/tickets/${TICKET_ID}/parties/remove`, { userId }, removeBtn);
         document.querySelector(`#party-list [data-user-id="${userId}"]`)?.remove();
       } catch (err) { alert('Could not remove person: ' + err.message); }
       return;
@@ -696,7 +700,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (notifyBtn) {
       const userId = notifyBtn.dataset.userId;
       try {
-        const data = await sidebarPost(`/tickets/${TICKET_ID}/parties/notify`, { userId });
+        const data = await sidebarPost(`/tickets/${TICKET_ID}/parties/notify`, { userId }, notifyBtn);
         const li   = document.querySelector(`#party-list [data-user-id="${userId}"]`);
         if (!li) return;
         const disabled = data.notificationsDisabled;
@@ -715,6 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const newRole = sel.value;
     const prev    = sel.querySelector('[selected]')?.value || sel.dataset.prev;
     sel.dataset.prev = newRole;
+    sel.disabled = true;
     try {
       await sidebarPost(`/tickets/${TICKET_ID}/parties/role`, { userId, role: newRole });
       // update the [selected] attribute so prev tracks correctly on next change
@@ -723,6 +728,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       alert('Could not change role: ' + err.message);
       sel.value = prev || sel.querySelector('[selected]')?.value;
+    } finally {
+      sel.disabled = false;
     }
   });
 
@@ -734,12 +741,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const emailInput  = addPartyForm.querySelector('[name="email"]');
       const userIdInput = document.getElementById('add-party-user-id');
       const roleSelect  = addPartyForm.querySelector('[name="role"]');
+      const addBtn      = e.submitter || addPartyForm.querySelector('[type=submit]');
       try {
         const data = await sidebarPost(`/tickets/${TICKET_ID}/parties`, {
           userId: userIdInput.value || '',
           email:  emailInput.value  || '',
           role:   roleSelect.value,
-        });
+        }, addBtn);
         const list = document.getElementById('party-list');
         if (!list.querySelector(`[data-user-id="${data.party.userId}"]`))
           list.insertAdjacentHTML('beforeend', renderPartyItem(data.party));

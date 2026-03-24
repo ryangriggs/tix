@@ -11,18 +11,6 @@
     <h1 class="page-title">Tickets</h1>
   </div>
 
-  <!-- View shortcuts -->
-  <% const viewDefs = { allopen:'new,pending,open,on_hold', inbox:'new', pending:'pending', active:'open', waiting:'on_hold', all:'' }; %>
-  <% const curStatus = filters.status || ''; %>
-  <div class="view-tabs">
-    <button type="button" class="view-tab <%= curStatus===viewDefs.allopen  ? 'view-tab-active':'' %>" onclick="setView('allopen')">All Open</button>
-    <button type="button" class="view-tab <%= curStatus===viewDefs.inbox    ? 'view-tab-active':'' %>" onclick="setView('inbox')">Inbox</button>
-    <button type="button" class="view-tab <%= curStatus===viewDefs.pending  ? 'view-tab-active':'' %>" onclick="setView('pending')">Pending</button>
-    <button type="button" class="view-tab <%= curStatus===viewDefs.active   ? 'view-tab-active':'' %>" onclick="setView('active')">Active</button>
-    <button type="button" class="view-tab <%= curStatus===viewDefs.waiting  ? 'view-tab-active':'' %>" onclick="setView('waiting')">Waiting</button>
-    <button type="button" class="view-tab <%= curStatus===viewDefs.all      ? 'view-tab-active':'' %>" onclick="setView('all')">All</button>
-  </div>
-
   <!-- Filters & Search -->
   <form method="GET" action="/tickets" class="filter-bar" id="filter-form">
     <% const activeStatuses   = (filters.status   || '').split(',').filter(Boolean); %>
@@ -179,6 +167,7 @@
     <input type="hidden" name="action" id="bulk-action" value="">
 
     <div class="ticket-list" id="ticket-list">
+      <div class="list-loading-overlay" id="list-loading-overlay"><span class="btn-spinner"></span></div>
       <% if (tickets.length === 0) { %>
         <div class="empty-state">
           <p>No tickets found.</p>
@@ -247,24 +236,10 @@
 <button class="scroll-top-btn" id="scroll-top-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top" aria-label="Back to top">↑</button>
 
 <script>
-function setView(name) {
-  const views = {
-    allopen: { status: 'new,pending,open,on_hold', sort: 'priority', order: 'desc', since: '' },
-    inbox:   { status: 'new',     sort: 'priority',  order: 'desc', since: '' },
-    pending: { status: 'pending', sort: 'priority',  order: 'desc', since: '' },
-    active:  { status: 'open',    sort: 'updated_at', order: 'desc', since: '' },
-    waiting: { status: 'on_hold', sort: 'updated_at', order: 'desc', since: '' },
-    all:     { status: '',        sort: 'updated_at', order: 'desc', since: '' },
-  };
-  const v = views[name];
-  if (!v) return;
-  const form = document.getElementById('filter-form');
-  document.getElementById('filter-status').value = v.status;
-  form.querySelector('[name="sort"]').value = v.sort;
-  form.querySelector('[name="order"]').value = v.order;
-  document.getElementById('filter-since').value = v.since;
-  form.submit();
-}
+// Show loading overlay whenever the filter form navigates
+document.getElementById('filter-form').addEventListener('submit', () => {
+  document.getElementById('list-loading-overlay').style.display = 'flex';
+});
 
 function setSince(val) {
   document.getElementById('filter-since').value = val;

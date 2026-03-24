@@ -9,5 +9,6 @@
       "Bash(npm install:*)",
       "Bash(node:*)"
     ]
-  }
+  },
+  "outputStyle": "default"
 }

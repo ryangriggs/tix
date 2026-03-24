@@ -81,6 +81,9 @@ router.post('/users/:id/edit', (req, res) => {
     if (isActive) db.unblockUser(id); else db.blockUser(id);
   }
 
+  const notificationsMuted = req.body.notifications_muted === '1' ? 1 : 0;
+  db.setUserNotificationsMuted(id, notificationsMuted);
+
   audit.log(req, `edited user ${editTarget?.email || id}`);
   res.redirect('/admin/users?message=User+updated');
 });

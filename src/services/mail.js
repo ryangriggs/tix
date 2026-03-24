@@ -6,6 +6,7 @@ const ejs       = require('ejs');
 const crypto    = require('crypto');
 const nodemailer = require('nodemailer');
 const config = require('../config');
+const db     = require('../db');
 
 // ============================================================
 // Unsubscribe token helpers (used by mail + unsubscribe route)
@@ -281,7 +282,8 @@ async function sendTicketNotification({ to, ticketSubject, body, ticketId, messa
   const text    = html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
   const subject = `${ticketSubject} [Ticket #${config.ticketPrefix}${ticketId}]`;
 
-  const recipients = Array.isArray(to) ? to : [to];
+  const recipients = db.filterNotificationRecipients(Array.isArray(to) ? to : [to]);
+  if (!recipients.length) return;
   const transport  = getTransport();
 
   // Per-recipient unsubscribe URL (signed token, no DB lookup needed)
@@ -309,6 +311,7 @@ async function sendTicketNotification({ to, ticketSubject, body, ticketId, messa
 }
 
 async function sendDueReminder(email, ticket) {
+  if (!db.filterNotificationRecipients([email]).length) return;
   const dueDate = new Date(ticket.due_date * 1000).toLocaleDateString();
   let replyTo;
   if (ticket.reply_token) {
@@ -327,6 +330,7 @@ async function sendDueReminder(email, ticket) {
 }
 
 async function sendInactivityReminder(email, ticket, hours) {
+  if (!db.filterNotificationRecipients([email]).length) return;
   let replyTo;
   if (ticket.reply_token) {
     const mailDomain = config.ticketEmail.includes('@') ? config.ticketEmail.split('@')[1] : 'tix.local';

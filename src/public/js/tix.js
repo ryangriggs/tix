@@ -323,16 +323,28 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
   }
 
   function positionDropdown() {
-    const r = inputEl.getBoundingClientRect();
-    dropdown.style.top   = r.bottom + 'px';
-    dropdown.style.left  = r.left   + 'px';
-    dropdown.style.width = r.width  + 'px';
+    const r  = inputEl.getBoundingClientRect();
+    // On iOS Safari the visual viewport and layout viewport can diverge (keyboard,
+    // zoom, pan) — position:fixed is relative to the layout viewport while
+    // getBoundingClientRect() is relative to the visual viewport.
+    // visualViewport.offsetTop/Left gives the delta; adding it aligns them.
+    const vv = window.visualViewport;
+    const vtop  = vv ? vv.offsetTop  : 0;
+    const vleft = vv ? vv.offsetLeft : 0;
+    dropdown.style.top   = (r.bottom + vtop)  + 'px';
+    dropdown.style.left  = (r.left   + vleft) + 'px';
+    dropdown.style.width = r.width + 'px';
   }
 
-  // Reposition on scroll/resize (passive — no perf impact)
+  // Reposition on scroll/resize (passive — no perf impact).
+  // Also listen to visualViewport events for iOS Safari momentum scrolling.
   const reposition = () => { if (isOpen()) positionDropdown(); };
   window.addEventListener('scroll', reposition, { passive: true, capture: true });
   window.addEventListener('resize', reposition, { passive: true });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('scroll', reposition);
+    window.visualViewport.addEventListener('resize', reposition);
+  }
 
   let activeIdx = -1;
   let currentItems = [];
@@ -425,48 +437,53 @@ document.addEventListener('keydown', e => {
 });
 
 // ============================================================
-// Navigation progress bar
-// Gives immediate visual feedback on mobile when a page navigation
-// is triggered — prevents the "frozen / did my tap register?" confusion.
+// Button spinner — disable button and show spinner while waiting
+// spinButton / restoreButton are global so detail.ejs AJAX handlers can use them.
 // ============================================================
-(function navProgress() {
-  const bar = document.createElement('div');
-  bar.style.cssText = [
-    'position:fixed', 'top:0', 'left:0', 'height:3px', 'width:0',
-    'background:var(--accent,#2563eb)', 'z-index:99999',
-    'pointer-events:none', 'transition:none', 'display:none',
-  ].join(';');
-  document.documentElement.appendChild(bar);
+window.spinButton = function(btn) {
+  if (!btn || btn._spinning) return;
+  btn._spinning    = true;
+  btn._origHTML    = btn.innerHTML;
+  btn._origDisabled = btn.disabled;
+  btn.disabled     = true;
+  btn.innerHTML    = '<span class="btn-spinner"></span>';
+};
 
-  function show() {
-    bar.style.display = 'block';
-    bar.style.transition = 'none';
-    bar.style.width = '0';
-    bar.offsetWidth; // force reflow so transition starts from 0
-    bar.style.transition = 'width 25s cubic-bezier(0.1, 0.05, 0, 1)';
-    bar.style.width = '92%';
-  }
+window.restoreButton = function(btn) {
+  if (!btn || !btn._spinning) return;
+  btn.innerHTML = btn._origHTML;
+  btn.disabled  = btn._origDisabled;
+  btn._spinning = false;
+};
 
-  // Show on link clicks that would navigate this tab
+(function initSpinnerListeners() {
+  // Track the most-recently clicked button so JS-triggered submits (e.g. pill
+  // buttons that call form.submit() directly) can still find their trigger.
+  let _lastBtn = null, _lastBtnTs = 0;
   document.addEventListener('click', e => {
-    const a = e.target.closest('a[href]');
-    if (!a) return;
-    const href = a.getAttribute('href') || '';
-    if (href.startsWith('#') || href.startsWith('javascript:')) return;
-    if (a.target === '_blank') return;
-    if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
-    show();
+    const btn = e.target.closest('button, [type=submit]');
+    if (btn) { _lastBtn = btn; _lastBtnTs = Date.now(); }
   }, { capture: true });
 
-  // Show on form submits that navigate (forms with action/method; AJAX forms have neither)
+  // Spin the triggering button on full-page form submissions.
+  // AJAX handlers call e.preventDefault() first, so e.defaultPrevented filters them out.
   document.addEventListener('submit', e => {
-    const form = e.target;
-    if (!form.getAttribute('action') && !form.getAttribute('method')) return;
-    show();
-  }, { capture: true });
+    if (e.defaultPrevented) return;
+    const recent = Date.now() - _lastBtnTs < 800;
+    const btn = e.submitter
+             || (recent ? _lastBtn : null)
+             || e.target.querySelector('[type=submit]');
+    if (btn) window.spinButton(btn);
+  });
 
-  // Hide when bfcache restores a page (pageshow fires on back-nav)
-  window.addEventListener('pageshow', () => { bar.style.display = 'none'; });
+  // Restore any frozen buttons when the browser restores a page from bfcache
+  // (e.g. pressing Back — the page is already rendered with spinners showing).
+  window.addEventListener('pageshow', ev => {
+    if (!ev.persisted) return;
+    document.querySelectorAll('button[disabled]').forEach(btn => {
+      if (btn._origHTML !== undefined) window.restoreButton(btn);
+    });
+  });
 })();
 
 // ============================================================

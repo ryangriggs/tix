@@ -71,6 +71,7 @@
               data-user-org="<%= (u.organization_name || '').replace(/"/g,'&quot;') %>"
               data-user-superuser="<%= u.is_group_superuser ? '1' : '0' %>"
               data-user-blocked="<%= u.blocked_at ? '1' : '0' %>"
+              data-user-notifications-muted="<%= u.notifications_muted ? '1' : '0' %>"
               data-is-self="<%= u.id === user.id ? '1' : '0' %>">Edit</button>
           </td>
         </tr>
@@ -91,6 +92,7 @@
         data-user-org="<%= (u.organization_name || '').replace(/"/g,'&quot;') %>"
         data-user-superuser="<%= u.is_group_superuser ? '1' : '0' %>"
         data-user-blocked="<%= u.blocked_at ? '1' : '0' %>"
+        data-user-notifications-muted="<%= u.notifications_muted ? '1' : '0' %>"
         data-is-self="<%= u.id === user.id ? '1' : '0' %>">
         <div class="user-card-top">
           <span class="user-card-name"><%= u.name || u.email %></span>
@@ -156,6 +158,13 @@
           <span>Account active</span>
         </label>
       </div>
+
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:normal">
+          <input type="checkbox" id="dialog-notifications-muted" name="notifications_muted" value="1">
+          <span>Mute email notifications <span style="font-size:.8rem;color:var(--text-muted)">(suppresses all ticket emails; login codes still sent)</span></span>
+        </label>
+      </div>
     </form>
 
     <!-- Additional orgs section (technicians + superusers) -->
@@ -217,6 +226,7 @@ function openEditDialog(btn) {
   document.getElementById('dialog-org').value   = d.userOrg;
   document.getElementById('dialog-superuser').checked = d.userSuperuser === '1';
   document.getElementById('dialog-active').checked = d.userBlocked !== '1';
+  document.getElementById('dialog-notifications-muted').checked = d.userNotificationsMuted === '1';
 
   const roleEl = document.getElementById('dialog-role');
   roleEl.value    = d.userRole;

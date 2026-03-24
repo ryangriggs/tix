@@ -408,29 +408,6 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 }
 
 /* Filter bar */
-/* View shortcut buttons */
-.view-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-bottom: 0.75rem;
-}
-.view-tab {
-  padding: 0.3rem 0.85rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  font-family: var(--font);
-  cursor: pointer;
-  border: 1.5px solid var(--border);
-  background: transparent;
-  color: var(--text-muted);
-  transition: background .12s, color .12s, border-color .12s;
-  white-space: nowrap;
-}
-.view-tab:hover { border-color: var(--accent); color: var(--accent); }
-.view-tab.view-tab-active { background: var(--accent); border-color: var(--accent); color: #fff; }
-
 .filter-bar {
   display: flex;
   flex-direction: column;
@@ -566,10 +543,38 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 }
 
 /* Ticket cards */
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+.btn-spinner {
+  display: inline-block;
+  width: .85em; height: .85em;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin .65s linear infinite;
+  vertical-align: middle;
+}
+
 .ticket-list {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  position: relative;
+}
+.list-loading-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  min-height: 4rem;
+  background: rgba(255,255,255,.65);
+  z-index: 10;
+  align-items: center;
+  justify-content: center;
+}
+.list-loading-overlay .btn-spinner {
+  width: 2rem; height: 2rem;
+  border-width: 3px;
+  border-color: var(--accent);
+  border-top-color: transparent;
 }
 
 /* Floating bulk action bar */
