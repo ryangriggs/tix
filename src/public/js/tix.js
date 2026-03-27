@@ -292,7 +292,7 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
   const styleArr = [
     'position:fixed', 'z-index:9999', 'list-style:none',
     'margin:0', 'padding:0', 'background:#fff', 'border:1px solid #d1d5db',
-    'border-radius:4px', 'max-height:240px', 'overflow-y:auto',
+    'border-radius:4px', 'overflow-y:auto',
     'box-shadow:0 4px 6px rgba(0,0,0,.08)',
   ];
   if (!usePopover) styleArr.unshift('display:none');
@@ -328,11 +328,30 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
     // zoom, pan) — position:fixed is relative to the layout viewport while
     // getBoundingClientRect() is relative to the visual viewport.
     // visualViewport.offsetTop/Left gives the delta; adding it aligns them.
-    const vv = window.visualViewport;
-    const vtop  = vv ? vv.offsetTop  : 0;
-    const vleft = vv ? vv.offsetLeft : 0;
-    dropdown.style.top   = (r.bottom + vtop)  + 'px';
-    dropdown.style.left  = (r.left   + vleft) + 'px';
+    const vv      = window.visualViewport;
+    const vtop    = vv ? vv.offsetTop    : 0;
+    const vleft   = vv ? vv.offsetLeft   : 0;
+    const vheight = vv ? vv.height : window.innerHeight;
+
+    // Flip above the input when there isn't enough room below (common on mobile
+    // with the virtual keyboard open, shrinking the visible viewport).
+    const spaceBelow = vheight - r.bottom;
+    const spaceAbove = r.top;
+    const maxH = 240;
+
+    if (spaceBelow >= Math.min(maxH, 120) || spaceBelow >= spaceAbove) {
+      // Enough room below — standard position
+      const availH = Math.min(maxH, spaceBelow - 6);
+      dropdown.style.top       = (r.bottom + vtop) + 'px';
+      dropdown.style.maxHeight = availH + 'px';
+    } else {
+      // Not enough room below — flip above the input
+      const availH = Math.min(maxH, spaceAbove - 6);
+      dropdown.style.top       = (r.top + vtop - availH) + 'px';
+      dropdown.style.maxHeight = availH + 'px';
+    }
+
+    dropdown.style.left  = (r.left + vleft) + 'px';
     dropdown.style.width = r.width + 'px';
   }
 
