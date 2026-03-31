@@ -7,7 +7,8 @@
       "Bash(ls:*)",
       "Bash(chmod +x:*)",
       "Bash(npm install:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(grep -rn \"checkUpdate\\\\|check_update\\\\|latest\\\\|github.*release\\\\|npm.*version\" C:tempticketsnewtixsrc --include=*.js)"
     ]
   },
   "outputStyle": "default"

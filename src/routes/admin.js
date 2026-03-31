@@ -366,8 +366,16 @@ router.get('/logs', (req, res) => {
 });
 
 // GET /admin/settings
-router.get('/settings', (req, res) => {
+router.get('/settings', async (req, res) => {
   const s = db.getAllSettings();
+
+  // Run a fresh update check on every settings page load so the displayed
+  // result is never stale. Swallow errors — a failed check just shows the
+  // last cached state rather than breaking the page.
+  const repoUrl = s.update_repo_url || 'https://github.com/ryangriggs/tix.git';
+  if (s.update_check_enabled !== 'false') {
+    await updater.checkForUpdates(repoUrl).catch(() => {});
+  }
   res.render('admin/settings', {
     title:   'Settings',
     s,
