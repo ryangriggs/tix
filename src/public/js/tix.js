@@ -320,14 +320,16 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
     const scrollX = inDialog ? 0 : (window.scrollX || 0);
 
     if (spaceBelow >= Math.min(maxH, 120) || spaceBelow >= spaceAbove) {
-      // Enough room below — standard position
+      // Enough room below — anchor top edge to input bottom
       dropdown.style.top       = (r.bottom + scrollY) + 'px';
       dropdown.style.maxHeight = Math.min(maxH, spaceBelow - 6) + 'px';
     } else {
-      // Flip above the input — common on mobile when the keyboard is open
-      const availH = Math.min(maxH, spaceAbove - 6);
-      dropdown.style.top       = (r.top + scrollY - availH) + 'px';
-      dropdown.style.maxHeight = availH + 'px';
+      // Flip above — anchor bottom edge to input top.
+      // Set maxHeight first so the browser knows the height cap, then read
+      // offsetHeight (actual rendered height, which shrinks as items filter)
+      // to pin the bottom edge flush with the input regardless of item count.
+      dropdown.style.maxHeight = Math.min(maxH, spaceAbove - 6) + 'px';
+      dropdown.style.top       = (r.top + scrollY - dropdown.offsetHeight) + 'px';
     }
     dropdown.style.left  = (r.left + scrollX) + 'px';
     dropdown.style.width = r.width + 'px';
@@ -366,8 +368,8 @@ function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars 
       li.addEventListener('click', () => choose(item));
       dropdown.appendChild(li);
     });
-    positionDropdown();
-    openDropdown();
+    openDropdown();      // open first so offsetHeight is measurable
+    positionDropdown();  // then position using actual rendered height
   }
 
   function setActive(i) {
