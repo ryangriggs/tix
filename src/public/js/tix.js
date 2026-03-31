@@ -280,89 +280,66 @@ document.addEventListener('DOMContentLoaded', () => localiseTimestamps());
  *   allowFreeform  — if true, free-typed text is preserved on blur
  */
 function createAutocomplete(inputEl, { fetchUrl, formatItem, onSelect, minChars = 1, showOnFocus = false } = {}) {
-  // Use the Popover API when available: popover elements are placed in the browser
-  // top layer, which sits above showModal() dialogs regardless of z-index.
-  // Fallback: append inside the closest <dialog> (if any) so the dropdown is not
-  // made inert by showModal(), otherwise fall back to document.body.
-  const usePopover = typeof HTMLElement.prototype.showPopover === 'function';
+  // Inside a showModal() dialog everything outside the dialog is inert, so we must
+  // append the dropdown inside the dialog itself.
+  // Outside a dialog we append to document.body and use position:absolute with
+  // document coordinates — this scrolls naturally with the page and needs no
+  // viewport corrections, avoiding all mobile browser fixed-positioning quirks.
+  const dialog   = inputEl.closest('dialog');
+  const inDialog = !!dialog;
+  const host     = dialog || document.body;
 
   const dropdown = document.createElement('ul');
   dropdown.className = 'autocomplete-dropdown';
-  // Don't set display:none when using popover — the UA stylesheet controls it.
-  const styleArr = [
-    'position:fixed', 'z-index:9999', 'list-style:none',
+  dropdown.style.cssText = [
+    inDialog ? 'position:fixed' : 'position:absolute',
+    'display:none', 'z-index:9999', 'list-style:none',
     'margin:0', 'padding:0', 'background:#fff', 'border:1px solid #d1d5db',
     'border-radius:4px', 'overflow-y:auto',
     'box-shadow:0 4px 6px rgba(0,0,0,.08)',
-  ];
-  if (!usePopover) styleArr.unshift('display:none');
-  dropdown.style.cssText = styleArr.join(';');
-
-  // Always append inside the closest <dialog> when present — showModal() marks
-  // everything outside the dialog as inert (no pointer events), so a dropdown
-  // attached to document.body is visible but completely non-interactive.
-  // The Popover API still works correctly when the popover element is a
-  // descendant of the dialog; showPopover() promotes it to the top layer above it.
-  if (usePopover) dropdown.setAttribute('popover', 'manual');
-  const host = inputEl.closest('dialog') || document.body;
+  ].join(';');
   host.appendChild(dropdown);
 
   // Suppress blur-close while the user is interacting with the dropdown
   let suppressBlur = false;
 
-  function isOpen()  {
-    return usePopover ? dropdown.matches(':popover-open') : dropdown.style.display !== 'none';
-  }
-  function openDropdown()  {
-    if (usePopover) { try { dropdown.showPopover(); } catch(_){} }
-    else dropdown.style.display = 'block';
-  }
-  function closeDropdown() {
-    if (usePopover) { try { dropdown.hidePopover(); } catch(_){} }
-    else dropdown.style.display = 'none';
-  }
+  function isOpen()       { return dropdown.style.display !== 'none'; }
+  function openDropdown()  { dropdown.style.display = 'block'; }
+  function closeDropdown() { dropdown.style.display = 'none'; }
 
   function positionDropdown() {
-    const r  = inputEl.getBoundingClientRect();
-    // On iOS Safari the visual viewport and layout viewport can diverge (keyboard,
-    // zoom, pan) — position:fixed is relative to the layout viewport while
-    // getBoundingClientRect() is relative to the visual viewport.
-    // visualViewport.offsetTop/Left gives the delta; adding it aligns them.
-    const vv      = window.visualViewport;
-    const vtop    = vv ? vv.offsetTop    : 0;
-    const vleft   = vv ? vv.offsetLeft   : 0;
-    const vheight = vv ? vv.height : window.innerHeight;
-
-    // Flip above the input when there isn't enough room below (common on mobile
-    // with the virtual keyboard open, shrinking the visible viewport).
+    const r        = inputEl.getBoundingClientRect();
+    const vheight  = window.innerHeight;
     const spaceBelow = vheight - r.bottom;
     const spaceAbove = r.top;
     const maxH = 240;
 
+    // For position:absolute we work in document coordinates (add scroll offset).
+    // For position:fixed inside a dialog we use viewport coordinates directly.
+    const scrollY = inDialog ? 0 : (window.scrollY || 0);
+    const scrollX = inDialog ? 0 : (window.scrollX || 0);
+
     if (spaceBelow >= Math.min(maxH, 120) || spaceBelow >= spaceAbove) {
       // Enough room below — standard position
-      const availH = Math.min(maxH, spaceBelow - 6);
-      dropdown.style.top       = (r.bottom + vtop) + 'px';
-      dropdown.style.maxHeight = availH + 'px';
+      dropdown.style.top       = (r.bottom + scrollY) + 'px';
+      dropdown.style.maxHeight = Math.min(maxH, spaceBelow - 6) + 'px';
     } else {
-      // Not enough room below — flip above the input
+      // Flip above the input — common on mobile when the keyboard is open
       const availH = Math.min(maxH, spaceAbove - 6);
-      dropdown.style.top       = (r.top + vtop - availH) + 'px';
+      dropdown.style.top       = (r.top + scrollY - availH) + 'px';
       dropdown.style.maxHeight = availH + 'px';
     }
-
-    dropdown.style.left  = (r.left + vleft) + 'px';
+    dropdown.style.left  = (r.left + scrollX) + 'px';
     dropdown.style.width = r.width + 'px';
   }
 
-  // Reposition on scroll/resize (passive — no perf impact).
-  // Also listen to visualViewport events for iOS Safari momentum scrolling.
+  // position:absolute scrolls with the page — no scroll listener needed.
+  // Reposition on resize in case the layout reflows (e.g. orientation change).
+  // Inside a dialog (position:fixed) also reposition on scroll.
   const reposition = () => { if (isOpen()) positionDropdown(); };
-  window.addEventListener('scroll', reposition, { passive: true, capture: true });
   window.addEventListener('resize', reposition, { passive: true });
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('scroll', reposition);
-    window.visualViewport.addEventListener('resize', reposition);
+  if (inDialog) {
+    window.addEventListener('scroll', reposition, { passive: true, capture: true });
   }
 
   let activeIdx = -1;
