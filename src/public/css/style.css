@@ -390,6 +390,17 @@ label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 .badge-role  { background: #f1f5f9; color: var(--text-muted); font-size: .68rem; }
 select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1px 2px; }
 .badge-email { background: #e0e7ff; color: #4338ca; font-size: .68rem; }
+.badge-visibility-technician { background: #fef9c3; color: #854d0e; font-size: .68rem; }
+.badge-visibility-admin      { background: #fee2e2; color: #991b1b; font-size: .68rem; }
+.badge-visibility-select {
+  appearance: none; -webkit-appearance: none;
+  border: 1px solid currentColor; border-radius: .25rem;
+  padding: 1px 4px; font-size: .68rem; cursor: pointer;
+  background: transparent; font-family: inherit;
+}
+.badge-visibility-select.badge-visibility-user       { color: var(--text-muted); border-color: var(--border); }
+.badge-visibility-select.badge-visibility-technician { color: #854d0e; border-color: #ca8a04; background: #fef9c3; }
+.badge-visibility-select.badge-visibility-admin      { color: #991b1b; border-color: #dc2626; background: #fee2e2; }
 
 /* ============================================================
    Ticket list

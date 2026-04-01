@@ -275,6 +275,7 @@ async function initDb() {
   try { _db.exec('ALTER TABLE tickets ADD COLUMN inactivity_reminder_sent_at INTEGER'); } catch (_) {}
   try { _db.exec('ALTER TABLE ticket_parties ADD COLUMN notifications_disabled INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   try { _db.exec('ALTER TABLE users ADD COLUMN notifications_muted INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
+  try { _db.exec("ALTER TABLE comments ADD COLUMN visibility TEXT NOT NULL DEFAULT 'user'"); } catch (_) {}
   _db.exec('CREATE INDEX IF NOT EXISTS idx_comments_location ON comments(location_id)');
   // Back-fill close_date for tickets closed before this column existed
   _db.exec(`UPDATE tickets SET close_date = updated_at WHERE status = 'closed' AND close_date IS NULL`);
@@ -753,10 +754,10 @@ function getPartyUserIds(ticketId) {
 // Comments
 // ============================================================
 
-function addComment(ticketId, userId, body, isEmail = false, billableHours = null, locationId = null) {
+function addComment(ticketId, userId, body, isEmail = false, billableHours = null, locationId = null, visibility = 'user') {
   const result = prepare(`
-    INSERT INTO comments (ticket_id, user_id, body, is_email, billable_hours, location_id) VALUES (?, ?, ?, ?, ?, ?)
-  `).run(ticketId, userId, body, isEmail ? 1 : 0, billableHours || null, locationId || null);
+    INSERT INTO comments (ticket_id, user_id, body, is_email, billable_hours, location_id, visibility) VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(ticketId, userId, body, isEmail ? 1 : 0, billableHours || null, locationId || null, visibility);
   prepare('UPDATE tickets SET updated_at = unixepoch() WHERE id = ?').run(ticketId);
   return prepare('SELECT * FROM comments WHERE id = ?').get(result.lastInsertRowid);
 }
@@ -767,6 +768,10 @@ function deleteComment(id) {
 
 function updateComment(id, body) {
   prepare('UPDATE comments SET body = ? WHERE id = ?').run(body, id);
+}
+
+function updateCommentVisibility(id, visibility) {
+  prepare('UPDATE comments SET visibility = ? WHERE id = ?').run(visibility, id);
 }
 
 function getComments(ticketId) {
@@ -1129,7 +1134,7 @@ module.exports = {
   // Parties
   addParty, removeParty, getParties, getUserTicketRole, getPartyUserIds,
   // Comments
-  addComment, getComments, deleteComment, updateComment,
+  addComment, getComments, deleteComment, updateComment, updateCommentVisibility,
   // Attachments
   addAttachment, getAttachments, getAttachmentsByComment, getAttachmentByStoredName, deleteAttachment,
   // Email threading

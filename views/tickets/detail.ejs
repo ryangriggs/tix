@@ -124,6 +124,20 @@
                 <% } %>
               </select>
             <% } %>
+            <% if (userVisibilityCap !== 'user') { %>
+              <select name="visibility" id="comment-visibility" class="form-select form-select-sm" style="width:auto">
+                <option value="user">Visible: All</option>
+                <option value="technician">Visible: Tech+</option>
+                <% if (userVisibilityCap === 'admin') { %>
+                <option value="admin">Visible: Admin only</option>
+                <% } %>
+              </select>
+            <% } else { %>
+              <input type="hidden" name="visibility" value="user">
+            <% } %>
+            <label style="display:flex;align-items:center;gap:.3rem;font-size:.875rem;cursor:pointer;white-space:nowrap">
+              <input type="checkbox" name="notify" value="1" checked id="comment-notify"> Notify
+            </label>
             <button type="submit" class="btn btn-primary">Post comment</button>
           </div>
         </form>
@@ -169,6 +183,9 @@
         <% for (const c of comments) { %>
           <%
             const canEditComment = user && (user.role === 'admin' || (c.user_id && c.user_id === user.id));
+            const cVis = c.visibility || 'user';
+            const canChangeVis = user && (user.role === 'admin' || (c.user_id && c.user_id === user.id)) && userVisibilityCap !== 'user';
+            const visLabels = { user: 'All', technician: 'Tech+', admin: 'Admin only' };
           %>
           <div class="comment" id="comment-<%= c.id %>">
             <div class="comment-header">
@@ -182,6 +199,19 @@
               <% if (c.is_email) { %><span class="badge badge-email">via email</span><% } %>
               <% if (enableBillableHours && isTechOrAdmin && c.billable_hours) { %><span class="badge badge-billing"><%= c.billable_hours %>h</span><% } %>
               <% if (enableLocation && c.location_name) { %><span class="badge badge-location">📍 <%= c.location_name %></span><% } %>
+              <% if (canChangeVis) { %>
+                <select class="badge-visibility-select badge-visibility-<%= cVis %>"
+                        id="vis-select-<%= c.id %>"
+                        onchange="changeCommentVisibility(<%= c.id %>, this)">
+                  <option value="user"       <%= cVis==='user'       ? 'selected':'' %>>👁 All</option>
+                  <option value="technician" <%= cVis==='technician' ? 'selected':'' %>>👁 Tech+</option>
+                  <% if (userVisibilityCap === 'admin') { %>
+                  <option value="admin"      <%= cVis==='admin'      ? 'selected':'' %>>👁 Admin only</option>
+                  <% } %>
+                </select>
+              <% } else if (cVis !== 'user') { %>
+                <span class="badge badge-visibility-<%= cVis %>">👁 <%= visLabels[cVis] %></span>
+              <% } %>
               <span class="comment-time" data-ts="<%= c.created_at %>" data-fmt="full"><%= formatDateFull(c.created_at) %></span>
               <% if (canEditComment) { %>
                 <button type="button" class="btn-icon btn-icon-danger" title="Edit comment"
@@ -490,6 +520,35 @@
       statusEl.style.color = '#b91c1c';
     } finally {
       window.restoreButton(btn);
+    }
+  }
+
+  // ---- Comment visibility change ----
+  async function changeCommentVisibility(id, selectEl) {
+    const newVis = selectEl.value;
+    const prev = selectEl.dataset.prev || selectEl.querySelector('[selected]')?.value || 'user';
+    selectEl.dataset.prev = newVis;
+    selectEl.disabled = true;
+    try {
+      const resp = await fetch('/tickets/<%= ticket.id %>/comments/' + id + '/visibility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': '<%= csrfToken %>' },
+        credentials: 'include',
+        body: '_csrf=<%= csrfToken %>&visibility=' + encodeURIComponent(newVis),
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        selectEl.className = 'badge-visibility-select badge-visibility-' + data.visibility;
+        selectEl.dataset.prev = data.visibility;
+      } else {
+        selectEl.value = selectEl.dataset.prev || prev;
+        alert(data.error || 'Failed to update visibility.');
+      }
+    } catch (err) {
+      selectEl.value = selectEl.dataset.prev || prev;
+      alert('Failed to update visibility: ' + err.message);
+    } finally {
+      selectEl.disabled = false;
     }
   }
 

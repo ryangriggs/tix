@@ -77,6 +77,16 @@ function canManage(ticket, user) {
 function canCloseTicket(user)  { return user.role === 'admin' || user.role === 'technician'; }
 function canReopenTicket(user) { return user.role === 'admin'; }
 
+const VISIBILITY_RANK = { user: 0, technician: 1, admin: 2 };
+function userVisibilityCap(user) {
+  if (user.role === 'admin') return 'admin';
+  if (user.role === 'technician') return 'technician';
+  return 'user';
+}
+function canSeeComment(comment, user) {
+  return (VISIBILITY_RANK[comment.visibility || 'user'] ?? 0) <= (VISIBILITY_RANK[userVisibilityCap(user)] ?? 0);
+}
+
 // Sanitize Quill-generated HTML (trusted tags only)
 const ALLOWED_TAGS = [
   'p', 'br', 'b', 'i', 'u', 's', 'strong', 'em', 'del',
@@ -131,9 +141,15 @@ function saveUploadedFiles(files, ticketId, commentId) {
 }
 
 // Helper: notify all parties except the actor
-async function notifyParties(ticket, actorEmail, messageBody, commentId, inReplyTo) {
+async function notifyParties(ticket, actorEmail, messageBody, commentId, inReplyTo, visibility = 'user') {
   const parties = db.getParties(ticket.id);
-  const toEmails = parties.filter(p => p.email !== actorEmail && !p.notifications_disabled).map(p => p.email);
+  const commentRank = VISIBILITY_RANK[visibility] ?? 0;
+  const toEmails = parties
+    .filter(p => {
+      if (p.email === actorEmail || p.notifications_disabled) return false;
+      return (VISIBILITY_RANK[userVisibilityCap({ role: p.user_role })] ?? 0) >= commentRank;
+    })
+    .map(p => p.email);
   if (!toEmails.length) return;
 
   const domain = config.ticketEmail.split('@')[1] || 'tix.local';
@@ -463,7 +479,7 @@ router.get('/:id', (req, res) => {
   const access = getTicketAccess(ticket, req.user);
   if (!access) return res.status(403).render('error', { title: '403', message: 'You do not have access to this ticket.' });
 
-  const comments = db.getComments(ticket.id);
+  const comments = db.getComments(ticket.id).filter(c => canSeeComment(c, req.user));
   const parties = db.getParties(ticket.id);
 
   const attachments = db.getAttachments(ticket.id);
@@ -486,6 +502,7 @@ router.get('/:id', (req, res) => {
     enableLocation:      config.enableLocation,
     canClose:  canCloseTicket(req.user),
     canReopen: canReopenTicket(req.user),
+    userVisibilityCap: userVisibilityCap(req.user),
     ticketUrl:        `${config.appUrl}/tickets/${ticket.id}`,
     ticketReplyEmail: `${_localPart}+${ticket.reply_token}@${_domain}`,
   });
@@ -530,7 +547,15 @@ router.post('/:id/comments', upload, async (req, res) => {
     }
   }
 
-  const comment = db.addComment(ticket.id, req.user.id, body, false, billableHours, locationId);
+  // Visibility — clamp to the user's own cap so they can't escalate
+  const cap = userVisibilityCap(req.user);
+  const rawVis = req.body.visibility || 'user';
+  const visibility = (VISIBILITY_RANK[rawVis] ?? 0) <= (VISIBILITY_RANK[cap] ?? 0) ? rawVis : cap;
+
+  // Checkbox: present with value '1' when checked, absent when unchecked — default notify ON
+  const shouldNotify = req.body.notify !== undefined ? req.body.notify === '1' : true;
+
+  const comment = db.addComment(ticket.id, req.user.id, body, false, billableHours, locationId, visibility);
   saveUploadedFiles(req.files, ticket.id, comment.id);
 
   if (willChangeStatus) {
@@ -540,19 +565,23 @@ router.post('/:id/comments', upload, async (req, res) => {
     db.updateTicket(ticket.id, closeFields);
   }
 
-  try {
-    await notifyParties(
-      ticket,
-      req.user.email,
-      `<p>Ticket #: <strong>${config.ticketPrefix}${ticket.id}</strong></p>
-      <p>Status: <strong>${willChangeStatus ? statusChange : ticket.status}</strong></p>
-      <p>Subject: <strong>${ticket.subject}</strong></p>
-      <p><strong>${req.user.email}</strong> commented:</p>
-      ${body}`,
-      comment.id
-    );
-  } catch (err) {
-    console.error('[Tickets] Notification error:', err);
+  if (shouldNotify) {
+    try {
+      await notifyParties(
+        ticket,
+        req.user.email,
+        `<p>Ticket #: <strong>${config.ticketPrefix}${ticket.id}</strong></p>
+        <p>Status: <strong>${willChangeStatus ? statusChange : ticket.status}</strong></p>
+        <p>Subject: <strong>${ticket.subject}</strong></p>
+        <p><strong>${req.user.email}</strong> commented:</p>
+        ${body}`,
+        comment.id,
+        null,
+        visibility
+      );
+    } catch (err) {
+      console.error('[Tickets] Notification error:', err);
+    }
   }
 
   audit.log(req, willChangeStatus ? `added comment, changed status to ${statusChange}` : 'added comment', ticket.id);
@@ -585,6 +614,31 @@ router.post('/:id/comments/:commentId/edit', (req, res) => {
   sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
 
   res.json({ ok: true, body });
+});
+
+// POST /tickets/:id/comments/:commentId/visibility — admin or comment owner
+router.post('/:id/comments/:commentId/visibility', (req, res) => {
+  const ticket = db.getTicketById(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Not found' });
+  if (!getTicketAccess(ticket, req.user)) return res.status(403).json({ error: 'Forbidden' });
+
+  const commentId = parseInt(req.params.commentId, 10);
+  const comment = db.getComments(ticket.id).find(c => c.id === commentId);
+  if (!comment || !canSeeComment(comment, req.user)) return res.status(404).json({ error: 'Comment not found' });
+
+  const isAdmin = req.user.role === 'admin';
+  const isOwner = comment.user_id === req.user.id;
+  if (!isAdmin && !isOwner) return res.status(403).json({ error: 'Forbidden' });
+
+  const newVis = req.body.visibility;
+  if (!['user', 'technician', 'admin'].includes(newVis)) return res.status(400).json({ error: 'Invalid visibility' });
+  if ((VISIBILITY_RANK[newVis] ?? 0) > (VISIBILITY_RANK[userVisibilityCap(req.user)] ?? 0))
+    return res.status(403).json({ error: 'Cannot set visibility above your own level' });
+
+  db.updateCommentVisibility(commentId, newVis);
+  audit.log(req, `set comment ${commentId} visibility to ${newVis}`, ticket.id);
+
+  res.json({ ok: true, visibility: newVis });
 });
 
 // POST /tickets/:id/comments/:commentId/delete — admin only
