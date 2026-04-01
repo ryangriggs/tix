@@ -50,7 +50,28 @@
     <div class="ticket-main">
 
       <!-- Ticket body -->
-      <div class="ticket-body rich-content"><%- ticket.body %></div>
+      <%
+        const canEditBody = user && (user.role === 'admin' || (typeof access === 'string' && access === 'owner'));
+      %>
+      <div style="position:relative">
+        <div class="ticket-body rich-content" id="ticket-body-display"><%- ticket.body %></div>
+        <% if (canEditBody) { %>
+        <button type="button" class="btn-icon btn-icon-danger" id="ticket-body-edit-btn"
+                title="Edit ticket body"
+                style="position:absolute;top:0;right:0"
+                onclick="startEditTicketBody()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
+        <div id="ticket-body-edit-area" style="display:none;margin-top:.5rem">
+          <div id="ticket-body-editor" class="quill-editor quill-compact"></div>
+          <div style="display:flex;gap:.5rem;margin-top:.5rem">
+            <button type="button" class="btn btn-primary btn-sm"
+              onclick="saveTicketBody(this)">Save</button>
+            <button type="button" class="btn btn-ghost btn-sm"
+              onclick="cancelEditTicketBody()">Cancel</button>
+            <span id="ticket-body-edit-status" style="font-size:.875rem;align-self:center"></span>
+          </div>
+        </div>
+        <% } %>
+      </div>
 
       <!-- Add comment (above activity) -->
       <div class="comment-form-section">
@@ -471,6 +492,71 @@
       window.restoreButton(btn);
     }
   }
+
+  // ---- Ticket body inline editing ----
+  <% if (canEditBody) { %>
+  let _bodyQuill = null;
+
+  function startEditTicketBody() {
+    document.getElementById('ticket-body-display').style.display = 'none';
+    document.getElementById('ticket-body-edit-btn').style.display = 'none';
+    document.getElementById('ticket-body-edit-area').style.display = '';
+    if (!_bodyQuill) {
+      _bodyQuill = new Quill('#ticket-body-editor', {
+        theme: 'snow',
+        modules: {
+          toolbar: [
+            ['bold', 'italic', 'underline', 'strike'],
+            ['blockquote', 'code-block'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            [{ color: [] }, { background: [] }],
+            ['link'],
+            ['clean'],
+          ],
+        },
+      });
+      _bodyQuill.root.innerHTML = document.getElementById('ticket-body-display').innerHTML;
+    }
+    _bodyQuill.focus();
+  }
+
+  function cancelEditTicketBody() {
+    document.getElementById('ticket-body-display').style.display = '';
+    document.getElementById('ticket-body-edit-btn').style.display = '';
+    document.getElementById('ticket-body-edit-area').style.display = 'none';
+    document.getElementById('ticket-body-edit-status').textContent = '';
+  }
+
+  async function saveTicketBody(btn) {
+    if (!_bodyQuill || !_bodyQuill.getText().trim()) return;
+    const body = _bodyQuill.root.innerHTML;
+    const statusEl = document.getElementById('ticket-body-edit-status');
+    window.spinButton(btn);
+    statusEl.textContent = '';
+    statusEl.style.color = '';
+    try {
+      const resp = await fetch('/tickets/<%= ticket.id %>/body', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': '<%= csrfToken %>' },
+        credentials: 'include',
+        body: '_csrf=<%= csrfToken %>&body=' + encodeURIComponent(body),
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        document.getElementById('ticket-body-display').innerHTML = data.body;
+        cancelEditTicketBody();
+      } else {
+        statusEl.textContent = data.error || 'Save failed.';
+        statusEl.style.color = '#b91c1c';
+      }
+    } catch (err) {
+      statusEl.textContent = 'Save failed: ' + err.message;
+      statusEl.style.color = '#b91c1c';
+    } finally {
+      window.restoreButton(btn);
+    }
+  }
+  <% } %>
 
   // Attachment UI — init after tix.js loads
   document.addEventListener('DOMContentLoaded', function () {

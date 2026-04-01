@@ -603,6 +603,24 @@ router.post('/:id/comments/:commentId/delete', (req, res) => {
   res.redirect(`/tickets/${ticket.id}`);
 });
 
+// POST /tickets/:id/body — edit ticket body (admin or party-role owner)
+router.post('/:id/body', (req, res) => {
+  const ticket = db.getTicketById(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Not found' });
+
+  const access = getTicketAccess(ticket, req.user);
+  if (access !== 'admin' && access !== 'owner') return res.status(403).json({ error: 'Forbidden' });
+
+  const body = (req.body.body || '').trim();
+  if (!body) return res.status(400).json({ error: 'Body cannot be empty.' });
+
+  db.updateTicket(ticket.id, { body });
+  audit.log(req, 'edited ticket body', ticket.id);
+  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
+
+  res.json({ ok: true, body });
+});
+
 // POST /tickets/:id/subject — rename ticket (admin only)
 router.post('/:id/subject', async (req, res) => {
   const ticket = db.getTicketById(req.params.id);
