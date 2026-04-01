@@ -163,14 +163,14 @@
               <% if (enableLocation && c.location_name) { %><span class="badge badge-location">📍 <%= c.location_name %></span><% } %>
               <span class="comment-time" data-ts="<%= c.created_at %>" data-fmt="full"><%= formatDateFull(c.created_at) %></span>
               <% if (canEditComment) { %>
-                <button type="button" class="btn-icon" title="Edit comment"
-                  onclick="startEditComment(<%= c.id %>)" style="margin-left:.5rem">Edit</button>
+                <button type="button" class="btn-icon btn-icon-danger" title="Edit comment"
+                  onclick="startEditComment(<%= c.id %>)" style="margin-left:.5rem"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
               <% } %>
               <% if (user && user.role === 'admin') { %>
                 <form method="POST" action="/tickets/<%= ticket.id %>/comments/<%= c.id %>/delete" style="display:inline;margin-left:.25rem">
                   <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                   <button type="submit" class="btn-icon btn-icon-danger" title="Delete comment"
-                    onclick="return confirm('Permanently delete this comment?')">Delete</button>
+                    onclick="return confirm('Permanently delete this comment?')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
                 </form>
               <% } %>
             </div>
