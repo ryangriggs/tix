@@ -765,6 +765,10 @@ function deleteComment(id) {
   prepare('DELETE FROM comments WHERE id = ?').run(id);
 }
 
+function updateComment(id, body) {
+  prepare('UPDATE comments SET body = ? WHERE id = ?').run(body, id);
+}
+
 function getComments(ticketId) {
   return prepare(`
     SELECT c.*, u.email AS user_email, u.name AS user_name,
@@ -1125,7 +1129,7 @@ module.exports = {
   // Parties
   addParty, removeParty, getParties, getUserTicketRole, getPartyUserIds,
   // Comments
-  addComment, getComments, deleteComment,
+  addComment, getComments, deleteComment, updateComment,
   // Attachments
   addAttachment, getAttachments, getAttachmentsByComment, getAttachmentByStoredName, deleteAttachment,
   // Email threading

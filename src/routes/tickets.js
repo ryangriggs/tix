@@ -564,6 +564,29 @@ router.post('/:id/comments', upload, async (req, res) => {
   res.redirect(`/tickets/${ticket.id}#comment-${comment.id}`);
 });
 
+// POST /tickets/:id/comments/:commentId/edit — admin or comment owner
+router.post('/:id/comments/:commentId/edit', (req, res) => {
+  const ticket = db.getTicketById(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found.' });
+
+  const commentId = parseInt(req.params.commentId, 10);
+  const comment = db.getComments(ticket.id).find(c => c.id === commentId);
+  if (!comment) return res.status(404).json({ error: 'Comment not found.' });
+
+  const isAdmin = req.user.role === 'admin';
+  const isOwner = comment.user_id === req.user.id;
+  if (!isAdmin && !isOwner) return res.status(403).json({ error: 'Forbidden.' });
+
+  const body = (req.body.body || '').trim();
+  if (!body) return res.status(400).json({ error: 'Comment body cannot be empty.' });
+
+  db.updateComment(commentId, body);
+  audit.log(req, 'edited comment', ticket.id);
+  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
+
+  res.json({ ok: true, body });
+});
+
 // POST /tickets/:id/comments/:commentId/delete — admin only
 router.post('/:id/comments/:commentId/delete', (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).render('error', { title: '403', message: 'Forbidden.' });

@@ -146,6 +146,9 @@
         <h2 class="section-title">Activity</h2>
 
         <% for (const c of comments) { %>
+          <%
+            const canEditComment = user && (user.role === 'admin' || (c.user_id && c.user_id === user.id));
+          %>
           <div class="comment" id="comment-<%= c.id %>">
             <div class="comment-header">
               <span class="comment-author">
@@ -159,15 +162,32 @@
               <% if (enableBillableHours && isTechOrAdmin && c.billable_hours) { %><span class="badge badge-billing"><%= c.billable_hours %>h</span><% } %>
               <% if (enableLocation && c.location_name) { %><span class="badge badge-location">📍 <%= c.location_name %></span><% } %>
               <span class="comment-time" data-ts="<%= c.created_at %>" data-fmt="full"><%= formatDateFull(c.created_at) %></span>
+              <% if (canEditComment) { %>
+                <button type="button" class="btn-icon" title="Edit comment"
+                  onclick="startEditComment(<%= c.id %>)" style="margin-left:.5rem">Edit</button>
+              <% } %>
               <% if (user && user.role === 'admin') { %>
-                <form method="POST" action="/tickets/<%= ticket.id %>/comments/<%= c.id %>/delete" style="display:inline;margin-left:.5rem">
+                <form method="POST" action="/tickets/<%= ticket.id %>/comments/<%= c.id %>/delete" style="display:inline;margin-left:.25rem">
                   <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                   <button type="submit" class="btn-icon btn-icon-danger" title="Delete comment"
                     onclick="return confirm('Permanently delete this comment?')">Delete</button>
                 </form>
               <% } %>
             </div>
-            <div class="comment-body rich-content"><%- c.body %></div>
+            <div class="comment-body rich-content" id="comment-body-<%= c.id %>"><%- c.body %></div>
+            <% if (canEditComment) { %>
+            <div class="comment-edit-area" id="comment-edit-<%= c.id %>" style="display:none;margin-top:.75rem">
+              <div id="comment-edit-editor-<%= c.id %>" class="quill-editor quill-compact"></div>
+              <div style="display:flex;gap:.5rem;margin-top:.5rem">
+                <button type="button" class="btn btn-primary btn-sm"
+                  onclick="saveEditComment(<%= c.id %>, this)">Save</button>
+                <button type="button" class="btn btn-ghost btn-sm"
+                  onclick="cancelEditComment(<%= c.id %>)">Cancel</button>
+                <span class="comment-edit-status" id="comment-edit-status-<%= c.id %>"
+                  style="font-size:.875rem;align-self:center"></span>
+              </div>
+            </div>
+            <% } %>
           </div>
         <% } %>
       </div>
@@ -384,6 +404,73 @@
   quill.on('text-change', () => {
     if (quill.getText().trim()) document.getElementById('comment-required-err')?.remove();
   });
+
+  // ---- Comment inline editing ----
+  const _editQuills = {};
+
+  function startEditComment(id) {
+    const bodyEl = document.getElementById('comment-body-' + id);
+    const editEl = document.getElementById('comment-edit-' + id);
+    if (!editEl) return;
+    bodyEl.style.display = 'none';
+    editEl.style.display = '';
+
+    if (!_editQuills[id]) {
+      _editQuills[id] = new Quill('#comment-edit-editor-' + id, {
+        theme: 'snow',
+        modules: {
+          toolbar: [
+            ['bold', 'italic', 'underline', 'strike'],
+            ['blockquote', 'code-block'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            [{ color: [] }, { background: [] }],
+            ['link'],
+            ['clean'],
+          ],
+        },
+      });
+      // Seed with current content
+      _editQuills[id].root.innerHTML = bodyEl.innerHTML;
+    }
+    _editQuills[id].focus();
+  }
+
+  function cancelEditComment(id) {
+    document.getElementById('comment-body-' + id).style.display = '';
+    document.getElementById('comment-edit-' + id).style.display = 'none';
+    document.getElementById('comment-edit-status-' + id).textContent = '';
+  }
+
+  async function saveEditComment(id, btn) {
+    const q = _editQuills[id];
+    if (!q || !q.getText().trim()) return;
+    const body = q.root.innerHTML;
+    const statusEl = document.getElementById('comment-edit-status-' + id);
+    window.spinButton(btn);
+    statusEl.textContent = '';
+    statusEl.style.color = '';
+    try {
+      const resp = await fetch('/tickets/<%= ticket.id %>/comments/' + id + '/edit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': '<%= csrfToken %>' },
+        credentials: 'include',
+        body: '_csrf=<%= csrfToken %>&body=' + encodeURIComponent(body),
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        document.getElementById('comment-body-' + id).innerHTML = data.body;
+        cancelEditComment(id);
+      } else {
+        statusEl.textContent = data.error || 'Save failed.';
+        statusEl.style.color = '#b91c1c';
+      }
+    } catch (err) {
+      statusEl.textContent = 'Save failed: ' + err.message;
+      statusEl.style.color = '#b91c1c';
+    } finally {
+      window.restoreButton(btn);
+    }
+  }
 
   // Attachment UI — init after tix.js loads
   document.addEventListener('DOMContentLoaded', function () {
