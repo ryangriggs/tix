@@ -482,7 +482,7 @@
         },
       });
       // Seed with current content
-      _editQuills[id].root.innerHTML = bodyEl.innerHTML;
+      _editQuills[id].clipboard.dangerouslyPasteHTML(bodyEl.innerHTML);
     }
     _editQuills[id].focus();
   }
@@ -575,7 +575,7 @@
           ],
         },
       });
-      _bodyQuill.root.innerHTML = document.getElementById('ticket-body-display').innerHTML;
+      _bodyQuill.clipboard.dangerouslyPasteHTML(document.getElementById('ticket-body-display').innerHTML);
     }
     _bodyQuill.focus();
   }
