@@ -967,17 +967,57 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 }
 .rich-content p { margin: 0 0 0.6em; }
 .rich-content p:last-child { margin-bottom: 0; }
-.rich-content ul, .rich-content ol { padding-left: 1.5em; margin: 0 0 0.6em; }
-.rich-content li { margin-bottom: 0.15em; }
-/* Quill flat-list indentation — each level adds 3em to match Quill Snow editor rendering */
-.rich-content li.ql-indent-1 { padding-left: 3em; }
-.rich-content li.ql-indent-2 { padding-left: 6em; }
-.rich-content li.ql-indent-3 { padding-left: 9em; }
-.rich-content li.ql-indent-4 { padding-left: 12em; }
-.rich-content li.ql-indent-5 { padding-left: 15em; }
-.rich-content li.ql-indent-6 { padding-left: 18em; }
-.rich-content li.ql-indent-7 { padding-left: 21em; }
-.rich-content li.ql-indent-8 { padding-left: 24em; }
+/* Lists — Quill outputs flat <ol>/<ul> with ql-indent-N classes instead of nested elements.
+   Replicate Quill Snow's counter+::before scheme so markers cycle correctly per level. */
+.rich-content ul,
+.rich-content ol  { list-style: none; padding-left: 1.5em; margin: 0 0 0.6em; }
+.rich-content li  { margin-bottom: 0.15em; }
+.rich-content li::before {
+  display: inline-block;
+  white-space: nowrap;
+  width: 1.2em;
+  margin-left: -1.5em;
+  margin-right: 0.3em;
+  text-align: right;
+}
+/* Ordered: decimal → lower-alpha → lower-roman, repeating */
+.rich-content ol { counter-reset: list-0; }
+.rich-content ol li { counter-increment: list-0; counter-reset: list-1 list-2 list-3 list-4 list-5 list-6 list-7 list-8; }
+.rich-content ol li::before { content: counter(list-0, decimal) '.'; }
+.rich-content ol li.ql-indent-1 { padding-left: 3em;  counter-increment: list-1; counter-reset: list-2 list-3 list-4 list-5 list-6 list-7 list-8; }
+.rich-content ol li.ql-indent-1::before { content: counter(list-1, lower-alpha) '.'; }
+.rich-content ol li.ql-indent-2 { padding-left: 6em;  counter-increment: list-2; counter-reset: list-3 list-4 list-5 list-6 list-7 list-8; }
+.rich-content ol li.ql-indent-2::before { content: counter(list-2, lower-roman) '.'; }
+.rich-content ol li.ql-indent-3 { padding-left: 9em;  counter-increment: list-3; counter-reset: list-4 list-5 list-6 list-7 list-8; }
+.rich-content ol li.ql-indent-3::before { content: counter(list-3, decimal) '.'; }
+.rich-content ol li.ql-indent-4 { padding-left: 12em; counter-increment: list-4; counter-reset: list-5 list-6 list-7 list-8; }
+.rich-content ol li.ql-indent-4::before { content: counter(list-4, lower-alpha) '.'; }
+.rich-content ol li.ql-indent-5 { padding-left: 15em; counter-increment: list-5; counter-reset: list-6 list-7 list-8; }
+.rich-content ol li.ql-indent-5::before { content: counter(list-5, lower-roman) '.'; }
+.rich-content ol li.ql-indent-6 { padding-left: 18em; counter-increment: list-6; counter-reset: list-7 list-8; }
+.rich-content ol li.ql-indent-6::before { content: counter(list-6, decimal) '.'; }
+.rich-content ol li.ql-indent-7 { padding-left: 21em; counter-increment: list-7; counter-reset: list-8; }
+.rich-content ol li.ql-indent-7::before { content: counter(list-7, lower-alpha) '.'; }
+.rich-content ol li.ql-indent-8 { padding-left: 24em; counter-increment: list-8; }
+.rich-content ol li.ql-indent-8::before { content: counter(list-8, lower-roman) '.'; }
+/* Unordered: disc (•) → circle (◦) → square (▪), repeating */
+.rich-content ul li::before { content: '\2022'; }
+.rich-content ul li.ql-indent-1 { padding-left: 3em; }
+.rich-content ul li.ql-indent-1::before { content: '\25E6'; }
+.rich-content ul li.ql-indent-2 { padding-left: 6em; }
+.rich-content ul li.ql-indent-2::before { content: '\25AA'; }
+.rich-content ul li.ql-indent-3 { padding-left: 9em; }
+.rich-content ul li.ql-indent-3::before { content: '\2022'; }
+.rich-content ul li.ql-indent-4 { padding-left: 12em; }
+.rich-content ul li.ql-indent-4::before { content: '\25E6'; }
+.rich-content ul li.ql-indent-5 { padding-left: 15em; }
+.rich-content ul li.ql-indent-5::before { content: '\25AA'; }
+.rich-content ul li.ql-indent-6 { padding-left: 18em; }
+.rich-content ul li.ql-indent-6::before { content: '\2022'; }
+.rich-content ul li.ql-indent-7 { padding-left: 21em; }
+.rich-content ul li.ql-indent-7::before { content: '\25E6'; }
+.rich-content ul li.ql-indent-8 { padding-left: 24em; }
+.rich-content ul li.ql-indent-8::before { content: '\25AA'; }
 .rich-content h1, .rich-content h2, .rich-content h3 { margin: 0.75em 0 0.4em; font-weight: 600; line-height: 1.3; }
 .rich-content h1 { font-size: 1.25em; }
 .rich-content h2 { font-size: 1.1em; }
