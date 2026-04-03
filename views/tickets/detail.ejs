@@ -156,6 +156,7 @@
               <li>
                 <a href="/tickets/attachments/<%= a.stored_name %>" class="attachment-link" target="_blank">📎 <%= a.original_name %></a>
                 <span class="meta-item" style="margin-left:.25rem">(<%= (a.size/1024).toFixed(1) %> KB)</span>
+                <span class="meta-item" style="margin-left:.25rem" data-ts="<%= a.created_at %>" data-fmt="full"><%= formatDateFull(a.created_at) %></span>
                 <% if (a.uploader_name) { %><span class="meta-item"> — <%= a.uploader_name %></span><% } %>
                 <% if (_aAnnotatable) { %>
                   <a href="/tickets/<%= ticket.id %>/attachments/<%= a.stored_name %>/annotate"

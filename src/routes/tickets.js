@@ -552,8 +552,8 @@ router.post('/:id/comments', upload, async (req, res) => {
   const rawVis = req.body.visibility || 'user';
   const visibility = (VISIBILITY_RANK[rawVis] ?? 0) <= (VISIBILITY_RANK[cap] ?? 0) ? rawVis : cap;
 
-  // Checkbox: present with value '1' when checked, absent when unchecked — default notify ON
-  const shouldNotify = req.body.notify !== undefined ? req.body.notify === '1' : true;
+  // Checkbox sends notify=1 when checked, absent when unchecked
+  const shouldNotify = req.body.notify === '1';
 
   const comment = db.addComment(ticket.id, req.user.id, body, false, billableHours, locationId, visibility);
   saveUploadedFiles(req.files, ticket.id, comment.id);
