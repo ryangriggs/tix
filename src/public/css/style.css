@@ -969,6 +969,15 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 .rich-content p:last-child { margin-bottom: 0; }
 .rich-content ul, .rich-content ol { padding-left: 1.5em; margin: 0 0 0.6em; }
 .rich-content li { margin-bottom: 0.15em; }
+/* Quill flat-list indentation — each level adds 3em to match Quill Snow editor rendering */
+.rich-content li.ql-indent-1 { padding-left: 3em; }
+.rich-content li.ql-indent-2 { padding-left: 6em; }
+.rich-content li.ql-indent-3 { padding-left: 9em; }
+.rich-content li.ql-indent-4 { padding-left: 12em; }
+.rich-content li.ql-indent-5 { padding-left: 15em; }
+.rich-content li.ql-indent-6 { padding-left: 18em; }
+.rich-content li.ql-indent-7 { padding-left: 21em; }
+.rich-content li.ql-indent-8 { padding-left: 24em; }
 .rich-content h1, .rich-content h2, .rich-content h3 { margin: 0.75em 0 0.4em; font-weight: 600; line-height: 1.3; }
 .rich-content h1 { font-size: 1.25em; }
 .rich-content h2 { font-size: 1.1em; }
