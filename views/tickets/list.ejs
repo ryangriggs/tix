@@ -48,7 +48,7 @@
         <% for (const s of statuses) { %>
           <button type="button" class="filter-tab filter-tab-status filter-tab-s-<%= s %> <%= activeStatuses.includes(s) ? 'active' : '' %>"
                   style="border-left: 4px solid <%= statusColors[s] %>"
-                  onclick="toggleFilter('status','<%= s %>')"><%= statusNames[s] %></button>
+                  onclick="toggleFilter('status','<%= s %>',event)"><%= statusNames[s] %></button>
         <% } %>
       </div>
 
@@ -253,12 +253,17 @@ function setSince(val) {
   form.submit();
 }
 
-function toggleFilter(name, value) {
+function toggleFilter(name, value, evt) {
   const el = document.getElementById('filter-' + name);
-  const vals = el.value ? el.value.split(',') : [];
-  const idx = vals.indexOf(value);
-  if (idx >= 0) vals.splice(idx, 1); else vals.push(value);
-  el.value = vals.join(',');
+  if (evt && (evt.ctrlKey || evt.metaKey)) {
+    // Ctrl/Cmd+click: isolate — clear all other filters, apply only this value
+    el.value = value;
+  } else {
+    const vals = el.value ? el.value.split(',') : [];
+    const idx = vals.indexOf(value);
+    if (idx >= 0) vals.splice(idx, 1); else vals.push(value);
+    el.value = vals.join(',');
+  }
   document.getElementById('filter-form').submit();
 }
 
