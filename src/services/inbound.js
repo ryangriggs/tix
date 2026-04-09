@@ -4,6 +4,7 @@ const { simpleParser } = require('mailparser');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
+const sanitizeHtml = require('sanitize-html');
 
 const config = require('../config');
 const db = require('../db');
@@ -107,6 +108,88 @@ function formatEmailAsPlaintext(parsed) {
     .map(p => p.trim().replace(/\n/g, '<br>'))
     .filter(Boolean)
     .join('</p><p>') + '</p>';
+}
+
+// Sanitize an email HTML body and resolve cid: inline image references.
+// Returns safe HTML suitable for storing/displaying in the ticket system.
+// Falls back to plaintext rendering if no usable HTML is present.
+function formatEmailBody(parsed, cidMap) {
+  if (!parsed.html || !parsed.html.trim()) {
+    return formatEmailAsPlaintext(parsed);
+  }
+
+  // Replace cid: image references with our stored attachment URLs before sanitizing
+  let html = parsed.html;
+  if (cidMap && cidMap.size > 0) {
+    html = html.replace(/\bsrc=["'](cid:([^"'>\s]+))["']/gi, (match, fullCid, cid) => {
+      const storedName = cidMap.get(cid) || cidMap.get(cid.replace(/^<|>$/g, ''));
+      if (storedName) {
+        return `src="/tickets/attachments/${encodeURIComponent(storedName)}"`;
+      }
+      return match; // leave unknown cid refs; sanitizer will strip them
+    });
+  }
+
+  const clean = sanitizeHtml(html, {
+    allowedTags: [
+      'p', 'br', 'b', 'i', 'strong', 'em', 'u', 's', 'strike',
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+      'ul', 'ol', 'li',
+      'blockquote', 'pre', 'code',
+      'a', 'img',
+      'table', 'thead', 'tbody', 'tr', 'th', 'td',
+      'div', 'span',
+    ],
+    allowedAttributes: {
+      a:   ['href', 'title', 'target', 'rel'],
+      img: ['src', 'alt', 'width', 'height', 'style'],
+      td:  ['colspan', 'rowspan'],
+      th:  ['colspan', 'rowspan'],
+      '*': ['style'],
+    },
+    allowedSchemes: ['http', 'https', 'mailto', '/'],
+    allowedSchemesByTag: {
+      img: ['http', 'https', '/'],
+    },
+    // Strip src attributes that are still cid: references (unresolved inline images)
+    // and any external tracking pixel URLs we shouldn't load
+    transformTags: {
+      a: (tagName, attribs) => ({
+        tagName,
+        attribs: {
+          ...attribs,
+          target: '_blank',
+          rel: 'noopener noreferrer',
+        },
+      }),
+      img: (tagName, attribs) => {
+        const src = attribs.src || '';
+        // Drop cid: references that weren't resolved (no attachment match)
+        if (src.startsWith('cid:')) return { tagName: 'span', attribs: {} };
+        return { tagName, attribs };
+      },
+    },
+    // Limit style attributes to safe visual properties only
+    allowedStyles: {
+      '*': {
+        color:            [/.*/],
+        'background-color': [/.*/],
+        'font-size':      [/.*/],
+        'font-weight':    [/.*/],
+        'font-style':     [/.*/],
+        'text-decoration':[/.*/],
+        'text-align':     [/.*/],
+        width:            [/.*/],
+        height:           [/.*/],
+        'max-width':      [/.*/],
+        padding:          [/.*/],
+        margin:           [/.*/],
+      },
+    },
+  });
+
+  if (!clean.trim()) return formatEmailAsPlaintext(parsed);
+  return clean;
 }
 
 function getMailDomain() {
@@ -314,8 +397,8 @@ async function handleReply(ticketId, fromEmail, parsed, subjectFallback = false)
     db.addParty(ticketId, user.id, 'collaborator');
   }
 
-  const { prepared } = prepareAttachments(parsed.attachments);
-  const body = formatEmailAsPlaintext(parsed);
+  const { prepared, cidMap } = prepareAttachments(parsed.attachments);
+  const body = formatEmailBody(parsed, cidMap);
   const comment = db.addComment(ticketId, user.id, body, true);
   commitAttachments(prepared, ticketId, comment.id);
 
@@ -381,8 +464,8 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
   // Strip Re:/Fwd: prefixes from subject
   let subject = (parsed.subject || '(No Subject)').replace(/^(Re|Fwd?|Rv):\s*/gi, '').trim();
 
-  const { prepared } = prepareAttachments(parsed.attachments);
-  const body = formatEmailAsPlaintext(parsed);
+  const { prepared, cidMap } = prepareAttachments(parsed.attachments);
+  const body = formatEmailBody(parsed, cidMap);
   const ticket = db.createTicket({ subject, body, organizationId: senderUser.organization_id || null });
 
   // Sender is submitter
