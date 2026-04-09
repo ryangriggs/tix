@@ -56,7 +56,15 @@
                 <td style="white-space:nowrap;font-size:.8rem;font-family:monospace;color:var(--text-muted)" data-ts="<%= e.ts %>" data-fmt="full"><%= e.timestamp %></td>
                 <td style="font-size:.8rem;font-family:monospace;color:var(--text-muted)"><%= e.ip %></td>
                 <td style="font-size:.875rem"><%= e.email %></td>
-                <td style="font-size:.875rem;white-space:nowrap"><%= e.ticket %></td>
+                <td style="font-size:.875rem;white-space:nowrap">
+                  <% if (e.ticketId) { %>
+                    <a href="/tickets/<%= e.ticketId %>" target="_blank" style="font-weight:600"><%= e.ticket %></a>
+                    <% if (e.ticketSubject) { %><span style="color:var(--text-muted);margin-left:.35rem"><%= e.ticketSubject %></span><% } %>
+                    <% if (e.ticketOrg) { %><span style="color:var(--text-muted);margin-left:.35rem;font-size:.8rem">(<%=  e.ticketOrg %>)</span><% } %>
+                  <% } else { %>
+                    <%= e.ticket %>
+                  <% } %>
+                </td>
                 <td style="font-size:.875rem"><%= e.action %></td>
               </tr>
             <% } %>

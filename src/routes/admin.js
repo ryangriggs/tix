@@ -345,15 +345,31 @@ router.get('/logs', (req, res) => {
     auditEntries = lines.map(line => {
       const parts = line.split(' | ');
       const ts = Math.floor(Date.parse((parts[0] || '').replace(' ', 'T') + 'Z') / 1000) || 0;
+      const ticketRaw = parts[3] || '';
+      const ticketId  = ticketRaw.startsWith('#') ? parseInt(ticketRaw.slice(1), 10) : null;
       return {
         timestamp: parts[0] || '',
         ts,
         ip:       parts[1] || '',
         email:    parts[2] || '',
-        ticket:   parts[3] || '',
+        ticket:   ticketRaw,
+        ticketId,
         action:   parts[4] || '',
       };
     });
+    // Enrich with subject + org (batch — at most 100 unique IDs)
+    const uniqueIds = [...new Set(auditEntries.map(e => e.ticketId).filter(Boolean))];
+    const ticketMap = new Map();
+    for (const id of uniqueIds) {
+      const t = db.getTicketById(id);
+      if (t) ticketMap.set(id, { subject: t.subject, org: t.organization_name || '' });
+    }
+    for (const e of auditEntries) {
+      if (e.ticketId && ticketMap.has(e.ticketId)) {
+        e.ticketSubject = ticketMap.get(e.ticketId).subject;
+        e.ticketOrg     = ticketMap.get(e.ticketId).org;
+      }
+    }
   }
 
   res.render('admin/logs', {
