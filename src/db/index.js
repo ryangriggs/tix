@@ -559,6 +559,35 @@ function getDistinctOwners({ userRole, userId, userTechOrgIds = [] }) {
   return prepare(query).all(...params);
 }
 
+// Returns { condition, params } scoping a query on tickets aliased as 't' to what a user can see.
+// condition is null for admins (no restriction), otherwise a SQL fragment starting with '('.
+function ticketAccessCondition({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgIds = [] }) {
+  if (userRole === 'admin') return { condition: null, params: [] };
+
+  if (userRole === 'technician') {
+    const ph = userTechOrgIds.length ? userTechOrgIds.map(() => '?').join(',') : 'NULL';
+    return {
+      condition: `(t.organization_id IN (${ph}) OR EXISTS (SELECT 1 FROM ticket_parties _tp WHERE _tp.ticket_id = t.id AND _tp.user_id = ?))`,
+      params: [...userTechOrgIds, userId],
+    };
+  }
+
+  if (userIsSuperuser && userOrgId) {
+    const allOrgIds = [userOrgId, ...userTechOrgIds.filter(id => id !== userOrgId)];
+    const ph = allOrgIds.map(() => '?').join(',');
+    return {
+      condition: `(t.organization_id IN (${ph}) OR EXISTS (SELECT 1 FROM ticket_parties _tp WHERE _tp.ticket_id = t.id AND _tp.user_id = ?))`,
+      params: [...allOrgIds, userId],
+    };
+  }
+
+  // Regular user: only tickets they are explicitly a party to
+  return {
+    condition: `EXISTS (SELECT 1 FROM ticket_parties _tp WHERE _tp.ticket_id = t.id AND _tp.user_id = ?)`,
+    params: [userId],
+  };
+}
+
 function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgIds = [],
                       status, priority, sort = 'updated_at', order = 'desc', search = '',
                       dateFrom = null, dateTo = null, orgFilter = null, idSearch = null,
@@ -1030,34 +1059,39 @@ function getTicketCountsByStatus() {
   return { ...byStatus, total };
 }
 
-function getDashboardStats() {
+function getDashboardStats(user) {
   const ago24h = Math.floor(Date.now() / 1000) - 86400;
+  const { condition, params: ap } = ticketAccessCondition(user);
+  const w  = condition ? `WHERE ${condition}`  : '';   // full WHERE clause
+  const aw = condition ? `AND ${condition}`    : '';   // appended to existing WHERE
 
-  const statusRows = prepare('SELECT status, COUNT(*) AS count FROM tickets GROUP BY status').all();
+  const statusRows = prepare(`SELECT status, COUNT(*) AS count FROM tickets t ${w} GROUP BY t.status`).all(...ap);
   const byStatus = { new: 0, pending: 0, open: 0, on_hold: 0, closed: 0 };
   for (const r of statusRows) { if (r.status in byStatus) byStatus[r.status] = r.count; }
 
-  // Oldest ticket per active status
+  // Oldest ticket per active status (scoped)
   const oldestRows = prepare(`
-    SELECT id, subject, status, created_at
-    FROM tickets
-    WHERE status IN ('new','pending','open','on_hold')
-    ORDER BY created_at ASC
-  `).all();
+    SELECT t.id, t.subject, t.status, t.created_at
+    FROM tickets t
+    WHERE t.status IN ('new','pending','open','on_hold') ${aw}
+    ORDER BY t.created_at ASC
+  `).all(...ap);
   const oldestByStatus = {};
   for (const r of oldestRows) {
     if (!oldestByStatus[r.status]) oldestByStatus[r.status] = r;
   }
 
-  // Non-closed tickets with no activity in last 24h
-  const inactiveCount = prepare(
-    `SELECT COUNT(*) AS count FROM tickets WHERE status NOT IN ('closed') AND updated_at < ?`
-  ).get(ago24h).count;
+  // Non-closed tickets with no activity in last 24h (scoped)
+  const inactiveCount = prepare(`
+    SELECT COUNT(*) AS count FROM tickets t
+    WHERE t.status NOT IN ('closed') AND t.updated_at < ? ${aw}
+  `).get(ago24h, ...ap).count;
 
-  // Priority breakdown (non-closed)
-  const priorityRows = prepare(
-    `SELECT priority, COUNT(*) AS count FROM tickets WHERE status NOT IN ('closed') GROUP BY priority`
-  ).all();
+  // Priority breakdown, non-closed (scoped)
+  const priorityRows = prepare(`
+    SELECT t.priority, COUNT(*) AS count FROM tickets t
+    WHERE t.status NOT IN ('closed') ${aw} GROUP BY t.priority
+  `).all(...ap);
   const byPriority = { urgent: 0, high: 0, medium: 0, low: 0 };
   for (const r of priorityRows) { if (r.priority in byPriority) byPriority[r.priority] = r.count; }
 
