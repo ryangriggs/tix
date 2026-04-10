@@ -76,58 +76,6 @@ window.refreshTicketList = function refreshTicketList() {
     });
 };
 
-// ============================================================
-// Ticket detail — background poll for new activity
-// Polls /api/tickets/:id/poll every 30s while the page is visible.
-// Never navigates away — only shows a "new activity" banner if
-// the comment count or updated_at changes since page load.
-// ============================================================
-
-(function initTicketPolling() {
-  const ticketEl = document.getElementById('ticket-detail');
-  if (!ticketEl) return;
-
-  const ticketId      = ticketEl.dataset.ticketId;
-  const loadedCount   = parseInt(ticketEl.dataset.commentCount  || '0', 10);
-  const loadedUpdated = parseInt(ticketEl.dataset.updatedAt     || '0', 10);
-  if (!ticketId) return;
-
-  let bannerShown = false;
-
-  function showActivityBanner() {
-    if (bannerShown) return;
-    bannerShown = true;
-    const banner = document.createElement('div');
-    banner.style.cssText = 'position:fixed;top:56px;left:0;right:0;background:#2563eb;color:#fff;text-align:center;padding:.5rem 1rem;font-size:.875rem;cursor:pointer;z-index:200;display:flex;align-items:center;justify-content:center;gap:.75rem';
-    banner.innerHTML = '<span>New activity on this ticket.</span><button style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:4px;padding:.2rem .6rem;cursor:pointer;font-size:.8rem">Refresh</button>';
-    banner.querySelector('button').addEventListener('click', () => window.location.reload());
-    banner.addEventListener('click', e => { if (e.target === banner) window.location.reload(); });
-    document.body.prepend(banner);
-  }
-
-  function poll() {
-    // Don't bother if the tab is hidden
-    if (document.visibilityState === 'hidden') return;
-
-    fetch(`/api/tickets/${encodeURIComponent(ticketId)}/poll`, {
-      headers: { Accept: 'application/json' },
-    })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (!data) return;
-        if (data.comment_count > loadedCount || data.updated_at > loadedUpdated) {
-          showActivityBanner();
-        }
-      })
-      .catch(() => { /* ignore network errors */ });
-  }
-
-  // Poll every 30 seconds
-  const pollInterval = setInterval(poll, 30_000);
-
-  // Stop polling when navigating away
-  window.addEventListener('pagehide', () => clearInterval(pollInterval));
-})();
 
 // ============================================================
 // Autocomplete — reusable dropdown component

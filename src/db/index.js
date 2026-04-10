@@ -1109,9 +1109,6 @@ function getDashboardStats(user) {
   return { byStatus, oldestByStatus, inactiveCount, byPriority };
 }
 
-function getCommentCount(ticketId) {
-  return prepare('SELECT COUNT(*) AS count FROM comments WHERE ticket_id = ?').get(ticketId)?.count || 0;
-}
 
 function getAttachmentCount() {
   return prepare('SELECT COUNT(*) AS count FROM attachments').get().count || 0;
@@ -1196,7 +1193,7 @@ module.exports = {
   getOpenTicketsForInactivityCheck, setInactivityReminderSent,
   getTicketByReplyToken, disableAllPartyNotifications, disablePartyNotifications, togglePartyNotifications,
   // Reports
-  getBillingReport, getTicketCountsByStatus, getDashboardStats, getAttachmentCount, getCommentCount,
+  getBillingReport, getTicketCountsByStatus, getDashboardStats, getAttachmentCount,
   // Organizations
   findOrCreateOrganization, getAllOrganizations, getOrganizationsByIds, searchOrganizations,
   renameOrganization, deleteOrganization, getOrganizationById,

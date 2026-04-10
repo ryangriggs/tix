@@ -55,28 +55,5 @@ router.get('/organizations/:id/locations', (req, res) => {
   res.json(locs);
 });
 
-// GET /api/tickets/:id/poll — lightweight endpoint for ticket detail polling.
-// Returns comment_count + updated_at so the client can detect new activity
-// without fetching the full ticket page. Access-controlled same as the ticket route.
-router.get('/tickets/:id/poll', (req, res) => {
-  const ticket = db.getTicketById(req.params.id);
-  if (!ticket) return res.status(404).json({ error: 'Not found' });
-
-  const user = req.user;
-  if (user.role !== 'admin') {
-    // Must be a party — same rule as GET /tickets/:id
-    if (!db.getUserTicketRole(ticket.id, user.id)) {
-      // Technicians can also see tickets in their orgs
-      const inOrgAccess = (user.role === 'technician' && ticket.organization_id &&
-        (user.techOrgIds || []).includes(ticket.organization_id));
-      const isSuperuser = user.isGroupSuperuser && ticket.organization_id &&
-        (user.techOrgIds || []).includes(ticket.organization_id);
-      if (!inOrgAccess && !isSuperuser) return res.status(403).json({ error: 'Forbidden' });
-    }
-  }
-
-  const count = db.getCommentCount(ticket.id);
-  res.json({ comment_count: count, updated_at: ticket.updated_at });
-});
 
 module.exports = router;
