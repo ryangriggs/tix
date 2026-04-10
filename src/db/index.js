@@ -591,7 +591,7 @@ function ticketAccessCondition({ userId, userRole, userOrgId, userIsSuperuser, u
 function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgIds = [],
                       status, priority, sort = 'updated_at', order = 'desc', search = '',
                       dateFrom = null, dateTo = null, orgFilter = null, idSearch = null,
-                      ownerFilter = null }) {
+                      ownerFilter = null, limit = 0, offset = 0 }) {
   const validSorts = {
     created_at:    't.created_at',
     updated_at:    't.updated_at',
@@ -693,7 +693,19 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
   if (conditions.length > 0) query += ' WHERE ' + conditions.join(' AND ');
   query += ` ORDER BY CASE t.status WHEN 'new' THEN 0 ELSE 1 END ASC, ${sortCol} ${sortOrder}`;
 
-  return prepare(query).all(...params);
+  // Count query (same WHERE, no ORDER BY/LIMIT)
+  const countQuery = query.replace(
+    /^SELECT DISTINCT t\.\*.+?FROM tickets t/s,
+    'SELECT COUNT(DISTINCT t.id) AS total FROM tickets t'
+  ).replace(/ORDER BY.+$/s, '');
+  const total = prepare(countQuery).get(...params)?.total ?? 0;
+
+  if (limit > 0) {
+    query += ' LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+  }
+
+  return { rows: prepare(query).all(...params), total };
 }
 
 function deleteTicket(id) {
@@ -1098,6 +1110,10 @@ function getDashboardStats(user) {
   return { byStatus, oldestByStatus, inactiveCount, byPriority };
 }
 
+function getCommentCount(ticketId) {
+  return prepare('SELECT COUNT(*) AS count FROM comments WHERE ticket_id = ?').get(ticketId)?.count || 0;
+}
+
 function getAttachmentCount() {
   return prepare('SELECT COUNT(*) AS count FROM attachments').get().count || 0;
 }
@@ -1181,7 +1197,7 @@ module.exports = {
   getOpenTicketsForInactivityCheck, setInactivityReminderSent,
   getTicketByReplyToken, disableAllPartyNotifications, disablePartyNotifications, togglePartyNotifications,
   // Reports
-  getBillingReport, getTicketCountsByStatus, getDashboardStats, getAttachmentCount,
+  getBillingReport, getTicketCountsByStatus, getDashboardStats, getAttachmentCount, getCommentCount,
   // Organizations
   findOrCreateOrganization, getAllOrganizations, getOrganizationsByIds, searchOrganizations,
   renameOrganization, deleteOrganization, getOrganizationById,

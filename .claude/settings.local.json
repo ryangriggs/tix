@@ -11,7 +11,10 @@
       "Bash(grep -rn \"checkUpdate\\\\|check_update\\\\|latest\\\\|github.*release\\\\|npm.*version\" C:tempticketsnewtixsrc --include=*.js)",
       "Bash(grep -r \"req\\\\.body\\\\|req\\\\.query\" src/routes/*.js)",
       "Bash(grep -r \"getTicketAccess\\\\|canManage\\\\|requireAdmin\\\\|requireAuth\" src/routes/*.js)",
-      "Bash(grep -rn \"template\\\\|render\\\\|ejs\\\\|html\\\\|body\" src/routes/*.js)"
+      "Bash(grep -rn \"template\\\\|render\\\\|ejs\\\\|html\\\\|body\" src/routes/*.js)",
+      "Bash(python3 -c ':*)",
+      "Bash(python3:*)",
+      "Bash(npm ls:*)"
     ]
   },
   "outputStyle": "default"

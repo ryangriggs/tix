@@ -3,13 +3,13 @@
 const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
 
 const fs   = require('fs');
 const jwt  = require('jsonwebtoken');
 const config = require('./config');
 const { requireAuth, requireAdmin, optionalAuth, verifyCsrf } = require('./middleware/auth');
 const { startSMTPServer } = require('./smtp');
-const sse = require('./services/sse');
 const { initDb, getTicketsForReminders, setTicketRemindersSent, getSetting, setSetting, seedSetting, getAllSettings,
         getOpenTicketsForInactivityCheck, setInactivityReminderSent } = require('./db');
 const { sendDueReminder, sendInactivityReminder } = require('./services/mail');
@@ -28,9 +28,31 @@ app.set('views', path.join(__dirname, '..', 'views'));
 // ============================================================
 // Middleware
 // ============================================================
+
+// Security headers. CSP allows:
+//  - Same-origin scripts + the Quill CDN used in the editor
+//  - Inline scripts (needed for EJS templates that embed data)
+//  - Same-origin styles + inline styles (used extensively in EJS templates)
+//  - Same-origin images + data: URIs (for attachment previews / annotation canvas)
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc:     ["'self'"],
+      scriptSrc:      ["'self'", "'unsafe-inline'", 'cdn.quilljs.com'],
+      styleSrc:       ["'self'", "'unsafe-inline'", 'cdn.quilljs.com'],
+      imgSrc:         ["'self'", 'data:'],
+      connectSrc:     ["'self'"],
+      fontSrc:        ["'self'", 'cdn.quilljs.com'],
+      objectSrc:      ["'none'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // PDF.js viewer needs this relaxed
+}));
+
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+app.use(express.urlencoded({ extended: true, limit: '10mb' })); // tickets/comments can have large HTML bodies
+app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
 const { version } = require('../package.json');
@@ -126,32 +148,6 @@ app.use('/unsubscribe', require('./routes/unsubscribe'));
 app.get('/', requireAuth, (req, res) => res.redirect('/dashboard'));
 
 // ============================================================
-// Server-Sent Events
-// ============================================================
-app.get('/events', requireAuth, (req, res) => {
-  res.writeHead(200, {
-    'Content-Type':  'text/event-stream',
-    'Cache-Control': 'no-cache, no-transform',
-    'Connection':    'keep-alive',
-    'X-Accel-Buffering': 'no', // disable nginx buffering when behind reverse proxy
-  });
-
-  res.write(`data: ${JSON.stringify({ type: 'connected', userId: req.user.id })}\n\n`);
-
-  sse.addClient(req.user.id, res);
-
-  // Keepalive ping every 25 seconds (browsers time out SSE after ~30s of silence)
-  const ping = setInterval(() => {
-    try { res.write(': ping\n\n'); } catch (_) { clearInterval(ping); }
-  }, 25000);
-
-  req.on('close', () => {
-    clearInterval(ping);
-    sse.removeClient(req.user.id, res);
-  });
-});
-
-// ============================================================
 // Error handlers
 // ============================================================
 app.use((req, res) => {
@@ -214,6 +210,9 @@ async function start() {
     upload_blocked_extensions:      config.uploadBlockedExtensions,
     email_rate_limit_per_ticket:    String(config.emailRateLimitPerTicket),
     email_rate_limit_new_tickets:   String(config.emailRateLimitNewTickets),
+    login_rate_limit_ip:            String(config.loginRateLimitPerIpPerHour),
+    login_rate_limit_email:         String(config.loginRateLimitPerEmailPerMin),
+    mailgun_webhook_enabled:        config.mailTransport === 'mailgun' ? 'true' : 'false',
     reminder_count:                 '1',
     reminder_frequency_hours:       '24',
     notify_email_submitter:         'true',

@@ -9,7 +9,6 @@ const sanitizeHtml = require('sanitize-html');
 const config = require('../config');
 const db = require('../db');
 const { sendTicketNotification, logEmail } = require('./mail');
-const sse = require('./sse');
 const audit = require('./audit');
 
 // ============================================================
@@ -433,12 +432,6 @@ async function handleReply(ticketId, fromEmail, parsed, subjectFallback = false)
     });
   }
 
-  // Push SSE update to connected clients who are parties
-  sse.broadcast(db.getPartyUserIds(ticketId), { type: 'comment_added', ticketId, commentId: comment.id });
-  if (wasReopened) {
-    sse.broadcast(db.getPartyUserIds(ticketId), { type: 'ticket_updated', ticketId });
-  }
-
   audit.logEmail(fromEmail, wasReopened ? 'replied and reopened ticket' : 'added comment via email', ticketId);
   console.log(`[Inbound] Comment added to ticket #${ticketId} from ${fromEmail}`);
 }
@@ -519,7 +512,6 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
     db.disableAllPartyNotifications(ticket.id);
     commitAttachments(prepared, ticket.id, null);
     if (parsed.messageId) db.recordEmailMessage(ticket.id, parsed.messageId, 'in');
-    sse.broadcastToAll({ type: 'ticket_created', ticketId: ticket.id });
     audit.logEmail(fromEmail, 'created ticket via email (silent)', ticket.id);
     console.log(`[Inbound] Created silent ticket #${ticket.id} from ${fromEmail}`);
     return;
@@ -601,9 +593,6 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
       replyToken: ticket.reply_token,
     });
   }
-
-  // Push SSE to all connected clients (admins see it immediately)
-  sse.broadcastToAll({ type: 'ticket_created', ticketId: ticket.id });
 
   audit.logEmail(fromEmail, 'created ticket via email', ticket.id);
   console.log(`[Inbound] Created ticket #${ticket.id} from ${fromEmail}`);

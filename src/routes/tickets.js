@@ -11,7 +11,7 @@ const sanitizeHtml = require('sanitize-html');
 const config = require('../config');
 const db = require('../db');
 const { sendTicketNotification } = require('../services/mail');
-const sse = require('../services/sse');
+
 const audit = require('../services/audit');
 
 // ============================================================
@@ -173,7 +173,8 @@ async function notifyParties(ticket, actorEmail, messageBody, commentId, inReply
 // ============================================================
 
 const SINCE_SECONDS    = { '1d': 86400, '7d': 7 * 86400, '30d': 30 * 86400 };
-const DEFAULT_PREFS    = { status: 'new,pending,open,on_hold', priority: '', sort: 'priority', order: 'desc', since: '', org: '', q: '', owner: 'me' };
+const DEFAULT_PREFS    = { status: 'new,pending,open,on_hold', priority: '', sort: 'priority', order: 'desc', since: '', org: '', q: '', owner: 'me', per_page: '50' };
+const VALID_PER_PAGE   = [10, 50, 100, 0]; // 0 = All
 const VALID_STATUSES   = ['new', 'pending', 'open', 'on_hold', 'closed'];
 const VALID_PRIORITIES = ['urgent', 'high', 'medium', 'low'];
 const FILTER_COOKIE  = 'tix_filters';
@@ -192,7 +193,7 @@ router.get('/', (req, res) => {
     return res.redirect(`/tickets?${qs}`);
   }
 
-  const { status, priority, sort, order, q, since, org, date_from, date_to, owner } = req.query;
+  const { status, priority, sort, order, q, since, org, date_from, date_to, owner, page: pageParam, per_page: perPageParam } = req.query;
 
   // Strip ticket prefix from search term; if remainder is a plain integer treat as ID lookup
   const prefix = config.ticketPrefix;
@@ -207,6 +208,9 @@ router.get('/', (req, res) => {
   }
 
   // Persist filter choices to cookie (including search query).
+  const perPage = VALID_PER_PAGE.includes(parseInt(perPageParam, 10)) ? parseInt(perPageParam, 10) : 50;
+  const currentPage = Math.max(1, parseInt(pageParam, 10) || 1);
+
   const savedPrefs = {
     status:    'status'   in req.query ? (status   || '') : DEFAULT_PREFS.status,
     priority:  'priority' in req.query ? (priority || '') : DEFAULT_PREFS.priority,
@@ -218,6 +222,7 @@ router.get('/', (req, res) => {
     date_from: date_from || '',
     date_to:   date_to   || '',
     owner:     owner !== undefined ? (owner || '') : 'me',
+    per_page:  String(perPage),
   };
   res.cookie(FILTER_COOKIE, JSON.stringify(savedPrefs), {
     httpOnly: false,
@@ -251,7 +256,7 @@ router.get('/', (req, res) => {
     // empty string ('') = no filter (show all)
   }
 
-  const tickets = db.getTickets({
+  const { rows: tickets, total: ticketTotal } = db.getTickets({
     userId:          req.user.id,
     userRole:        req.user.role,
     userOrgId:       req.user.organization_id || null,
@@ -267,7 +272,10 @@ router.get('/', (req, res) => {
     dateTo,
     orgFilter:       org === 'unassigned' ? -1 : (org ? parseInt(org, 10) : null),
     ownerFilter,
+    limit:           perPage > 0 ? perPage : 0,
+    offset:          perPage > 0 ? (currentPage - 1) * perPage : 0,
   });
+  const totalPages = perPage > 0 ? Math.ceil(ticketTotal / perPage) : 1;
 
   // Org filter dropdown — visible to admins, technicians, and superusers
   const canFilterOrg = req.user.role === 'admin' || req.user.role === 'technician' || req.user.isGroupSuperuser;
@@ -299,6 +307,12 @@ router.get('/', (req, res) => {
     canFilterOwner,
     assignableUsers,
     filters: savedPrefs,
+    pagination: {
+      page:       currentPage,
+      perPage,
+      total:      ticketTotal,
+      totalPages,
+    },
   });
 });
 
@@ -357,7 +371,7 @@ router.post('/', upload, async (req, res) => {
   }
 
   audit.log(req, `created ticket "${ticket.subject}"`, ticket.id);
-  sse.broadcastToAll({ type: 'ticket_created', ticketId: ticket.id });
+
 
   // Notify default assignee and collaborators (creator is excluded — they just submitted it)
   const ticketUrl = `${config.appUrl}/tickets/${ticket.id}`;
@@ -440,20 +454,20 @@ router.post('/bulk', (req, res) => {
   if (action === 'delete') {
     db.bulkDeleteTickets(ids);
     audit.log(req, `bulk deleted ${ids.length} ticket(s): ${ids.join(', ')}`);
-    sse.broadcastToAll({ type: 'tickets_deleted', ticketIds: ids });
+
   } else if (action === 'status') {
     const validStatuses = ['new', 'pending', 'open', 'on_hold', 'closed'];
     if (validStatuses.includes(bulkStatus)) {
       db.bulkUpdateStatus(ids, bulkStatus);
       audit.log(req, `bulk changed status to ${bulkStatus} on ${ids.length} ticket(s): ${ids.join(', ')}`);
-      sse.broadcastToAll({ type: 'tickets_updated', ticketIds: ids });
+
     }
   } else if (action === 'priority') {
     const validPriorities = ['low', 'medium', 'high', 'urgent'];
     if (validPriorities.includes(bulkPriority)) {
       db.bulkUpdatePriority(ids, bulkPriority);
       audit.log(req, `bulk changed priority to ${bulkPriority} on ${ids.length} ticket(s): ${ids.join(', ')}`);
-      sse.broadcastToAll({ type: 'tickets_updated', ticketIds: ids });
+
     }
   } else if (action === 'assign') {
     const assigneeId = parseInt(bulkAssignee, 10);
@@ -464,7 +478,7 @@ router.post('/bulk', (req, res) => {
           db.addParty(id, assignee.id, 'owner');
         }
         audit.log(req, `bulk assigned ${assignee.email} as owner on ${ids.length} ticket(s): ${ids.join(', ')}`);
-        sse.broadcastToAll({ type: 'tickets_updated', ticketIds: ids });
+
       }
     }
   }
@@ -586,9 +600,7 @@ router.post('/:id/comments', upload, async (req, res) => {
   }
 
   audit.log(req, willChangeStatus ? `added comment, changed status to ${statusChange}` : 'added comment', ticket.id);
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'comment_added', ticketId: ticket.id, commentId: comment.id });
   if (willChangeStatus) {
-    sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'status', value: statusChange });
   }
 
   res.redirect(`/tickets/${ticket.id}#comment-${comment.id}`);
@@ -612,7 +624,6 @@ router.post('/:id/comments/:commentId/edit', (req, res) => {
 
   db.updateComment(commentId, body);
   audit.log(req, 'edited comment', ticket.id);
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
 
   res.json({ ok: true, body });
 });
@@ -653,7 +664,6 @@ router.post('/:id/comments/:commentId/delete', (req, res) => {
 
   db.deleteComment(commentId);
   audit.log(req, 'deleted comment', ticket.id);
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
 
   res.redirect(`/tickets/${ticket.id}`);
 });
@@ -671,7 +681,6 @@ router.post('/:id/body', (req, res) => {
 
   db.updateTicket(ticket.id, { body });
   audit.log(req, 'edited ticket body', ticket.id);
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id });
 
   res.json({ ok: true, body });
 });
@@ -690,7 +699,6 @@ router.post('/:id/subject', async (req, res) => {
 
   db.updateTicket(ticket.id, { subject });
   audit.log(req, `changed subject to "${subject}"`, ticket.id);
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'subject', value: subject });
 
   if (req.accepts('json')) return res.json({ ok: true, subject });
   res.redirect(`/tickets/${ticket.id}`);
@@ -727,7 +735,6 @@ router.post('/:id/status', async (req, res) => {
   }
 
   audit.log(req, `changed status to ${status}`, ticket.id);
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'status', value: status });
 
   if (req.accepts('json')) return res.json({ ok: true, status });
   res.redirect(`/tickets/${ticket.id}`);
@@ -745,7 +752,6 @@ router.post('/:id/priority', async (req, res) => {
 
   db.updateTicket(ticket.id, { priority });
   audit.log(req, `changed priority to ${priority}`, ticket.id);
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'priority', value: priority });
 
   if (req.accepts('json')) return res.json({ ok: true, priority });
   res.redirect(`/tickets/${ticket.id}`);
@@ -761,7 +767,6 @@ router.post('/:id/due-date', (req, res) => {
   db.updateTicket(ticket.id, { due_date: dueDate });
   if (dueDate !== ticket.due_date) db.setTicketRemindersSent(ticket.id, 0);
   audit.log(req, dueDate ? `changed due date to ${req.body.due_date}` : 'cleared due date', ticket.id);
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'due_date', value: dueDate });
 
   if (req.accepts('json')) {
     const formatted = dueDate ? new Date(dueDate * 1000).toLocaleDateString() : null;
@@ -785,7 +790,6 @@ router.post('/:id/organization', (req, res) => {
   }
   db.updateTicket(ticket.id, { organization_id: orgId });
   audit.log(req, orgId ? `changed organization to "${resolvedOrgName}"` : 'cleared organization', ticket.id);
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'org', value: resolvedOrgName });
   if (req.accepts('json')) return res.json({ ok: true, orgName: resolvedOrgName, orgId: orgId || null });
   res.redirect(`/tickets/${ticket.id}`);
 });
@@ -828,7 +832,6 @@ router.post('/:id/parties', async (req, res) => {
   } catch (err) { console.error('[Tickets] Notification error:', err); }
 
   const partyPayload = { userId: full.id, name: full.name || null, email: full.email, orgName: full.organization_name || null, role, notificationsDisabled: false };
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'party_added', party: partyPayload });
 
   if (req.accepts('json')) return res.json({ ok: true, party: partyPayload });
   res.redirect(`/tickets/${ticket.id}`);
@@ -850,7 +853,6 @@ router.post('/:id/parties/role', async (req, res) => {
   const affected = db.getUserById(userId);
   db.addParty(ticket.id, userId, role);
   audit.log(req, `changed ${affected?.email || userId}'s role to ${role}`, ticket.id);
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'party_updated', userId, role });
 
   // Notify the affected user (skip if they made the change themselves)
   if (affected && affected.email !== req.user.email) {
@@ -897,7 +899,6 @@ router.post('/:id/parties/remove', (req, res) => {
   const removedUser = db.getUserById(userId);
   db.removeParty(ticket.id, userId);
   audit.log(req, `removed ${removedUser?.email || userId}`, ticket.id);
-  sse.broadcast(db.getPartyUserIds(ticket.id), { type: 'ticket_updated', ticketId: ticket.id, field: 'party_removed', userId });
 
   if (req.accepts('json')) return res.json({ ok: true });
   res.redirect(`/tickets/${ticket.id}`);
@@ -911,7 +912,7 @@ router.post('/:id/delete', (req, res) => {
 
   db.deleteTicket(ticket.id);
   audit.log(req, `deleted ticket "${ticket.subject}"`, ticket.id);
-  sse.broadcastToAll({ type: 'ticket_deleted', ticketId: ticket.id });
+
   res.redirect('/tickets');
 });
 

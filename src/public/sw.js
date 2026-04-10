@@ -1,4 +1,4 @@
-const CACHE = 'tix-v1.1.111';
+const CACHE = 'tix-v1.1.112';
 
 // Static assets to cache on install
 const PRECACHE = [
@@ -25,9 +25,8 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Never intercept SSE, API, or POST requests
+  // Never intercept API or POST requests
   if (
-    url.pathname === '/events' ||
     event.request.method !== 'GET' ||
     url.pathname.startsWith('/auth') ||
     url.pathname.startsWith('/tickets/attachments')

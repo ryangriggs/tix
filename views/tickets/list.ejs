@@ -9,6 +9,10 @@
 <main class="container">
   <div class="page-toolbar">
     <h1 class="page-title">Tickets</h1>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="refreshTicketList()" title="Refresh list" style="margin-left:auto">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Refresh
+    </button>
   </div>
 
   <!-- Filters & Search -->
@@ -194,6 +198,60 @@
             <label class="ticket-card-checkbox" title="Select ticket">
               <input type="checkbox" name="ticketIds[]" value="<%= t.id %>" class="ticket-checkbox" onchange="updateBulkBar()">
             </label>
+          <% } %>
+        </div>
+      <% } %>
+    </div>
+
+    <!-- Pagination -->
+    <%
+      const _pq = Object.assign({}, filters);
+      delete _pq.page;
+      const _pBase = '/tickets?' + Object.entries(_pq).filter(([,v]) => v !== '').map(([k,v]) => k + '=' + encodeURIComponent(v)).join('&');
+      function pageUrl(p) { return _pBase + '&page=' + p; }
+    %>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;padding:.75rem 0;margin-top:.25rem;border-top:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:.5rem;font-size:.875rem;color:var(--text-muted)">
+        <span>Show:</span>
+        <% for (const pp of [10, 50, 100, 0]) { %>
+          <a href="<%= _pBase + '&per_page=' + pp + '&page=1' %>"
+             style="padding:.2rem .5rem;border-radius:4px;text-decoration:none;font-weight:500;
+                    background:<%= pagination.perPage === pp ? 'var(--primary)' : 'transparent' %>;
+                    color:<%= pagination.perPage === pp ? '#fff' : 'var(--text-muted)' %>;
+                    border:1px solid <%= pagination.perPage === pp ? 'var(--primary)' : 'var(--border)' %>">
+            <%= pp === 0 ? 'All' : pp %>
+          </a>
+        <% } %>
+        <span style="margin-left:.5rem">
+          <% if (pagination.perPage > 0) { %>
+            <%= (pagination.page - 1) * pagination.perPage + 1 %>–<%= Math.min(pagination.page * pagination.perPage, pagination.total) %> of <%= pagination.total %>
+          <% } else { %>
+            <%= pagination.total %> total
+          <% } %>
+        </span>
+      </div>
+      <% if (pagination.totalPages > 1) { %>
+        <div style="display:flex;align-items:center;gap:.25rem">
+          <% if (pagination.page > 1) { %>
+            <a href="<%= pageUrl(1) %>" style="padding:.25rem .5rem;border:1px solid var(--border);border-radius:4px;text-decoration:none;font-size:.875rem;color:var(--text)">&laquo;</a>
+            <a href="<%= pageUrl(pagination.page - 1) %>" style="padding:.25rem .5rem;border:1px solid var(--border);border-radius:4px;text-decoration:none;font-size:.875rem;color:var(--text)">&lsaquo;</a>
+          <% } %>
+          <%
+            const _startPage = Math.max(1, pagination.page - 2);
+            const _endPage   = Math.min(pagination.totalPages, pagination.page + 2);
+          %>
+          <% for (let _pi = _startPage; _pi <= _endPage; _pi++) { %>
+            <a href="<%= pageUrl(_pi) %>"
+               style="padding:.25rem .5rem;border-radius:4px;text-decoration:none;font-size:.875rem;min-width:2rem;text-align:center;
+                      background:<%= _pi === pagination.page ? 'var(--primary)' : 'transparent' %>;
+                      color:<%= _pi === pagination.page ? '#fff' : 'var(--text)' %>;
+                      border:1px solid <%= _pi === pagination.page ? 'var(--primary)' : 'var(--border)' %>">
+              <%= _pi %>
+            </a>
+          <% } %>
+          <% if (pagination.page < pagination.totalPages) { %>
+            <a href="<%= pageUrl(pagination.page + 1) %>" style="padding:.25rem .5rem;border:1px solid var(--border);border-radius:4px;text-decoration:none;font-size:.875rem;color:var(--text)">&rsaquo;</a>
+            <a href="<%= pageUrl(pagination.totalPages) %>" style="padding:.25rem .5rem;border:1px solid var(--border);border-radius:4px;text-decoration:none;font-size:.875rem;color:var(--text)">&raquo;</a>
           <% } %>
         </div>
       <% } %>

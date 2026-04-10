@@ -11,6 +11,47 @@ const db = require('../db');
 const { sendMagicLink } = require('../services/mail');
 const { issueSessionCookie } = require('../middleware/auth');
 
+// ============================================================
+// Login rate limiting — in-memory, resets on restart
+// ============================================================
+
+const _loginByIp    = new Map(); // ip  → [timestamp, ...]
+const _loginByEmail = new Map(); // email → [timestamp, ...]
+
+// Prune stale buckets every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, ts] of _loginByIp)    { const r = ts.filter(t => now - t < 3_600_000); r.length ? _loginByIp.set(k, r)    : _loginByIp.delete(k);    }
+  for (const [k, ts] of _loginByEmail) { const r = ts.filter(t => now - t < 60_000);    r.length ? _loginByEmail.set(k, r) : _loginByEmail.delete(k); }
+}, 5 * 60_000).unref();
+
+function checkLoginRateLimit(ip, email) {
+  const now = Date.now();
+
+  const ipLimit    = config.loginRateLimitPerIpPerHour   || 20;
+  const emailLimit = config.loginRateLimitPerEmailPerMin || 5;
+
+  const recentIp    = (_loginByIp.get(ip)       || []).filter(t => now - t < 3_600_000);
+  const recentEmail = (_loginByEmail.get(email)  || []).filter(t => now - t < 60_000);
+
+  if (recentIp.length >= ipLimit)       return 'ip';
+  if (recentEmail.length >= emailLimit) return 'email';
+
+  recentIp.push(now);
+  recentEmail.push(now);
+  _loginByIp.set(ip, recentIp);
+  _loginByEmail.set(email, recentEmail);
+  return null;
+}
+
+function clientIp(req) {
+  // Trust X-Forwarded-For only if behind a known proxy (configurable).
+  // For simplicity, use the first non-private IP or fall back to socket address.
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) return forwarded.split(',')[0].trim();
+  return req.socket?.remoteAddress || 'unknown';
+}
+
 // Only allow relative same-origin redirects (starts with / but not //)
 function safeRedirectUrl(url) {
   if (typeof url === 'string' && url.startsWith('/') && !url.startsWith('//')) return url;
@@ -42,6 +83,17 @@ router.post('/login', async (req, res) => {
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.render('auth/login', { title: 'Log in', error: 'Please enter a valid email address.', email, next });
+  }
+
+  const limited = checkLoginRateLimit(clientIp(req), email);
+  if (limited === 'ip') {
+    logUser(email, 'FAILED - IP rate limited');
+    return res.render('auth/login', { title: 'Log in', error: 'Too many login attempts from your network. Please try again later.', email, next });
+  }
+  if (limited === 'email') {
+    logUser(email, 'FAILED - email rate limited');
+    // Return generic message to avoid confirming email existence
+    return res.render('auth/login', { title: 'Log in', error: 'Too many login attempts. Please try again in a minute.', email, next });
   }
 
   const user = db.findOrCreateUser(email);

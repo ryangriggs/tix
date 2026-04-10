@@ -326,6 +326,31 @@
         </div>
       </div>
       <p class="form-hint">Maximum inbound email messages per minute. 0 disables the limit.</p>
+
+      <div class="form-row" style="gap:.75rem;flex-wrap:wrap;margin-top:.75rem">
+        <div class="form-group" style="flex:0 0 auto">
+          <label for="login_rate_limit_ip">Login attempts per IP / hour</label>
+          <input type="number" id="login_rate_limit_ip" name="login_rate_limit_ip"
+                 value="<%= s.login_rate_limit_ip || '20' %>" min="1" step="1"
+                 class="form-input form-input-sm" style="width:6rem">
+        </div>
+        <div class="form-group" style="flex:0 0 auto">
+          <label for="login_rate_limit_email">Login attempts per email / minute</label>
+          <input type="number" id="login_rate_limit_email" name="login_rate_limit_email"
+                 value="<%= s.login_rate_limit_email || '5' %>" min="1" step="1"
+                 class="form-input form-input-sm" style="width:6rem">
+        </div>
+      </div>
+      <p class="form-hint">Limits magic link requests to prevent email bombing. Resets on server restart.</p>
+
+      <div class="form-group" style="margin-top:.75rem">
+        <label class="checkbox-label">
+          <input type="checkbox" name="mailgun_webhook_enabled" value="true"
+                 <%= s.mailgun_webhook_enabled === 'true' ? 'checked' : '' %>>
+          Enable Mailgun inbound webhook (<code>POST /inbound/mailgun</code>)
+        </label>
+        <p class="form-hint">Only needed when using Mailgun's inbound routing. Disable if not in use.</p>
+      </div>
     </div>
 
     <!-- ── Features ─────────────────────────────────────────── -->

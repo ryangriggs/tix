@@ -17,6 +17,14 @@ const config = {
   emailRateLimitPerTicket:  parseInt(process.env.EMAIL_RATE_LIMIT_PER_TICKET  || '10', 10),
   emailRateLimitNewTickets: parseInt(process.env.EMAIL_RATE_LIMIT_NEW_TICKETS || '3',  10),
 
+  // Login rate limiting (in-process, resets on restart)
+  loginRateLimitPerIpPerHour:    parseInt(process.env.LOGIN_RATE_LIMIT_IP    || '20', 10),
+  loginRateLimitPerEmailPerMin:  parseInt(process.env.LOGIN_RATE_LIMIT_EMAIL || '5',  10),
+
+  // Mailgun inbound webhook — enable or disable the /inbound/mailgun POST endpoint.
+  // Automatically defaults to true when mail_transport is mailgun.
+  mailgunWebhookEnabled: false, // set dynamically via applySettings
+
   // Comma-separated extension lists (without leading dot, case-insensitive).
   // Whitelist: only these extensions are accepted. Empty = allow all.
   // Blacklist: always rejected, even if in the whitelist.
@@ -130,6 +138,16 @@ function applySettings(map) {
   if ('upload_blocked_extensions'   in map) config.uploadBlockedExtensions   = map.upload_blocked_extensions   || '';
   if ('email_rate_limit_per_ticket'  in map) config.emailRateLimitPerTicket  = parseInt(map.email_rate_limit_per_ticket,  10) || 0;
   if ('email_rate_limit_new_tickets' in map) config.emailRateLimitNewTickets = parseInt(map.email_rate_limit_new_tickets, 10) || 0;
+
+  if ('login_rate_limit_ip'    in map) config.loginRateLimitPerIpPerHour   = parseInt(map.login_rate_limit_ip,    10) || 20;
+  if ('login_rate_limit_email' in map) config.loginRateLimitPerEmailPerMin = parseInt(map.login_rate_limit_email, 10) || 5;
+
+  if ('mailgun_webhook_enabled' in map) {
+    config.mailgunWebhookEnabled = map.mailgun_webhook_enabled === 'true';
+  } else {
+    // Auto-enable when transport is mailgun
+    config.mailgunWebhookEnabled = config.mailTransport === 'mailgun';
+  }
 }
 
 module.exports = config;

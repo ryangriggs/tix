@@ -44,227 +44,89 @@ function localiseTimestamps(root) {
 document.addEventListener('DOMContentLoaded', () => localiseTimestamps());
 
 // ============================================================
-// Server-Sent Events — real-time updates
+// Ticket list — manual refresh
 // ============================================================
 
-(function initSSE() {
-  // Only connect if the user is logged in (page has a main element with real content)
-  if (!document.querySelector('main')) return;
+// Reload the ticket list by refetching the current URL and swapping in the new list.
+// Called by the Refresh button; also available globally for external callers.
+window.refreshTicketList = function refreshTicketList() {
+  const list = document.getElementById('ticket-list');
+  if (!list) return;
 
-  // Don't open SSE on auth pages
-  if (window.location.pathname.startsWith('/auth')) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:absolute;inset:0;background:rgba(255,255,255,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;z-index:10;border-radius:4px';
+  overlay.innerHTML = '<div style="width:28px;height:28px;border:3px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:spin 0.7s linear infinite"></div><span style="font-size:.8rem;color:#6b7280">Loading…</span>';
+  const wrapper = list.parentElement;
+  const prevPosition = getComputedStyle(wrapper).position;
+  if (prevPosition === 'static') wrapper.style.position = 'relative';
+  wrapper.appendChild(overlay);
 
-  let evtSource;
-  let retryDelay = 3000;
-
-  function connect() {
-    evtSource = new EventSource('/events');
-
-    evtSource.addEventListener('message', (e) => {
-      try {
-        const event = JSON.parse(e.data);
-        handleEvent(event);
-      } catch (_) { /* ignore malformed */ }
+  fetch(window.location.href, { headers: { 'Accept': 'text/html' } })
+    .then(r => r.text())
+    .then(html => {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const newList = doc.getElementById('ticket-list');
+      if (newList) { list.replaceWith(newList); localiseTimestamps(newList); }
+    })
+    .catch(() => { /* network error — ignore */ })
+    .finally(() => {
+      overlay.remove();
+      if (prevPosition === 'static') wrapper.style.position = '';
     });
+};
 
-    evtSource.addEventListener('open', () => {
-      retryDelay = 3000; // reset backoff on successful connect
-    });
+// ============================================================
+// Ticket detail — background poll for new activity
+// Polls /api/tickets/:id/poll every 30s while the page is visible.
+// Never navigates away — only shows a "new activity" banner if
+// the comment count or updated_at changes since page load.
+// ============================================================
 
-    evtSource.addEventListener('error', () => {
-      evtSource.close();
-      setTimeout(connect, retryDelay);
-      retryDelay = Math.min(retryDelay * 2, 30000); // exponential backoff
-    });
-  }
+(function initTicketPolling() {
+  const ticketEl = document.getElementById('ticket-detail');
+  if (!ticketEl) return;
 
-  function handleEvent(event) {
-    const path = window.location.pathname;
+  const ticketId      = ticketEl.dataset.ticketId;
+  const loadedCount   = parseInt(ticketEl.dataset.commentCount  || '0', 10);
+  const loadedUpdated = parseInt(ticketEl.dataset.updatedAt     || '0', 10);
+  if (!ticketId) return;
 
-    if (event.type === 'ticket_created' || event.type === 'ticket_updated') {
-      if (path === '/tickets' || path === '/') {
-        // Refresh the ticket list silently
-        refreshTicketList();
-      }
-    }
+  let bannerShown = false;
 
-    if (event.type === 'comment_added' && path === `/tickets/${event.ticketId}`) {
-      // New comment on the ticket we're viewing — fetch and append it
-      fetchAndAppendComment(event.ticketId, event.commentId);
-    }
-
-    if (event.type === 'ticket_updated' && path === `/tickets/${event.ticketId}`) {
-      const f  = event.field;
-      const _e = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-
-      if (f === 'status' && event.value) {
-        const sv = event.value;
-        document.querySelectorAll('#status-pills .pill-btn').forEach(b =>
-          b.classList.toggle('pill-active', b.dataset.status === sv));
-        const badge = document.getElementById('badge-status');
-        if (badge) { badge.className = `badge badge-status-${sv}`; badge.textContent = sv.replace(/_/g, ' '); }
-
-      } else if (f === 'priority' && event.value) {
-        const pv = event.value;
-        document.querySelectorAll('#priority-pills .pill-btn').forEach(b =>
-          b.classList.toggle('pill-active', b.dataset.priority === pv));
-        const badge = document.getElementById('badge-priority');
-        if (badge) { badge.className = `badge badge-priority-${pv}`; badge.textContent = pv; }
-
-      } else if (f === 'subject' && event.value) {
-        document.title = document.title.replace(/—.*/, `\u2014 ${event.value}`);
-        const input = document.getElementById('subject-input');
-        // Don't clobber an in-progress edit
-        if (input && input.dataset.dirty !== 'true') input.value = event.value;
-        const h1 = document.querySelector('.ticket-title');
-        if (h1) h1.textContent = event.value;
-
-      } else if (f === 'due_date') {
-        const meta = document.getElementById('due-date-meta');
-        if (meta) {
-          if (event.value) {
-            const dtEl = document.getElementById('due-date-text');
-            dtEl.textContent = fmtTs(event.value, 'date');
-            dtEl.dataset.ts = event.value;
-            const overdue = event.value < Math.floor(Date.now() / 1000);
-            meta.className = 'meta-item' + (overdue ? ' overdue' : '');
-            meta.style.display = '';
-            const dateInput = document.querySelector('#due-date-form [name="due_date"]');
-            if (dateInput) dateInput.value = new Date(event.value * 1000).toISOString().slice(0, 10);
-          } else {
-            meta.style.display = 'none';
-          }
-        }
-
-      } else if (f === 'org') {
-        const input = document.getElementById('org-name-input');
-        if (input) input.value = event.value || '';
-
-      } else if (f === 'party_added' && event.party) {
-        const list = document.getElementById('party-list');
-        if (list && !list.querySelector(`[data-user-id="${event.party.userId}"]`)) {
-          const canManage     = list.dataset.canManage === 'true';
-          const currentUserId = parseInt(list.dataset.currentUserId || '0', 10);
-          const p = event.party;
-          const nameHtml   = p.name
-            ? `<span class="party-name">${_e(p.name)}</span><a href="mailto:${_e(p.email)}" class="party-email-link">${_e(p.email)}</a>`
-            : `<span class="party-name">${_e(p.email)}</span>`;
-          const orgHtml    = p.orgName ? `<span class="party-org">[${_e(p.orgName)}]</span>` : '';
-          const bellSvg    = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`;
-          const notifyHtml = canManage && p.role !== 'submitter'
-            ? `<button type="button" class="btn-icon notify-party-btn" data-user-id="${p.userId}" title="Mute notifications">${bellSvg}</button>`
-            : '';
-          const removeHtml = canManage && p.userId !== currentUserId
-            ? `<button type="button" class="btn-icon remove-party-btn" data-user-id="${p.userId}" title="Remove">×</button>`
-            : '';
-          list.insertAdjacentHTML('beforeend',
-            `<li class="party-item" data-user-id="${p.userId}" data-notifications-disabled="0">
-               <div class="party-info">${nameHtml}${orgHtml}</div>
-               <span class="badge badge-role">${_e(p.role)}</span>
-               ${notifyHtml}
-               ${removeHtml}
-             </li>`);
-        }
-
-      } else if (f === 'party_removed' && event.userId) {
-        document.querySelector(`#party-list [data-user-id="${event.userId}"]`)?.remove();
-
-      } else if (f === 'party_updated' && event.userId && event.role) {
-        const row = document.querySelector(`#party-list [data-user-id="${event.userId}"]`);
-        if (row) {
-          const sel  = row.querySelector('.role-select');
-          const span = row.querySelector('.badge-role');
-          if (sel)  sel.value = event.role;
-          else if (span) span.textContent = event.role;
-        }
-      }
-    }
-  }
-
-  // Reload the ticket list by refetching the current URL
-  function refreshTicketList() {
-    const list = document.getElementById('ticket-list');
-    if (!list) return;
-
-    // Show a loading overlay over the list
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:absolute;inset:0;background:rgba(255,255,255,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;z-index:10;border-radius:4px';
-    overlay.innerHTML = '<div style="width:28px;height:28px;border:3px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:spin 0.7s linear infinite"></div><span style="font-size:.8rem;color:#6b7280">Loading…</span>';
-    const wrapper = list.parentElement;
-    const prevPosition = getComputedStyle(wrapper).position;
-    if (prevPosition === 'static') wrapper.style.position = 'relative';
-    wrapper.appendChild(overlay);
-
-    fetch(window.location.href, { headers: { 'Accept': 'text/html' } })
-      .then(r => r.text())
-      .then(html => {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const newList = doc.getElementById('ticket-list');
-        if (newList) { list.replaceWith(newList); localiseTimestamps(newList); }
-      })
-      .catch(() => { /* network error — ignore */ })
-      .finally(() => {
-        overlay.remove();
-        if (prevPosition === 'static') wrapper.style.position = '';
-      });
-  }
-
-  // Fetch a specific comment HTML and append it to the comment thread
-  function fetchAndAppendComment(ticketId, commentId) {
-    // We refetch the whole ticket page and extract the new comment
-    fetch(`/tickets/${ticketId}`, { headers: { 'Accept': 'text/html' } })
-      .then(r => r.text())
-      .then(html => {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const newComment = doc.getElementById(`comment-${commentId}`);
-        if (!newComment) return;
-
-        const existing = document.getElementById(`comment-${commentId}`);
-        if (existing) return; // already showing
-
-        const comments = document.getElementById('comments');
-        if (comments) {
-          // Insert before the "Activity" heading's next sibling
-          const heading = comments.querySelector('.section-title');
-          if (heading) {
-            heading.after(newComment);
-          } else {
-            comments.appendChild(newComment);
-          }
-          newComment.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          localiseTimestamps(newComment);
-        }
-      })
-      .catch(() => { });
-  }
-
-  function showBanner(msg) {
-    let banner = document.getElementById('update-banner');
-    if (banner) return; // already showing
-    banner = document.createElement('div');
-    banner.id = 'update-banner';
-    banner.style.cssText = 'position:fixed;top:56px;left:0;right:0;background:#2563eb;color:#fff;text-align:center;padding:.5rem;font-size:.875rem;cursor:pointer;z-index:200';
-    banner.textContent = msg + ' Click to refresh.';
-    banner.addEventListener('click', () => window.location.reload());
+  function showActivityBanner() {
+    if (bannerShown) return;
+    bannerShown = true;
+    const banner = document.createElement('div');
+    banner.style.cssText = 'position:fixed;top:56px;left:0;right:0;background:#2563eb;color:#fff;text-align:center;padding:.5rem 1rem;font-size:.875rem;cursor:pointer;z-index:200;display:flex;align-items:center;justify-content:center;gap:.75rem';
+    banner.innerHTML = '<span>New activity on this ticket.</span><button style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:4px;padding:.2rem .6rem;cursor:pointer;font-size:.8rem">Refresh</button>';
+    banner.querySelector('button').addEventListener('click', () => window.location.reload());
+    banner.addEventListener('click', e => { if (e.target === banner) window.location.reload(); });
     document.body.prepend(banner);
   }
 
-  connect();
+  function poll() {
+    // Don't bother if the tab is hidden
+    if (document.visibilityState === 'hidden') return;
 
-  // Release the SSE connection slot before the browser opens the next page.
-  // Without this, the old connection holds one of HTTP/1.1's 6 per-origin slots,
-  // starving the new page's requests and causing 30+ second freezes on mobile.
-  window.addEventListener('pagehide', () => {
-    if (evtSource) { evtSource.close(); evtSource = null; }
-  });
+    fetch(`/api/tickets/${encodeURIComponent(ticketId)}/poll`, {
+      headers: { Accept: 'application/json' },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        if (data.comment_count > loadedCount || data.updated_at > loadedUpdated) {
+          showActivityBanner();
+        }
+      })
+      .catch(() => { /* ignore network errors */ });
+  }
 
-  // iOS Safari restores pages from the back-forward cache (bfcache) via pageshow.
-  // The SSE connection was closed on pagehide, so we must reconnect here.
-  window.addEventListener('pageshow', e => {
-    if (e.persisted && !evtSource) connect();
-  });
+  // Poll every 30 seconds
+  const pollInterval = setInterval(poll, 30_000);
+
+  // Stop polling when navigating away
+  window.addEventListener('pagehide', () => clearInterval(pollInterval));
 })();
 
 // ============================================================

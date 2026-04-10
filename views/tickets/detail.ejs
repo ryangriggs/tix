@@ -5,7 +5,10 @@
 <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
 <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
 
-<main class="container">
+<main class="container" id="ticket-detail"
+  data-ticket-id="<%= ticket.id %>"
+  data-comment-count="<%= comments.length %>"
+  data-updated-at="<%= ticket.updated_at %>">
 
   <!-- Back link + copy actions -->
   <div style="margin-bottom:1rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
