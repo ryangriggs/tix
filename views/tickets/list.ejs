@@ -51,8 +51,10 @@
                 onclick="toggleAll('status')">All</button>
         <% for (const s of statuses) { %>
           <button type="button" class="filter-tab filter-tab-status filter-tab-s-<%= s %> <%= activeStatuses.includes(s) ? 'active' : '' %>"
-                  style="border-left: 4px solid <%= statusColors[s] %>"
-                  onclick="toggleFilter('status','<%= s %>',event)"><%= statusNames[s] %></button>
+                  style="border-left: 4px solid <%= statusColors[s] %>; padding-right:.35rem"
+                  onclick="toggleFilter('status','<%= s %>')"><%= statusNames[s] %><span
+                    class="filter-tab-solo" title="Select only this status"
+                    onclick="event.stopPropagation();soloFilter('status','<%= s %>')">&#9651;</span></button>
         <% } %>
       </div>
 
@@ -73,7 +75,7 @@
       <div class="filter-group">
         <input type="hidden" name="since" id="filter-since" value="<%= filters.since %>">
         <span class="filter-row-label">Date</span>
-        <% const sinceOpts = [['1d','24h'],['7d','7d'],['30d','30d'],['','All'],['custom','Custom']]; %>
+        <% const sinceOpts = [['','All'],['1d','24h'],['7d','7d'],['30d','30d'],['custom','Custom']]; %>
         <% for (const [val, label] of sinceOpts) { %>
           <button type="button" class="filter-tab <%= filters.since===val ? 'active' : '' %>"
                   onclick="setSince('<%= val %>')"><%= label %></button>
@@ -311,17 +313,17 @@ function setSince(val) {
   form.submit();
 }
 
-function toggleFilter(name, value, evt) {
+function toggleFilter(name, value) {
   const el = document.getElementById('filter-' + name);
-  if (evt && (evt.ctrlKey || evt.metaKey)) {
-    // Ctrl/Cmd+click: isolate — clear all other filters, apply only this value
-    el.value = value;
-  } else {
-    const vals = el.value ? el.value.split(',') : [];
-    const idx = vals.indexOf(value);
-    if (idx >= 0) vals.splice(idx, 1); else vals.push(value);
-    el.value = vals.join(',');
-  }
+  const vals = el.value ? el.value.split(',') : [];
+  const idx = vals.indexOf(value);
+  if (idx >= 0) vals.splice(idx, 1); else vals.push(value);
+  el.value = vals.join(',');
+  document.getElementById('filter-form').submit();
+}
+
+function soloFilter(name, value) {
+  document.getElementById('filter-' + name).value = value;
   document.getElementById('filter-form').submit();
 }
 
@@ -336,7 +338,7 @@ function resetFilters() {
   document.getElementById('filter-priority').value = '';
   form.querySelector('[name="sort"]').value = 'priority';
   form.querySelector('[name="order"]').value = 'desc';
-  document.getElementById('filter-since').value = '1d';
+  document.getElementById('filter-since').value = '';
   document.getElementById('search-input').value = '';
   document.getElementById('search-clear').style.display = 'none';
   const orgSel = form.querySelector('select[name="org"]');

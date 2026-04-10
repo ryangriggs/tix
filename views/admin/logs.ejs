@@ -39,8 +39,8 @@
         </p>
         <span style="font-size:.8rem;color:var(--text-muted)">Newest first</span>
       </div>
-      <div style="overflow-x:auto">
-        <table class="data-table">
+      <div style="overflow-x:auto;width:100%;-webkit-overflow-scrolling:touch">
+        <table class="data-table" style="min-width:600px">
           <thead>
             <tr>
               <th style="white-space:nowrap">Time</th>
@@ -56,11 +56,11 @@
                 <td style="white-space:nowrap;font-size:.8rem;font-family:monospace;color:var(--text-muted)" data-ts="<%= e.ts %>" data-fmt="full"><%= e.timestamp %></td>
                 <td style="font-size:.8rem;font-family:monospace;color:var(--text-muted)"><%= e.ip %></td>
                 <td style="font-size:.875rem"><%= e.email %></td>
-                <td style="font-size:.875rem;white-space:nowrap">
+                <td style="font-size:.875rem;max-width:280px">
                   <% if (e.ticketId) { %>
-                    <a href="/tickets/<%= e.ticketId %>" target="_blank" style="font-weight:600"><%= e.ticket %></a>
-                    <% if (e.ticketSubject) { %><span style="color:var(--text-muted);margin-left:.35rem"><%= e.ticketSubject %></span><% } %>
-                    <% if (e.ticketOrg) { %><span style="color:var(--text-muted);margin-left:.35rem;font-size:.8rem">(<%=  e.ticketOrg %>)</span><% } %>
+                    <a href="/tickets/<%= e.ticketId %>" target="_blank" style="font-weight:600;white-space:nowrap"><%= e.ticket %></a>
+                    <% if (e.ticketSubject) { %><span style="color:var(--text-muted);margin-left:.35rem;word-break:break-word"><%= e.ticketSubject %></span><% } %>
+                    <% if (e.ticketOrg) { %><span style="color:var(--text-muted);margin-left:.35rem;font-size:.8rem;white-space:nowrap">(<%=  e.ticketOrg %>)</span><% } %>
                   <% } else { %>
                     <%= e.ticket %>
                   <% } %>
@@ -90,7 +90,7 @@
         </p>
         <span style="font-size:.8rem;color:var(--text-muted)">Newest first</span>
       </div>
-      <div style="overflow-x:auto">
+      <div style="overflow-x:auto;width:100%;-webkit-overflow-scrolling:touch">
         <table class="data-table">
           <thead>
             <tr>
@@ -131,7 +131,7 @@
         </p>
         <span style="font-size:.8rem;color:var(--text-muted)">Newest first</span>
       </div>
-      <div style="overflow-x:auto">
+      <div style="overflow-x:auto;width:100%;-webkit-overflow-scrolling:touch">
         <table class="data-table">
           <thead>
             <tr>
