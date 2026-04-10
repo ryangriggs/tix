@@ -1,9 +1,10 @@
 {
   "name": "tix",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "description": "Simple email-based ticketing system",
   "main": "src/tix.js",
   "scripts": {
+    "prepare": "node -e \"const{execSync}=require('child_process');try{execSync('git config core.hooksPath .githooks')}catch(e){}\"",
     "start": "node src/tix.js",
     "dev": "nodemon src/tix.js",
     "gmail-setup": "node scripts/gmail-setup.js",
