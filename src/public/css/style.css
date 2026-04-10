@@ -1408,11 +1408,9 @@ dialog {
   max-width: 95vw;
   max-height: 90vh;
   overflow-y: auto;
-  margin: auto;
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  inset: 0;
+  margin: auto;
 }
 dialog::backdrop { background: rgba(0,0,0,.45); }
 

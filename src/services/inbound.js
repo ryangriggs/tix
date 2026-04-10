@@ -8,7 +8,7 @@ const sanitizeHtml = require('sanitize-html');
 
 const config = require('../config');
 const db = require('../db');
-const { sendTicketNotification, logEmail } = require('./mail');
+const { sendTicketNotification, sendAdminNewUserNotification, logEmail } = require('./mail');
 const audit = require('./audit');
 
 // ============================================================
@@ -370,6 +370,7 @@ async function handleReply(ticketId, fromEmail, parsed, subjectFallback = false)
 
   const fromName = parsed.from?.value?.[0]?.name || '';
   const user = db.findOrCreateUser(fromEmail, fromName);
+  if (user._isNew) sendAdminNewUserNotification(user, 'Inbound email reply').catch(console.error);
 
   if (user.blocked_at) {
     console.log(`[Inbound] Ignoring email from blocked user ${fromEmail}`);
@@ -443,6 +444,7 @@ async function handleReply(ticketId, fromEmail, parsed, subjectFallback = false)
 async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
   const fromName = parsed.from?.value?.[0]?.name || '';
   const senderUser = db.findOrCreateUser(fromEmail, fromName);
+  if (senderUser._isNew) sendAdminNewUserNotification(senderUser, 'Inbound email — new ticket').catch(console.error);
 
   if (senderUser.blocked_at) {
     console.log(`[Inbound] Ignoring email from blocked user ${fromEmail}`);
@@ -479,6 +481,7 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
     if (config.ticketSilentEmail && email === config.ticketSilentEmail.toLowerCase()) continue; // skip silent address
     if (email === fromEmail) continue;            // skip sender (already submitter)
     const u = db.findOrCreateUser(email, addr.name || null);
+    if (u._isNew) sendAdminNewUserNotification(u, 'Inbound email — CC recipient on new ticket').catch(console.error);
     if (u.blocked_at) continue;
     if (!db.getUserTicketRole(ticket.id, u.id)) {
       db.addParty(ticket.id, u.id, 'collaborator');
@@ -493,6 +496,7 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
     const origEmail = extractForwardedSender(parsed.text || '');
     if (origEmail && origEmail !== fromEmail) {
       const origUser = db.findOrCreateUser(origEmail);
+      if (origUser._isNew) sendAdminNewUserNotification(origUser, 'Inbound email — forwarded sender').catch(console.error);
       db.addParty(ticket.id, origUser.id, 'collaborator');
       originalSenderEmail = origEmail;
       console.log(`[Inbound] Forwarded email — added original sender ${origEmail} as collaborator`);
@@ -504,6 +508,7 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
   const defaultEmail = config.defaultAssigneeEmail || db.getSetting('default_assignee_email');
   if (defaultEmail) {
     const assignee = db.findOrCreateUser(defaultEmail);
+    if (assignee._isNew) sendAdminNewUserNotification(assignee, 'Default assignee config — user did not exist').catch(console.error);
     db.addParty(ticket.id, assignee.id, 'owner');
   }
 

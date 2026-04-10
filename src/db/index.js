@@ -334,7 +334,9 @@ function findOrCreateUser(email, name = null) {
   const role = (isFirstUser || isAdminEmail) ? 'admin' : 'user';
 
   const result = prepare('INSERT INTO users (email, role, name) VALUES (?, ?, ?)').run(normalised, role, cleanName);
-  return prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
+  const newUser = prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
+  newUser._isNew = true;
+  return newUser;
 }
 
 function updateUserName(id, name) {

@@ -350,4 +350,28 @@ async function sendInactivityReminder(email, ticket, hours) {
 
 function resetMailTransport() { _transport = null; }
 
-module.exports = { send, sendMagicLink, sendTicketNotification, sendDueReminder, sendInactivityReminder, resetMailTransport, makeUnsubToken, parseUnsubToken, logEmail };
+async function sendAdminNewUserNotification(user, source) {
+  const adminEmail = config.adminEmail || db.getSetting('admin_email');
+  if (!adminEmail) return;
+
+  const nameRow = user.name ? `<li><strong>Name:</strong> ${user.name}</li>` : '';
+  const html = `<p>A new user account has been created:</p>
+<ul>
+  <li><strong>Email:</strong> ${user.email}</li>
+  ${nameRow}
+  <li><strong>Source:</strong> ${source}</li>
+</ul>
+<p><a href="${config.appUrl}/admin/users">View all users</a></p>`;
+
+  const text = [
+    'A new user account has been created.',
+    `Email:  ${user.email}`,
+    user.name ? `Name:   ${user.name}` : null,
+    `Source: ${source}`,
+    `Users:  ${config.appUrl}/admin/users`,
+  ].filter(Boolean).join('\n');
+
+  send({ to: adminEmail, subject: `New user: ${user.email}`, html, text });
+}
+
+module.exports = { send, sendMagicLink, sendTicketNotification, sendDueReminder, sendInactivityReminder, sendAdminNewUserNotification, resetMailTransport, makeUnsubToken, parseUnsubToken, logEmail };

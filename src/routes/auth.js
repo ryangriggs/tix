@@ -8,7 +8,7 @@ const router  = express.Router();
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 const db = require('../db');
-const { sendMagicLink } = require('../services/mail');
+const { sendMagicLink, sendAdminNewUserNotification } = require('../services/mail');
 const { issueSessionCookie } = require('../middleware/auth');
 
 // ============================================================
@@ -97,6 +97,7 @@ router.post('/login', async (req, res) => {
   }
 
   const user = db.findOrCreateUser(email);
+  if (user._isNew) sendAdminNewUserNotification(user, 'First login (magic link request)').catch(console.error);
   if (user.blocked_at) {
     logUser(email, 'FAILED - account blocked');
     return res.render('auth/login', { title: 'Log in', error: 'This account has been blocked.', email, next });

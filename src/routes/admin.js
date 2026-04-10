@@ -8,7 +8,7 @@ const router  = express.Router();
 const db = require('../db');
 const config = require('../config');
 const { issueSessionCookie } = require('../middleware/auth');
-const { resetMailTransport } = require('../services/mail');
+const { resetMailTransport, sendAdminNewUserNotification } = require('../services/mail');
 const updater = require('../services/updater');
 const backup  = require('../services/backup');
 const audit   = require('../services/audit');
@@ -114,7 +114,8 @@ router.post('/users/pre-add', (req, res) => {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.redirect('/admin/users?message=Invalid+email');
   }
-  db.findOrCreateUser(email, name || null);
+  const newU = db.findOrCreateUser(email, name || null);
+  if (newU._isNew) sendAdminNewUserNotification(newU, 'Admin pre-added user').catch(console.error);
   audit.log(req, `added user ${email}`);
   res.redirect('/admin/users?message=User+added');
 });

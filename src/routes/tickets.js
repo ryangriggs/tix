@@ -10,7 +10,7 @@ const sanitizeHtml = require('sanitize-html');
 
 const config = require('../config');
 const db = require('../db');
-const { sendTicketNotification } = require('../services/mail');
+const { sendTicketNotification, sendAdminNewUserNotification } = require('../services/mail');
 
 const audit = require('../services/audit');
 
@@ -356,6 +356,7 @@ router.post('/', upload, async (req, res) => {
     const e = email.trim().toLowerCase();
     if (e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e !== req.user.email) {
       const u = db.findOrCreateUser(e);
+      if (u._isNew) sendAdminNewUserNotification(u, 'Added as collaborator on new ticket (web)').catch(console.error);
       db.addParty(ticket.id, u.id, 'collaborator');
       notifyCollabEmails.push(e);
     }
@@ -367,6 +368,7 @@ router.post('/', upload, async (req, res) => {
   const defaultEmail = config.defaultAssigneeEmail || db.getSetting('default_assignee_email');
   if (defaultEmail) {
     const assignee = db.findOrCreateUser(defaultEmail);
+    if (assignee._isNew) sendAdminNewUserNotification(assignee, 'Default assignee config — user did not exist').catch(console.error);
     db.addParty(ticket.id, assignee.id, 'owner');
   }
 
@@ -814,6 +816,7 @@ router.post('/:id/parties', async (req, res) => {
       return res.redirect(`/tickets/${ticket.id}?error=invalid_email`);
     }
     newUser = db.findOrCreateUser(email);
+    if (newUser._isNew) sendAdminNewUserNotification(newUser, `Added to ticket via web (${role})`).catch(console.error);
   }
   const full = db.getUserById(newUser.id); // includes organization_name via JOIN
   db.addParty(ticket.id, full.id, role);
