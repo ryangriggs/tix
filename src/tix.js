@@ -29,22 +29,24 @@ app.set('views', path.join(__dirname, '..', 'views'));
 // Middleware
 // ============================================================
 
-// Security headers. CSP allows:
-//  - Same-origin scripts + the Quill CDN used in the editor
-//  - Inline scripts (needed for EJS templates that embed data)
-//  - Same-origin styles + inline styles (used extensively in EJS templates)
-//  - Same-origin images + data: URIs (for attachment previews / annotation canvas)
+// Security headers.
+// useDefaults:false prevents Helmet from injecting nonce/'strict-dynamic' which
+// would silently override 'unsafe-inline' and break all inline event handlers and
+// inline <script> blocks in EJS templates.
 app.use(helmet({
   contentSecurityPolicy: {
+    useDefaults: false,
     directives: {
       defaultSrc:     ["'self'"],
       scriptSrc:      ["'self'", "'unsafe-inline'", 'cdn.quilljs.com'],
       styleSrc:       ["'self'", "'unsafe-inline'", 'cdn.quilljs.com'],
-      imgSrc:         ["'self'", 'data:'],
+      imgSrc:         ["'self'", 'data:', 'blob:'],
       connectSrc:     ["'self'"],
       fontSrc:        ["'self'", 'cdn.quilljs.com'],
       objectSrc:      ["'none'"],
       frameAncestors: ["'none'"],
+      baseUri:        ["'self'"],
+      formAction:     ["'self'"],
     },
   },
   crossOriginEmbedderPolicy: false, // PDF.js viewer needs this relaxed

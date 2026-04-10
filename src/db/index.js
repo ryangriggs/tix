@@ -607,29 +607,9 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
   const sortCol   = validSorts[sort] || 't.updated_at';
   const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
 
-  let query = `
-    SELECT DISTINCT t.*,
-      (SELECT o.name FROM organizations o WHERE o.id = t.organization_id) AS organization_name,
-      (SELECT COUNT(*) FROM comments WHERE ticket_id = t.id) AS comment_count,
-      (SELECT u.email FROM ticket_parties tp2
-         JOIN users u ON u.id = tp2.user_id
-         WHERE tp2.ticket_id = t.id AND tp2.role = 'submitter'
-         LIMIT 1) AS submitter_email,
-      (SELECT u.name FROM ticket_parties tp2
-         JOIN users u ON u.id = tp2.user_id
-         WHERE tp2.ticket_id = t.id AND tp2.role = 'submitter'
-         LIMIT 1) AS submitter_name,
-      (SELECT COALESCE(NULLIF(u.name, ''), u.email)
-         FROM comments c JOIN users u ON u.id = c.user_id
-         WHERE c.ticket_id = t.id
-         ORDER BY c.created_at DESC LIMIT 1) AS last_actor,
-      (SELECT u.email
-         FROM comments c JOIN users u ON u.id = c.user_id
-         WHERE c.ticket_id = t.id
-         ORDER BY c.created_at DESC LIMIT 1) AS last_actor_email
-    FROM tickets t
-  `;
-
+  // Track the JOIN clause separately so we can build a clean COUNT query
+  // without the complex SELECT columns. This avoids fragile regex transforms.
+  let joinClause = '';
   const conditions = [];
   const params = [];
 
@@ -645,7 +625,7 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
     conditions.push(`(t.organization_id IN (${ph}) OR EXISTS (SELECT 1 FROM ticket_parties tp2 WHERE tp2.ticket_id = t.id AND tp2.user_id = ?))`);
     params.push(...allOrgIds, userId);
   } else {
-    query += ' JOIN ticket_parties tp ON t.id = tp.ticket_id';
+    joinClause = ' JOIN ticket_parties tp ON t.id = tp.ticket_id';
     conditions.push('tp.user_id = ?');
     params.push(userId);
   }
@@ -690,22 +670,39 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
     params.push(ftsQuery, ftsQuery, `%${search}%`);
   }
 
-  if (conditions.length > 0) query += ' WHERE ' + conditions.join(' AND ');
-  query += ` ORDER BY CASE t.status WHEN 'new' THEN 0 ELSE 1 END ASC, ${sortCol} ${sortOrder}`;
+  const whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
+  const orderClause = ` ORDER BY CASE t.status WHEN 'new' THEN 0 ELSE 1 END ASC, ${sortCol} ${sortOrder}`;
 
-  // Count query (same WHERE, no ORDER BY/LIMIT)
-  const countQuery = query.replace(
-    /^SELECT DISTINCT t\.\*.+?FROM tickets t/s,
-    'SELECT COUNT(DISTINCT t.id) AS total FROM tickets t'
-  ).replace(/ORDER BY.+$/s, '');
+  // COUNT query — built directly from join+where, no SELECT columns needed
+  const countQuery = `SELECT COUNT(DISTINCT t.id) AS total FROM tickets t${joinClause}${whereClause}`;
   const total = prepare(countQuery).get(...params)?.total ?? 0;
 
-  if (limit > 0) {
-    query += ' LIMIT ? OFFSET ?';
-    params.push(limit, offset);
-  }
+  // Full SELECT query
+  const selectQuery = `SELECT DISTINCT t.*,
+      (SELECT o.name FROM organizations o WHERE o.id = t.organization_id) AS organization_name,
+      (SELECT COUNT(*) FROM comments WHERE ticket_id = t.id) AS comment_count,
+      (SELECT u.email FROM ticket_parties tp2
+         JOIN users u ON u.id = tp2.user_id
+         WHERE tp2.ticket_id = t.id AND tp2.role = 'submitter'
+         LIMIT 1) AS submitter_email,
+      (SELECT u.name FROM ticket_parties tp2
+         JOIN users u ON u.id = tp2.user_id
+         WHERE tp2.ticket_id = t.id AND tp2.role = 'submitter'
+         LIMIT 1) AS submitter_name,
+      (SELECT COALESCE(NULLIF(u.name, ''), u.email)
+         FROM comments c JOIN users u ON u.id = c.user_id
+         WHERE c.ticket_id = t.id
+         ORDER BY c.created_at DESC LIMIT 1) AS last_actor,
+      (SELECT u.email
+         FROM comments c JOIN users u ON u.id = c.user_id
+         WHERE c.ticket_id = t.id
+         ORDER BY c.created_at DESC LIMIT 1) AS last_actor_email
+    FROM tickets t${joinClause}${whereClause}${orderClause}`;
 
-  return { rows: prepare(query).all(...params), total };
+  const rowParams = limit > 0 ? [...params, limit, offset] : params;
+  const rowQuery  = limit > 0 ? selectQuery + ' LIMIT ? OFFSET ?' : selectQuery;
+
+  return { rows: prepare(rowQuery).all(...rowParams), total };
 }
 
 function deleteTicket(id) {
