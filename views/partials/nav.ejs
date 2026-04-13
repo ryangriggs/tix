@@ -38,7 +38,13 @@
     <nav class="app-nav" id="app-nav">
       <% if (user) { %><a href="/tickets/new" class="btn btn-primary btn-sm nav-new-ticket">+ New Ticket</a><% } %>
       <% if (user) { %><a href="/dashboard" class="nav-link">Dashboard</a><% } %>
-      <a href="/tickets" class="nav-link">Tickets</a>
+      <div class="nav-dropdown">
+        <a href="/tickets" class="nav-link nav-dropdown-toggle">Tickets</a>
+        <div class="nav-dropdown-menu">
+          <a href="/tickets" class="nav-dropdown-item">List</a>
+          <a href="/timeline" class="nav-dropdown-item">Timeline</a>
+        </div>
+      </div>
       <% if (user) { %><a href="/reports" class="nav-link">Reports</a><% } %>
       <% if (user && user.role === 'admin') { %>
         <a href="/admin/users" class="nav-link">Users</a>

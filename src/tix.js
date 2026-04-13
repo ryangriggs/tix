@@ -139,6 +139,7 @@ app.use((req, res, next) => {
 app.use('/auth', optionalAuth, require('./routes/auth'));
 app.use('/tickets', requireAuth, verifyCsrf, require('./routes/annotate'));
 app.use('/tickets',   requireAuth, verifyCsrf, require('./routes/tickets'));
+app.use('/timeline',  requireAuth, verifyCsrf, require('./routes/timeline'));
 app.use('/dashboard', requireAuth, require('./routes/dashboard'));
 app.use('/admin', requireAuth, requireAdmin, verifyCsrf, require('./routes/admin'));
 app.use('/api', requireAuth, require('./routes/api'));

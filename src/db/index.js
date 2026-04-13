@@ -276,6 +276,11 @@ async function initDb() {
   try { _db.exec('ALTER TABLE ticket_parties ADD COLUMN notifications_disabled INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   try { _db.exec('ALTER TABLE users ADD COLUMN notifications_muted INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   try { _db.exec("ALTER TABLE comments ADD COLUMN visibility TEXT NOT NULL DEFAULT 'user'"); } catch (_) {}
+  try { _db.exec('ALTER TABLE tickets ADD COLUMN schedule_type TEXT'); } catch (_) {}
+  try { _db.exec('ALTER TABLE tickets ADD COLUMN schedule_window_start INTEGER'); } catch (_) {}
+  try { _db.exec('ALTER TABLE tickets ADD COLUMN schedule_window_end   INTEGER'); } catch (_) {}
+  try { _db.exec('ALTER TABLE tickets ADD COLUMN schedule_time_of_day  TEXT'); } catch (_) {}
+  try { _db.exec('ALTER TABLE tickets ADD COLUMN schedule_exact_at     INTEGER'); } catch (_) {}
   _db.exec('CREATE INDEX IF NOT EXISTS idx_comments_location ON comments(location_id)');
   // Back-fill close_date for tickets closed before this column existed
   _db.exec(`UPDATE tickets SET close_date = updated_at WHERE status = 'closed' AND close_date IS NULL`);
@@ -519,6 +524,37 @@ function createTicket({ subject, body, priority = 'medium', dueDate = null, orga
     VALUES (?, ?, 'new', ?, ?, ?, ?)
   `).run(subject, body, priority, dueDate, replyToken, organizationId || null);
   return prepare('SELECT * FROM tickets WHERE id = ?').get(result.lastInsertRowid);
+}
+
+function getTimelineTickets(userId) {
+  return prepare(`
+    SELECT t.*, o.name AS organization_name
+    FROM tickets t
+    LEFT JOIN organizations o ON o.id = t.organization_id
+    JOIN ticket_parties tp ON tp.ticket_id = t.id AND tp.role = 'owner'
+    WHERE tp.user_id = ? AND t.status != 'closed'
+    ORDER BY t.id ASC
+  `).all(userId);
+}
+
+function setTicketSchedule(ticketId, { type, window_start, window_end, time_of_day, exact_at }) {
+  prepare(`
+    UPDATE tickets SET
+      schedule_type         = ?,
+      schedule_window_start = ?,
+      schedule_window_end   = ?,
+      schedule_time_of_day  = ?,
+      schedule_exact_at     = ?,
+      updated_at            = unixepoch()
+    WHERE id = ?
+  `).run(
+    type        || null,
+    window_start || null,
+    window_end   || null,
+    time_of_day  || null,
+    exact_at     || null,
+    ticketId
+  );
 }
 
 function getTicketById(id) {
@@ -1194,6 +1230,7 @@ module.exports = {
   getTicketByReplyToken, disableAllPartyNotifications, disablePartyNotifications, togglePartyNotifications,
   // Reports
   getBillingReport, getTicketCountsByStatus, getDashboardStats, getAttachmentCount,
+  getTimelineTickets, setTicketSchedule,
   // Organizations
   findOrCreateOrganization, getAllOrganizations, getOrganizationsByIds, searchOrganizations,
   renameOrganization, deleteOrganization, getOrganizationById,

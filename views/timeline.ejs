@@ -1,0 +1,505 @@
+<%- include('partials/head', { title: 'Timeline' }) %>
+<%- include('partials/nav') %>
+
+<%
+// Helper: format a unix timestamp as a short date/time string
+function fmtTs(ts) {
+  if (!ts) return '';
+  return new Date(ts * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+function fmtTsFull(ts) {
+  if (!ts) return '';
+  return new Date(ts * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+function schedLabel(t) {
+  if (!t.schedule_type) return '';
+  if (t.schedule_type === 'asap') return 'ASAP';
+  if (t.schedule_type === 'someday') return 'Someday';
+  if (t.schedule_type === 'appointment') return fmtTsFull(t.schedule_exact_at);
+  if (t.schedule_type === 'window') {
+    const tod = t.schedule_time_of_day;
+    const label = tod === 'tonight' ? 'Tonight' : tod === 'allday' ? 'All day' : 'Business hrs';
+    const start = fmtTs(t.schedule_window_start);
+    const end   = fmtTs(t.schedule_window_end);
+    return start === end ? `${start} · ${label}` : `${start}–${end} · ${label}`;
+  }
+  return '';
+}
+
+// Render a card snippet — used for both timeline and sidebar
+function cardClass(t) {
+  let c = 'tl-card';
+  if (t.status === 'open')    c += ' tl-card--open';
+  if (t.status === 'pending') c += ' tl-card--pending';
+  if (t.status === 'on_hold') c += ' tl-card--on-hold';
+  return c;
+}
+
+const totalScheduled = ['overdue','asap','todayBusiness','todayTonight','todayAllDay',
+  'tomorrow','thisWeek','nextWeek','thisMonth','beyond','someday']
+  .reduce((s, k) => s + (sections[k] || []).length, 0);
+%>
+
+<main style="padding-bottom:3rem">
+  <div class="timeline-page">
+
+    <!-- ── TIMELINE (left/main) ────────────────────────────── -->
+    <div class="timeline-main">
+
+      <h1 class="page-title" style="margin-bottom:.75rem">Timeline</h1>
+      <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:1.25rem">
+        ⚠️ POC — time periods hardcoded: business hours <%= BUSINESS_START_H %>am–<%= BUSINESS_END_H %>pm, tonight <%= TONIGHT_START_H %>pm–<%= TONIGHT_END_H %>pm.
+        Click any card to schedule or reschedule it.
+      </p>
+
+      <% if (totalScheduled === 0 && sections.unscheduled.length === 0) { %>
+        <div class="card" style="color:var(--text-muted);text-align:center;padding:2rem">
+          No tickets assigned to you as owner.
+        </div>
+      <% } %>
+
+      <!-- OVERDUE -->
+      <% if (sections.overdue.length) { %>
+      <div class="tl-section tl-section--overdue">
+        <div class="tl-section-header">Overdue (<%= sections.overdue.length %>)</div>
+        <% for (const t of sections.overdue) { %>
+          <%- cardHtml(t, schedLabel(t), cardClass(t)) %>
+        <% } %>
+      </div>
+      <% } %>
+
+      <!-- NOW bar -->
+      <div class="tl-now-bar">Now</div>
+
+      <!-- ASAP -->
+      <% if (sections.asap.length) { %>
+      <div class="tl-section tl-section--asap">
+        <div class="tl-section-header">ASAP</div>
+        <% for (const t of sections.asap) { %>
+          <%- cardHtml(t, 'As soon as possible', cardClass(t)) %>
+        <% } %>
+      </div>
+      <% } %>
+
+      <!-- TODAY — business hours -->
+      <% if (sections.todayBusiness.length || sections.todayTonight.length || sections.todayAllDay.length) { %>
+      <div class="tl-section">
+        <div class="tl-section-header"><%= labels.today %></div>
+        <% if (sections.todayBusiness.length) { %>
+          <div style="font-size:.7rem;color:var(--text-muted);margin-bottom:.3rem;margin-left:.1rem">Business hours (<%= BUSINESS_START_H %>am – <%= BUSINESS_END_H %>pm)</div>
+          <% for (const t of sections.todayBusiness) { %><%- cardHtml(t, schedLabel(t), cardClass(t)) %><% } %>
+        <% } %>
+        <% if (sections.todayTonight.length) { %>
+          <div style="font-size:.7rem;color:var(--text-muted);margin:.4rem 0 .3rem .1rem">Tonight (<%= TONIGHT_START_H %>pm – <%= TONIGHT_END_H %>pm)</div>
+          <% for (const t of sections.todayTonight) { %><%- cardHtml(t, schedLabel(t), cardClass(t)) %><% } %>
+        <% } %>
+        <% if (sections.todayAllDay.length) { %>
+          <div style="font-size:.7rem;color:var(--text-muted);margin:.4rem 0 .3rem .1rem">All day</div>
+          <% for (const t of sections.todayAllDay) { %><%- cardHtml(t, schedLabel(t), cardClass(t)) %><% } %>
+        <% } %>
+      </div>
+      <% } %>
+
+      <!-- TOMORROW -->
+      <% if (sections.tomorrow.length) { %>
+      <div class="tl-section">
+        <div class="tl-section-header"><%= labels.tomorrow %></div>
+        <% for (const t of sections.tomorrow) { %><%- cardHtml(t, schedLabel(t), cardClass(t)) %><% } %>
+      </div>
+      <% } %>
+
+      <!-- THIS WEEK -->
+      <% if (sections.thisWeek.length) { %>
+      <div class="tl-section">
+        <div class="tl-section-header"><%= labels.thisWeek %></div>
+        <% for (const t of sections.thisWeek) { %><%- cardHtml(t, schedLabel(t), cardClass(t)) %><% } %>
+      </div>
+      <% } %>
+
+      <!-- NEXT WEEK -->
+      <% if (sections.nextWeek.length) { %>
+      <div class="tl-section">
+        <div class="tl-section-header"><%= labels.nextWeek %></div>
+        <% for (const t of sections.nextWeek) { %><%- cardHtml(t, schedLabel(t), cardClass(t)) %><% } %>
+      </div>
+      <% } %>
+
+      <!-- THIS MONTH -->
+      <% if (sections.thisMonth.length) { %>
+      <div class="tl-section">
+        <div class="tl-section-header"><%= labels.thisMonth %></div>
+        <% for (const t of sections.thisMonth) { %><%- cardHtml(t, schedLabel(t), cardClass(t)) %><% } %>
+      </div>
+      <% } %>
+
+      <!-- BEYOND -->
+      <% if (sections.beyond.length) { %>
+      <div class="tl-section">
+        <div class="tl-section-header">Beyond</div>
+        <% for (const t of sections.beyond) { %><%- cardHtml(t, schedLabel(t), cardClass(t)) %><% } %>
+      </div>
+      <% } %>
+
+      <!-- SOMEDAY -->
+      <% if (sections.someday.length) { %>
+      <div class="tl-section">
+        <div class="tl-section-header">Someday</div>
+        <% for (const t of sections.someday) { %><%- cardHtml(t, 'No specific date', cardClass(t)) %><% } %>
+      </div>
+      <% } %>
+
+    </div><!-- /.timeline-main -->
+
+    <!-- ── SIDEBAR (right) ─────────────────────────────────── -->
+    <div class="timeline-sidebar">
+      <div class="timeline-sidebar-header">
+        Backlog
+        <span><%= sections.unscheduled.length %> unscheduled</span>
+      </div>
+
+      <button class="timeline-sidebar-toggle" onclick="toggleSidebar()">Show / Hide backlog</button>
+
+      <div class="timeline-sidebar-body" id="sidebar-body">
+        <% if (sections.unscheduled.length === 0) { %>
+          <div class="tl-section-empty">All tickets are scheduled.</div>
+        <% } else { %>
+          <% for (const t of sections.unscheduled) { %>
+            <%- cardHtml(t, '', cardClass(t)) %>
+          <% } %>
+        <% } %>
+      </div>
+    </div>
+
+  </div><!-- /.timeline-page -->
+</main>
+
+<!-- ══════════════════════════════════════════════════════════
+     Schedule dialog
+     ══════════════════════════════════════════════════════════ -->
+<dialog id="sched-dialog" class="modal-dialog">
+  <div class="modal-header">
+    <h2 id="sched-dialog-title">Schedule Ticket</h2>
+    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('sched-dialog').close()">✕</button>
+  </div>
+  <div class="modal-body">
+    <div id="sched-ticket-info" style="margin-bottom:1rem;padding:.6rem .75rem;background:var(--bg);border-radius:var(--radius);font-size:.875rem"></div>
+
+    <!-- Quick type buttons -->
+    <div style="margin-bottom:1rem">
+      <div style="font-size:.75rem;font-weight:600;color:var(--text-muted);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em">When</div>
+      <div id="sched-type-btns" style="display:flex;flex-wrap:wrap;gap:.4rem">
+        <button class="sched-type-btn" data-type="asap"             onclick="selectType(this)">ASAP</button>
+        <button class="sched-type-btn" data-type="today_business"   onclick="selectType(this)">Today · AM</button>
+        <button class="sched-type-btn" data-type="today_tonight"    onclick="selectType(this)">Today · Tonight</button>
+        <button class="sched-type-btn" data-type="today_allday"     onclick="selectType(this)">Today · All day</button>
+        <button class="sched-type-btn" data-type="tomorrow_business" onclick="selectType(this)">Tomorrow · AM</button>
+        <button class="sched-type-btn" data-type="tomorrow_tonight" onclick="selectType(this)">Tomorrow · Tonight</button>
+        <button class="sched-type-btn" data-type="tomorrow_allday"  onclick="selectType(this)">Tomorrow · All day</button>
+        <button class="sched-type-btn" data-type="weekend"          onclick="selectType(this)">This Weekend</button>
+        <button class="sched-type-btn" data-type="this_week"        onclick="selectType(this)">This Week</button>
+        <button class="sched-type-btn" data-type="next_week"        onclick="selectType(this)">Next Week</button>
+        <button class="sched-type-btn" data-type="window"           onclick="selectType(this)">Custom Window…</button>
+        <button class="sched-type-btn" data-type="appointment"      onclick="selectType(this)">Appointment…</button>
+        <button class="sched-type-btn" data-type="someday"          onclick="selectType(this)">Someday</button>
+        <button class="sched-type-btn sched-type-btn--clear" data-type="" onclick="selectType(this)">✕ Unschedule</button>
+      </div>
+    </div>
+
+    <!-- Custom window fields -->
+    <div id="sched-window-fields" style="display:none;margin-bottom:1rem">
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:.5rem">
+        <div class="form-group" style="flex:1;min-width:120px;margin:0">
+          <label for="sched-win-start" style="font-size:.8rem">From</label>
+          <input type="date" id="sched-win-start" class="form-input form-input-sm">
+        </div>
+        <div class="form-group" style="flex:1;min-width:120px;margin:0">
+          <label for="sched-win-end" style="font-size:.8rem">To</label>
+          <input type="date" id="sched-win-end" class="form-input form-input-sm">
+        </div>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label for="sched-win-tod" style="font-size:.8rem">Time of day</label>
+        <select id="sched-win-tod" class="form-select form-select-sm">
+          <option value="business">Business hours (<%= BUSINESS_START_H %>am – <%= BUSINESS_END_H %>pm)</option>
+          <option value="tonight">Tonight (<%= TONIGHT_START_H %>pm – <%= TONIGHT_END_H %>pm)</option>
+          <option value="allday">All day</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Appointment fields -->
+    <div id="sched-appt-fields" style="display:none;margin-bottom:1rem">
+      <div class="form-group" style="margin:0">
+        <label for="sched-appt-dt" style="font-size:.8rem">Date &amp; Time</label>
+        <input type="datetime-local" id="sched-appt-dt" class="form-input form-input-sm">
+      </div>
+    </div>
+
+    <div id="sched-error" style="display:none;color:#dc2626;font-size:.8rem;margin-bottom:.5rem"></div>
+  </div>
+  <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center">
+    <a id="sched-ticket-link" href="#" target="_blank" style="font-size:.8rem;color:var(--text-muted)">Open ticket ↗</a>
+    <div style="display:flex;gap:.5rem">
+      <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('sched-dialog').close()">Cancel</button>
+      <button type="button" class="btn btn-primary btn-sm" id="sched-save-btn" onclick="saveSchedule()">Save</button>
+    </div>
+  </div>
+</dialog>
+
+<style>
+.sched-type-btn {
+  padding: .3rem .7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: .8rem;
+  color: var(--text-muted);
+  transition: background .1s, border-color .1s, color .1s;
+}
+.sched-type-btn:hover { background: var(--bg); color: var(--text); border-color: var(--text-muted); }
+.sched-type-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.sched-type-btn--clear.active { background: #dc2626; border-color: #dc2626; }
+</style>
+
+<script>
+// ── Card data embedded from server ───────────────────────────
+const CSRF   = '<%= csrfToken %>';
+const CARDS  = <%- JSON.stringify(
+  [...sections.overdue, ...sections.asap,
+   ...sections.todayBusiness, ...sections.todayTonight, ...sections.todayAllDay,
+   ...sections.tomorrow, ...sections.thisWeek, ...sections.nextWeek,
+   ...sections.thisMonth, ...sections.beyond, ...sections.someday,
+   ...sections.unscheduled
+  ].map(t => ({
+    id: t.id,
+    subject: t.subject,
+    org: t.organization_name || '',
+    status: t.status,
+    schedType: t.schedule_type || '',
+    windowStart: t.schedule_window_start || 0,
+    windowEnd: t.schedule_window_end || 0,
+    timeOfDay: t.schedule_time_of_day || '',
+    exactAt: t.schedule_exact_at || 0,
+  }))
+) %>;
+
+const cardMap = Object.fromEntries(CARDS.map(c => [c.id, c]));
+
+// ── Sidebar toggle (mobile) ───────────────────────────────────
+function toggleSidebar() {
+  document.getElementById('sidebar-body').classList.toggle('collapsed');
+}
+
+// ── Schedule dialog ───────────────────────────────────────────
+let activeTicketId = null;
+let selectedType   = null;  // the data-type value of the active button
+
+function openScheduleDialog(ticketId) {
+  const c = cardMap[ticketId];
+  if (!c) return;
+  activeTicketId = ticketId;
+  selectedType   = null;
+
+  // Populate info box
+  document.getElementById('sched-dialog-title').textContent = 'Schedule Ticket';
+  document.getElementById('sched-ticket-info').innerHTML =
+    '<strong>' + escHtml(c.subject) + '</strong>' +
+    (c.org ? ' <span style="color:var(--text-muted);font-size:.8rem">— ' + escHtml(c.org) + '</span>' : '');
+  document.getElementById('sched-ticket-link').href = '/tickets/' + ticketId;
+  document.getElementById('sched-error').style.display = 'none';
+
+  // Pre-select current type button
+  document.querySelectorAll('.sched-type-btn').forEach(b => b.classList.remove('active'));
+  const currentPreset = resolveCurrentPreset(c);
+  if (currentPreset) {
+    const btn = document.querySelector('.sched-type-btn[data-type="' + currentPreset + '"]');
+    if (btn) { btn.classList.add('active'); selectedType = currentPreset; }
+  }
+
+  // Pre-fill custom fields
+  if (c.schedType === 'window') {
+    if (c.windowStart) document.getElementById('sched-win-start').value = tsToDateInput(c.windowStart);
+    if (c.windowEnd)   document.getElementById('sched-win-end').value   = tsToDateInput(c.windowEnd);
+    if (c.timeOfDay)   document.getElementById('sched-win-tod').value   = c.timeOfDay;
+  }
+  if (c.schedType === 'appointment' && c.exactAt) {
+    document.getElementById('sched-appt-dt').value = tsToDatetimeLocal(c.exactAt);
+  }
+
+  updateFieldVisibility(currentPreset);
+  document.getElementById('sched-dialog').showModal();
+}
+
+function resolveCurrentPreset(c) {
+  if (!c.schedType) return '';
+  if (c.schedType === 'asap')        return 'asap';
+  if (c.schedType === 'someday')     return 'someday';
+  if (c.schedType === 'appointment') return 'appointment';
+  if (c.schedType === 'window') {
+    // Try to match a quick preset
+    const tod = c.timeOfDay || 'allday';
+    const ws = c.windowStart, we = c.windowEnd;
+    const todayStartTs = todayMidnightTs();
+    const tomorrowStartTs = todayStartTs + 86400;
+    if (ws === todayStartTs && we === todayStartTs) {
+      if (tod === 'business') return 'today_business';
+      if (tod === 'tonight')  return 'today_tonight';
+      return 'today_allday';
+    }
+    if (ws === tomorrowStartTs && we === tomorrowStartTs) {
+      if (tod === 'business') return 'tomorrow_business';
+      if (tod === 'tonight')  return 'tomorrow_tonight';
+      return 'tomorrow_allday';
+    }
+    return 'window'; // custom
+  }
+  return '';
+}
+
+function selectType(btn) {
+  document.querySelectorAll('.sched-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  selectedType = btn.dataset.type;
+  updateFieldVisibility(selectedType);
+}
+
+function updateFieldVisibility(type) {
+  document.getElementById('sched-window-fields').style.display = type === 'window' ? '' : 'none';
+  document.getElementById('sched-appt-fields').style.display   = type === 'appointment' ? '' : 'none';
+}
+
+async function saveSchedule() {
+  if (selectedType === null) {
+    showSchedError('Please select a schedule option.');
+    return;
+  }
+  document.getElementById('sched-error').style.display = 'none';
+  document.getElementById('sched-save-btn').disabled = true;
+
+  const payload = buildPayload(selectedType);
+  if (!payload) { document.getElementById('sched-save-btn').disabled = false; return; }
+
+  try {
+    const r = await fetch('/timeline/tickets/' + activeTicketId + '/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) { const d = await r.json(); showSchedError(d.error || 'Save failed.'); document.getElementById('sched-save-btn').disabled = false; return; }
+    window.location.reload();
+  } catch (e) {
+    showSchedError('Network error. Please try again.');
+    document.getElementById('sched-save-btn').disabled = false;
+  }
+}
+
+function buildPayload(type) {
+  if (type === '') return { type: '' }; // unschedule
+
+  if (type === 'asap')   return { type: 'asap' };
+  if (type === 'someday') return { type: 'someday' };
+
+  if (type === 'appointment') {
+    const dtVal = document.getElementById('sched-appt-dt').value;
+    if (!dtVal) { showSchedError('Please enter a date and time.'); return null; }
+    const exact_at = Math.floor(new Date(dtVal).getTime() / 1000);
+    return { type: 'appointment', exact_at };
+  }
+
+  if (type === 'window') {
+    const startVal = document.getElementById('sched-win-start').value;
+    const endVal   = document.getElementById('sched-win-end').value;
+    if (!startVal || !endVal) { showSchedError('Please enter start and end dates.'); return null; }
+    const window_start = dateInputToTs(startVal);
+    const window_end   = dateInputToTs(endVal);
+    if (window_end < window_start) { showSchedError('End date must be on or after start date.'); return null; }
+    const time_of_day = document.getElementById('sched-win-tod').value;
+    return { type: 'window', window_start, window_end, time_of_day };
+  }
+
+  // Quick presets — compute window from today's date
+  const today = todayMidnightTs();
+  const tomorrow = today + 86400;
+
+  // Find next Saturday (days ahead: 0=today if Sat, else next Sat)
+  const dow = new Date().getDay(); // 0=Sun
+  const daysToSat = dow === 6 ? 7 : (6 - dow + 7) % 7 || 7;
+  const saturday  = today + daysToSat * 86400;
+  const sunday    = saturday + 86400;
+
+  // This week: from tomorrow through end of Sunday
+  const thisWeekStart = tomorrow;
+  const thisWeekEnd   = sunday;
+
+  // Next week: Mon through Sun
+  const nextMon = saturday + 86400;
+  const nextSun = nextMon + 6 * 86400;
+
+  const presets = {
+    today_business:  { type: 'window', window_start: today,    window_end: today,    time_of_day: 'business' },
+    today_tonight:   { type: 'window', window_start: today,    window_end: today,    time_of_day: 'tonight'  },
+    today_allday:    { type: 'window', window_start: today,    window_end: today,    time_of_day: 'allday'   },
+    tomorrow_business: { type: 'window', window_start: tomorrow, window_end: tomorrow, time_of_day: 'business' },
+    tomorrow_tonight:  { type: 'window', window_start: tomorrow, window_end: tomorrow, time_of_day: 'tonight'  },
+    tomorrow_allday:   { type: 'window', window_start: tomorrow, window_end: tomorrow, time_of_day: 'allday'   },
+    weekend:         { type: 'window', window_start: saturday, window_end: sunday,   time_of_day: 'allday'   },
+    this_week:       { type: 'window', window_start: thisWeekStart, window_end: thisWeekEnd, time_of_day: 'allday' },
+    next_week:       { type: 'window', window_start: nextMon,  window_end: nextSun,  time_of_day: 'allday'   },
+  };
+
+  return presets[type] || null;
+}
+
+// ── Utilities ─────────────────────────────────────────────────
+function todayMidnightTs() {
+  const d = new Date(); d.setHours(0,0,0,0);
+  return Math.floor(d.getTime() / 1000);
+}
+function tsToDateInput(ts) {
+  return new Date(ts * 1000).toISOString().slice(0, 10);
+}
+function tsToDatetimeLocal(ts) {
+  const d = new Date(ts * 1000);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function dateInputToTs(val) {
+  // val = "YYYY-MM-DD" — interpret as local midnight
+  const [y, m, day] = val.split('-').map(Number);
+  const d = new Date(y, m - 1, day, 0, 0, 0, 0);
+  return Math.floor(d.getTime() / 1000);
+}
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function showSchedError(msg) {
+  const el = document.getElementById('sched-error');
+  el.textContent = msg;
+  el.style.display = '';
+}
+</script>
+
+<%
+// ── EJS helper functions (used in the template above) ────────
+function cardHtml(t, schedNote, cls) {
+  const idStr  = formatTicketId(t.id);
+  const status = t.status ? t.status.replace('_', ' ') : '';
+  const orgStr = t.organization_name ? `<span>${escStr(t.organization_name)}</span>` : '';
+  const schStr = schedNote ? `<span class="tl-card-sched">${escStr(schedNote)}</span>` : '';
+  return `<div class="${cls}" onclick="openScheduleDialog(${t.id})">
+  <div class="tl-card-title">${escStr(t.subject)}</div>
+  <div class="tl-card-meta">
+    <span class="tl-card-id">#${escStr(idStr)}</span>
+    ${orgStr}${schStr}
+    <span style="text-transform:capitalize">${escStr(status)}</span>
+  </div>
+</div>`;
+}
+
+function escStr(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+%>
+
+<%- include('partials/foot') %>
