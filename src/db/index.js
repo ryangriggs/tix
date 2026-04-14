@@ -898,6 +898,10 @@ function deleteAttachment(storedName) {
   prepare('DELETE FROM attachments WHERE stored_name = ?').run(storedName);
 }
 
+function renameAttachment(storedName, newOriginalName) {
+  prepare('UPDATE attachments SET original_name = ? WHERE stored_name = ?').run(newOriginalName, storedName);
+}
+
 // ============================================================
 // Email message tracking
 // ============================================================
@@ -1218,7 +1222,7 @@ module.exports = {
   // Comments
   addComment, getComments, deleteComment, updateComment, updateCommentVisibility,
   // Attachments
-  addAttachment, getAttachments, getAttachmentsByComment, getAttachmentByStoredName, deleteAttachment,
+  addAttachment, getAttachments, getAttachmentsByComment, getAttachmentByStoredName, deleteAttachment, renameAttachment,
   // Email threading
   recordEmailMessage, findTicketByMessageId, findTicketByReplyToken,
   // Settings

@@ -146,16 +146,17 @@
 
       <!-- All attachments (ticket + comments, grouped here) -->
       <% if (attachments.length) { %>
-        <div class="attachments-section">
+        <div class="attachments-section" id="attachments">
           <h3 class="section-title">Attachments (<%= attachments.length %>)</h3>
           <ul class="attachment-list">
             <% for (const a of attachments) { %>
               <%
                 const _aExt = (a.original_name || '').split('.').pop().toLowerCase();
                 const _aAnnotatable = annotationExts.has(_aExt);
+                const _aRenameId = 'rename-' + a.stored_name.replace(/[^a-z0-9]/gi, '_');
               %>
               <li>
-                <a href="/tickets/attachments/<%= a.stored_name %>" class="attachment-link" target="_blank">📎 <%= a.original_name %></a>
+                <a href="/tickets/attachments/<%= a.stored_name %>" class="attachment-link" target="_blank">📎 <span id="<%= _aRenameId %>-label"><%= a.original_name %></span></a>
                 <span class="meta-item" style="margin-left:.25rem">(<%= (a.size/1024).toFixed(1) %> KB)</span>
                 <span class="meta-item" style="margin-left:.25rem" data-ts="<%= a.created_at %>" data-fmt="full"><%= formatDateFull(a.created_at) %></span>
                 <% if (a.uploader_name) { %><span class="meta-item"> — <%= a.uploader_name %></span><% } %>
@@ -166,10 +167,24 @@
                   </a>
                 <% } %>
                 <% if (user && user.role === 'admin') { %>
-                  <form method="POST" action="/tickets/attachments/<%= a.stored_name %>/delete" style="display:inline;margin-left:.25rem">
+                  <button type="button" class="btn-icon" title="Rename attachment" style="margin-left:.25rem"
+                    onclick="toggleAttachRename('<%= a.stored_name %>')">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                  </button>
+                  <form method="POST" action="/tickets/attachments/<%= a.stored_name %>/delete" style="display:inline;margin-left:.1rem">
                     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <button type="submit" class="btn-icon btn-icon-danger" title="Delete attachment"
                       onclick="return confirm('Permanently delete this attachment?')">×</button>
+                  </form>
+                  <form id="<%= _aRenameId %>-form" method="POST" action="/tickets/attachments/<%= a.stored_name %>/rename"
+                        style="display:none;margin-top:.4rem">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <input type="text" name="original_name" id="<%= _aRenameId %>-input"
+                           class="form-input form-input-sm" style="width:260px;max-width:100%"
+                           value="<%= a.original_name %>" maxlength="255">
+                    <button type="submit" class="btn btn-primary btn-sm" style="margin-left:.35rem">Save</button>
+                    <button type="button" class="btn btn-ghost btn-sm" style="margin-left:.2rem"
+                      onclick="toggleAttachRename('<%= a.stored_name %>')">Cancel</button>
                   </form>
                 <% } %>
               </li>
@@ -1060,6 +1075,18 @@ document.addEventListener('DOMContentLoaded', () => {
     navigator.clipboard.writeText('<%- ticketReplyEmail %>').then(() => flashBtn(this, 'Copy Email'));
   });
 });
+</script>
+
+<script>
+function toggleAttachRename(storedName) {
+  const safeId = 'rename-' + storedName.replace(/[^a-z0-9]/gi, '_');
+  const form   = document.getElementById(safeId + '-form');
+  const input  = document.getElementById(safeId + '-input');
+  if (!form) return;
+  const showing = form.style.display !== 'none';
+  form.style.display = showing ? 'none' : '';
+  if (!showing) { input.focus(); input.select(); }
+}
 </script>
 
 <%- include('../partials/foot') %>

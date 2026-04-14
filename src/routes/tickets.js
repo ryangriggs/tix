@@ -408,6 +408,22 @@ router.post('/', upload, async (req, res) => {
   res.redirect(`/tickets/${ticket.id}`);
 });
 
+// POST /tickets/attachments/:storedName/rename — admin only; must be before /:id
+router.post('/attachments/:storedName/rename', (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).render('error', { title: '403', message: 'Forbidden.' });
+
+  const att = db.getAttachmentByStoredName(req.params.storedName);
+  if (!att) return res.status(404).render('error', { title: '404', message: 'Attachment not found.' });
+
+  const newName = (req.body.original_name || '').trim();
+  if (!newName) return res.status(400).render('error', { title: 'Bad request', message: 'Name cannot be empty.' });
+  if (newName.length > 255) return res.status(400).render('error', { title: 'Bad request', message: 'Name too long.' });
+
+  db.renameAttachment(att.stored_name, newName);
+  audit.log(req, `renamed attachment "${att.original_name}" → "${newName}"`, att.ticket_id);
+  res.redirect(`/tickets/${att.ticket_id}#attachments`);
+});
+
 // POST /tickets/attachments/:storedName/delete — admin only; must be before /:id
 router.post('/attachments/:storedName/delete', (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).render('error', { title: '403', message: 'Forbidden.' });

@@ -10,7 +10,7 @@ const config  = require('../config');
 // Validate that storedName is a UUID (optionally followed by a file extension).
 // This prevents path traversal — storedName comes from the URL and must match
 // what we generate server-side, never be a relative path like ../../etc/passwd.
-const STORED_NAME_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(\.[a-zA-Z0-9]{1,10})?$/i;
+const STORED_NAME_RE = /^(\d+-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(\.[a-zA-Z0-9]{1,10})?$/i;
 
 function annotationFile(storedName, page) {
   // storedName is already validated before this is called
