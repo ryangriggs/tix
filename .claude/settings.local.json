@@ -21,7 +21,10 @@
       "Bash(dir:*)",
       "Bash(powershell:*)",
       "Bash(grep -n \"requireAuth\\\\|requireAdmin\" /c/temp/tickets/new/tix/src/routes/*.js)",
-      "Bash(git ls-files:*)"
+      "Bash(git ls-files:*)",
+      "Bash(curl -fsSL \"https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js\" -o src/public/js/fabric.min.js)",
+      "Bash(curl -fsSL \"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js\" -o src/public/js/pdf.min.js)",
+      "Bash(curl -fsSL \"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js\" -o src/public/js/pdf.worker.min.js)"
     ]
   },
   "outputStyle": "default"
