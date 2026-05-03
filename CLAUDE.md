@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Memory
+
+Detailed reference notes are in `.claude/memory/`. Read `.claude/memory/MEMORY.md` for the index, then load whichever files are relevant to the current task:
+- `db-schema.md` — full schema, all tables, all DB functions
+- `routes.md` — all routes, access control, CSRF patterns
+- `views.md` — template structure, JS patterns, CSS class reference
+- `features.md` — billable hours, locations, party roles, settings, reminders, attachments
+- `security-audit.md` — all 23 audit items with current status (some fixed, some deferred)
+- `timeline-feature-design.md` — timeline POC design + implementation notes
+
 ## Commands
 
 ```bash
@@ -34,13 +44,13 @@ A server-rendered email ticketing system. Users submit tickets via web UI or by 
 | `src/smtp.js` | Inbound SMTP server (port 25) |
 | `src/services/inbound.js` | Parses inbound email → creates tickets or appends comments |
 | `src/services/mail.js` | Outbound email (nodemailer/Mailgun); selects transport from config |
-| `src/services/sse.js` | Server-Sent Events broadcaster for real-time UI updates |
+| `src/services/sse.js` | Server-Sent Events broadcaster (present but unused — SSE was removed) |
 
 ### Database
 
 SQLite via `sql.js` (wraps the WASM build). `src/db/index.js` exposes a synchronous API mimicking `better-sqlite3`. All schema, migrations, and queries live in this single file. FTS4 (not FTS5) is used for full-text search — required for sql.js compatibility.
 
-Schema core: `users`, `tickets`, `ticket_parties` (many-to-many roles), `comments`, `attachments`, `email_messages` (threading), `auth_tokens`, `settings`.
+Schema core: `users`, `tickets`, `ticket_parties` (many-to-many roles), `comments`, `attachments`, `email_messages` (threading), `auth_tokens`, `settings`. Tickets also have schedule columns for the timeline view (`schedule_type`, `schedule_window_start`, `schedule_window_end`, `schedule_time_of_day`, `schedule_exact_at`).
 
 ### Authentication
 
@@ -59,7 +69,7 @@ Configured via `MAIL_TRANSPORT=mailgun|smtp|gmail`. The Gmail transport builds a
 
 ### Real-time updates
 
-SSE endpoint at `/events` (authenticated). The server broadcasts typed events (`ticket_created`, `ticket_updated`, `comment_added`, etc.) to all connected clients. Client reconnects with exponential backoff (3s–30s).
+SSE was removed. There are no real-time updates — the page refreshes manually.
 
 ## Configuration
 
