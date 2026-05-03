@@ -420,6 +420,121 @@
 </main>
 
 <script>
+  // ---- Inline image paste handler ----
+  // Intercepts pasted images in any Quill instance on this page, uploads them
+  // immediately, and replaces the data URI with a proper attachment URL.
+  const _pasteUploadsInFlight = new Set();
+
+  async function _uploadInlineImage(blob, ext) {
+    const fd = new FormData();
+    fd.append('image', blob, `paste.${ext}`);
+    const res = await fetch('/tickets/<%= ticket.id %>/attachments/inline', {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': '<%= csrfToken %>' },
+      credentials: 'include',
+      body: fd,
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Upload failed');
+    return data.url;
+  }
+
+  function _showPasteError(msg) {
+    let el = document.getElementById('paste-upload-err');
+    if (!el) {
+      el = document.createElement('p');
+      el.id = 'paste-upload-err';
+      el.className = 'form-hint form-hint-error';
+      document.getElementById('comment-editor').insertAdjacentElement('afterend', el);
+    }
+    el.textContent = msg;
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.remove(), 6000);
+  }
+
+  function attachPasteHandler(quillInst) {
+    // Path 1: direct clipboard image items (screenshots, copied images)
+    quillInst.root.addEventListener('paste', async e => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const imageItems = Array.from(items).filter(it => it.kind === 'file' && it.type.startsWith('image/'));
+      if (!imageItems.length) return;
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      for (const item of imageItems) {
+        const blob = item.getAsFile();
+        if (!blob) continue;
+        const ext  = item.type.split('/')[1]?.replace('jpeg','jpg') || 'png';
+        const key  = `${Date.now()}-${Math.random()}`;
+        _pasteUploadsInFlight.add(key);
+        _updateSubmitState();
+
+        const range = quillInst.getSelection(true);
+        try {
+          const url = await _uploadInlineImage(blob, ext);
+          quillInst.insertEmbed(range.index, 'image', url, 'user');
+          quillInst.setSelection(range.index + 1, 0, 'silent');
+        } catch (err) {
+          _showPasteError('Image upload failed: ' + err.message);
+        } finally {
+          _pasteUploadsInFlight.delete(key);
+          _updateSubmitState();
+        }
+      }
+    }, true);
+
+    // Path 2: HTML paste containing embedded data: URIs (from Word, email clients, browsers)
+    quillInst.on('text-change', (delta, _old, source) => {
+      if (source !== 'user') return;
+      const imgs = quillInst.root.querySelectorAll('img[src^="data:image/"]');
+      if (!imgs.length) return;
+      imgs.forEach(async img => {
+        if (img.dataset.uploading) return;
+        img.dataset.uploading = '1';
+
+        const dataUrl = img.src;
+        const match = dataUrl.match(/^data:image\/([a-z]+);base64,(.+)$/i);
+        if (!match) { img.removeAttribute('data-uploading'); return; }
+
+        const ext = match[1].replace('jpeg', 'jpg');
+        const binary = atob(match[2]);
+        const bytes  = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: `image/${match[1]}` });
+
+        const key = `${Date.now()}-${Math.random()}`;
+        _pasteUploadsInFlight.add(key);
+        _updateSubmitState();
+        try {
+          const url = await _uploadInlineImage(blob, ext);
+          img.src = url;
+          delete img.dataset.uploading;
+        } catch (err) {
+          img.remove();
+          _showPasteError('Image upload failed: ' + err.message);
+        } finally {
+          _pasteUploadsInFlight.delete(key);
+          _updateSubmitState();
+        }
+      });
+    });
+  }
+
+  function _updateSubmitState() {
+    const btn = document.querySelector('#comment-form [type="submit"]');
+    if (!btn) return;
+    if (_pasteUploadsInFlight.size > 0) {
+      btn.disabled = true;
+      btn.dataset.origText = btn.dataset.origText || btn.textContent;
+      btn.textContent = 'Uploading image…';
+    } else {
+      btn.disabled = false;
+      if (btn.dataset.origText) { btn.textContent = btn.dataset.origText; delete btn.dataset.origText; }
+    }
+  }
+
   // Comment editor
   const quill = new Quill('#comment-editor', {
     theme: 'snow',
@@ -446,6 +561,8 @@
       }
     }
   });
+
+  attachPasteHandler(quill);
 
   document.getElementById('comment-form').addEventListener('submit', e => {
     // Require comment text
@@ -497,6 +614,7 @@
           ],
         },
       });
+      attachPasteHandler(_editQuills[id]);
       // Seed with current content
       _editQuills[id].clipboard.dangerouslyPasteHTML(bodyEl.innerHTML);
     }
@@ -591,6 +709,7 @@
           ],
         },
       });
+      attachPasteHandler(_bodyQuill);
       _bodyQuill.clipboard.dangerouslyPasteHTML(document.getElementById('ticket-body-display').innerHTML);
     }
     _bodyQuill.focus();

@@ -461,6 +461,43 @@ router.get('/attachments/:storedName', (req, res) => {
   }
 });
 
+// POST /tickets/:id/attachments/inline — upload a single image pasted from clipboard
+// Returns JSON { ok, url, storedName }. Access: any party member (mirrors comment upload gate).
+router.post('/:id/attachments/inline', (req, res, next) => {
+  const ticket = db.getTicketById(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+  if (!getTicketAccess(ticket, req.user)) return res.status(403).json({ error: 'Forbidden' });
+
+  multer({
+    storage,
+    limits: { fileSize: (config.uploadMaxSizeMb || 25) * 1024 * 1024 },
+    fileFilter(req, file, cb) {
+      if (!file.mimetype.startsWith('image/')) return cb(new Error('Only image files are accepted'));
+      const ext = path.extname(file.originalname).toLowerCase().replace('.', '') || 'png';
+      const blocked = config.uploadBlockedExtensions.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+      if (blocked.includes(ext)) return cb(new Error(`File type .${ext} is not allowed`));
+      cb(null, true);
+    },
+  }).single('image')(req, res, err => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'No image received' });
+
+    const now = new Date();
+    const ts  = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}-${String(now.getSeconds()).padStart(2,'0')}`;
+    const ext = path.extname(req.file.filename);
+    const newName = `${ticket.id}-${path.basename(req.file.filename, ext)}${ext}`;
+    const originalName = `paste-${ts}${ext}`;
+    try {
+      fs.renameSync(path.join(config.uploadsDir, req.file.filename), path.join(config.uploadsDir, newName));
+    } catch (renameErr) {
+      console.error('[InlineUpload] rename failed:', renameErr.message);
+    }
+    const storedName = fs.existsSync(path.join(config.uploadsDir, newName)) ? newName : req.file.filename;
+    db.addAttachment({ ticketId: ticket.id, commentId: null, originalName, storedName, mimeType: req.file.mimetype, size: req.file.size });
+    res.json({ ok: true, url: `/tickets/attachments/${storedName}`, storedName });
+  });
+});
+
 // POST /tickets/bulk — bulk delete or status change (admin only)
 router.post('/bulk', (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
