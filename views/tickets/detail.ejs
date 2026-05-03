@@ -196,6 +196,8 @@
       <!-- Comments -->
       <div class="comments-section" id="comments">
         <h2 class="section-title">Activity</h2>
+        <% const hasPinned = comments.some(c => c.is_pinned); %>
+        <div id="pinned-divider" class="comments-pinned-header" style="<%= hasPinned ? '' : 'display:none' %>">📌 Pinned</div>
 
         <% for (const c of comments) { %>
           <%
@@ -204,7 +206,8 @@
             const canChangeVis = user && (user.role === 'admin' || (c.user_id && c.user_id === user.id)) && userVisibilityCap !== 'user';
             const visLabels = { user: 'All', technician: 'Tech+', admin: 'Admin only' };
           %>
-          <div class="comment" id="comment-<%= c.id %>">
+          <div class="comment<%= c.is_pinned ? ' comment--pinned' : '' %>" id="comment-<%= c.id %>"
+               data-comment-id="<%= c.id %>" data-pinned="<%= c.is_pinned ? '1' : '0' %>" data-ts="<%= c.created_at %>">
             <div class="comment-header">
               <span class="comment-author">
                 <% if (c.user_name) { %>
@@ -230,6 +233,14 @@
                 <span class="badge badge-visibility-<%= cVis %>">👁 <%= visLabels[cVis] %></span>
               <% } %>
               <span class="comment-time" data-ts="<%= c.created_at %>" data-fmt="full"><%= formatDateFull(c.created_at) %></span>
+              <% if (canPin) { %>
+                <button type="button"
+                  class="btn-icon btn-pin<%= c.is_pinned ? ' pinned' : '' %>"
+                  data-comment-id="<%= c.id %>"
+                  title="<%= c.is_pinned ? 'Unpin comment' : 'Pin comment' %>"
+                  style="margin-left:.5rem"
+                  onclick="togglePin(this, <%= c.id %>)"><svg width="12" height="12" viewBox="0 0 24 24" fill="<%= c.is_pinned ? 'currentColor' : 'none' %>" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg></button>
+              <% } %>
               <% if (canEditComment) { %>
                 <button type="button" class="btn-icon btn-icon-danger" title="Edit comment"
                   onclick="startEditComment(<%= c.id %>)" style="margin-left:.5rem"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
@@ -1205,6 +1216,63 @@ function toggleAttachRename(storedName) {
   const showing = form.style.display !== 'none';
   form.style.display = showing ? 'none' : '';
   if (!showing) { input.focus(); input.select(); }
+}
+</script>
+
+<script>
+async function togglePin(btn, commentId) {
+  btn.disabled = true;
+  try {
+    const res = await fetch('/tickets/<%= ticket.id %>/comments/' + commentId + '/pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': '<%= csrfToken %>' },
+      credentials: 'include',
+      body: '_csrf=<%= csrfToken %>',
+    });
+    const data = await res.json();
+    if (!data.ok) { alert(data.error || 'Could not update pin.'); return; }
+
+    const isPinned = data.isPinned;
+    const svg = btn.querySelector('svg');
+    if (svg) svg.setAttribute('fill', isPinned ? 'currentColor' : 'none');
+    btn.classList.toggle('pinned', isPinned);
+    btn.title = isPinned ? 'Unpin comment' : 'Pin comment';
+
+    const commentEl = document.getElementById('comment-' + commentId);
+    reorderAfterPin(commentEl, isPinned);
+  } catch (err) {
+    alert('Could not update pin: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function reorderAfterPin(commentEl, isPinned) {
+  const section = document.getElementById('comments');
+  const allComments = [...section.querySelectorAll('.comment[data-comment-id]')];
+  const ts = parseInt(commentEl.dataset.ts, 10);
+
+  commentEl.dataset.pinned = isPinned ? '1' : '0';
+  commentEl.classList.toggle('comment--pinned', isPinned);
+  commentEl.remove();
+
+  if (isPinned) {
+    const otherPinned = allComments.filter(c => c !== commentEl && c.dataset.pinned === '1');
+    const insertBefore = otherPinned.find(c => parseInt(c.dataset.ts, 10) < ts);
+    if (insertBefore) {
+      section.insertBefore(commentEl, insertBefore);
+    } else {
+      const firstUnpinned = allComments.find(c => c !== commentEl && c.dataset.pinned !== '1');
+      firstUnpinned ? section.insertBefore(commentEl, firstUnpinned) : section.appendChild(commentEl);
+    }
+  } else {
+    const unpinned = allComments.filter(c => c !== commentEl && c.dataset.pinned !== '1');
+    const insertBefore = unpinned.find(c => parseInt(c.dataset.ts, 10) < ts);
+    insertBefore ? section.insertBefore(commentEl, insertBefore) : section.appendChild(commentEl);
+  }
+
+  const hasPinned = section.querySelectorAll('.comment[data-pinned="1"]').length > 0;
+  document.getElementById('pinned-divider').style.display = hasPinned ? '' : 'none';
 }
 </script>
 

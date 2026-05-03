@@ -1725,6 +1725,21 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 /* Location badge on comments */
 .badge-location { background: #eff6ff; border: 1px solid #93c5fd; color: #1d4ed8; font-size: .75rem; }
 
+/* Pinned comments */
+.comments-pinned-header {
+  font-size: .72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-muted);
+  padding: .2rem 0 .4rem;
+  margin-top: .25rem;
+  border-bottom: 1px solid var(--border);
+}
+.comment--pinned { border-left: 3px solid #3b82f6; padding-left: .6rem; }
+.btn-pin         { color: var(--text-muted); }
+.btn-pin.pinned  { color: #3b82f6; }
+
 /* Org edit dialog */
 .modal-dialog { border: 1px solid var(--border); border-radius: var(--radius); padding: 0; min-width: 480px; max-width: 600px; width: 95vw; box-shadow: 0 8px 32px rgba(0,0,0,.15); }
 .modal-dialog::backdrop { background: rgba(0,0,0,.35); }

@@ -555,6 +555,7 @@ router.get('/:id', (req, res) => {
   const attachments = db.getAttachments(ticket.id);
 
   const isTechOrAdmin = req.user.role === 'admin' || req.user.role === 'technician';
+  const canPin = isTechOrAdmin || ['owner', 'superuser'].includes(access);
   const _localPart = config.ticketEmail.split('@')[0];
   const _domain    = config.ticketEmail.split('@')[1] || 'tix.local';
   res.render('tickets/detail', {
@@ -572,6 +573,7 @@ router.get('/:id', (req, res) => {
     enableLocation:      config.enableLocation,
     canClose:  canCloseTicket(req.user),
     canReopen: canReopenTicket(req.user),
+    canPin,
     userVisibilityCap: userVisibilityCap(req.user),
     ticketUrl:        `${config.appUrl}/tickets/${ticket.id}`,
     ticketReplyEmail: `${_localPart}+${ticket.reply_token}@${_domain}`,
@@ -706,6 +708,20 @@ router.post('/:id/comments/:commentId/visibility', (req, res) => {
   audit.log(req, `set comment ${commentId} visibility to ${newVis}`, ticket.id);
 
   res.json({ ok: true, visibility: newVis });
+});
+
+// POST /tickets/:id/comments/:commentId/pin — ticket owner, technician, or admin
+router.post('/:id/comments/:commentId/pin', (req, res) => {
+  const ticket = db.getTicketById(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Not found' });
+  const access = getTicketAccess(ticket, req.user);
+  const isTechOrAdmin = req.user.role === 'admin' || req.user.role === 'technician';
+  if (!isTechOrAdmin && !['owner', 'superuser'].includes(access)) return res.status(403).json({ error: 'Forbidden' });
+
+  const commentId = parseInt(req.params.commentId, 10);
+  const isPinned = db.toggleCommentPin(commentId);
+  audit.log(req, `${isPinned ? 'pinned' : 'unpinned'} comment ${commentId}`, ticket.id);
+  res.json({ ok: true, isPinned: !!isPinned });
 });
 
 // POST /tickets/:id/comments/:commentId/delete — admin only

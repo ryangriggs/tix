@@ -281,6 +281,7 @@ async function initDb() {
   try { _db.exec('ALTER TABLE tickets ADD COLUMN schedule_window_end   INTEGER'); } catch (_) {}
   try { _db.exec('ALTER TABLE tickets ADD COLUMN schedule_time_of_day  TEXT'); } catch (_) {}
   try { _db.exec('ALTER TABLE tickets ADD COLUMN schedule_exact_at     INTEGER'); } catch (_) {}
+  try { _db.exec('ALTER TABLE comments ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   _db.exec('CREATE INDEX IF NOT EXISTS idx_comments_location ON comments(location_id)');
   // Back-fill close_date for tickets closed before this column existed
   _db.exec(`UPDATE tickets SET close_date = updated_at WHERE status = 'closed' AND close_date IS NULL`);
@@ -858,8 +859,13 @@ function getComments(ticketId) {
     LEFT JOIN users u ON c.user_id = u.id
     LEFT JOIN locations l ON l.id = c.location_id
     WHERE c.ticket_id = ?
-    ORDER BY c.created_at DESC
+    ORDER BY c.is_pinned DESC, c.created_at DESC
   `).all(ticketId);
+}
+
+function toggleCommentPin(id) {
+  prepare('UPDATE comments SET is_pinned = CASE WHEN is_pinned = 1 THEN 0 ELSE 1 END WHERE id = ?').run(id);
+  return prepare('SELECT is_pinned FROM comments WHERE id = ?').get(id)?.is_pinned ?? 0;
 }
 
 // ============================================================
@@ -1220,7 +1226,7 @@ module.exports = {
   // Parties
   addParty, removeParty, getParties, getUserTicketRole, getPartyUserIds,
   // Comments
-  addComment, getComments, deleteComment, updateComment, updateCommentVisibility,
+  addComment, getComments, deleteComment, updateComment, updateCommentVisibility, toggleCommentPin,
   // Attachments
   addAttachment, getAttachments, getAttachmentsByComment, getAttachmentByStoredName, deleteAttachment, renameAttachment,
   // Email threading

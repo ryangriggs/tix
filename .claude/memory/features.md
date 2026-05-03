@@ -130,6 +130,13 @@ Priority order for matching email to ticket:
 2. Message-ID lookup via In-Reply-To / References headers
 3. [Ticket #N] subject tag — only from existing parties
 
+## Inbound Email — Image / Attachment Handling
+`prepareAttachments()` writes all email attachments to disk and builds `cidMap` (cid → storedName) for inline images.
+`formatEmailBody()` resolves `cid:` references in HTML body → `/tickets/attachments/{storedName}` URLs before sanitizing.
+
+**SMTP path (processInboundEmail):** inline CID images ARE re-embedded in body. ✓
+**Mailgun webhook path (processMailgunWebhook):** ⚠️ MISSING FEATURE — multer files have no contentId, cidMap is always empty, so cid: refs in the HTML body are stripped by the sanitizer. Inline images arrive as orphaned attachments only. Fix: parse Mailgun's `content-id-map` field and attach contentId to the matching multer file before calling prepareAttachments.
+
 ## Admin Impersonation
 Admin can impersonate another user. Current admin session stashed in `admin_session` cookie.
 Banner shown when impersonating. Can restore original session.
