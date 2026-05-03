@@ -9,10 +9,11 @@ router.get('/users/search', (req, res) => {
   const q = (req.query.q || '').trim();
   if (q.length < 1) return res.json([]);
 
-  // Admins and technicians see all users; others are scoped to their own org
-  const scopeOrgId = (req.user.role === 'admin' || req.user.role === 'technician')
-    ? null
-    : (req.user.organization_id || null);
+  // Admins and technicians see all users; others are scoped to their own org.
+  // Users with no org assigned get no results — prevents full user enumeration.
+  const isPrivileged = req.user.role === 'admin' || req.user.role === 'technician';
+  if (!isPrivileged && !req.user.organization_id) return res.json([]);
+  const scopeOrgId = isPrivileged ? null : req.user.organization_id;
 
   const users = db.searchUsers(q, scopeOrgId);
   res.json(users.map(u => ({

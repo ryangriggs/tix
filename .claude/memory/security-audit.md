@@ -90,6 +90,10 @@ Fix: use `getUserByEmail` first; log warning and skip if not found.
 Impersonation start/return not written to audit log. 8-hour session with no re-auth.
 Fix: log to audit; reduce maxAge to 30 minutes.
 
+## 24. User search exposes all accounts for org-less users ✅ FIXED
+`src/routes/api.js` — `GET /api/users/search`. Regular users scoped to `organization_id`, but if that was null the org filter was skipped and all users were returned, allowing full email enumeration.
+Fix: early return `[]` for non-privileged users with no org. They can still add collaborators by typing an email directly.
+
 ---
 
 ## Findings NOT confirmed / dismissed
