@@ -137,6 +137,8 @@ function buildLabels() {
 // GET /timeline
 // ============================================================
 router.get('/', (req, res) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'technician')
+    return res.status(403).render('error', { title: 'Forbidden', message: 'Timeline is only available to technicians and admins.' });
   const tickets  = db.getTimelineTickets(req.user.id);
   const sections = buildSections(tickets);
   const labels   = buildLabels();
@@ -156,6 +158,8 @@ router.get('/', (req, res) => {
 // POST /timeline/tickets/:id/schedule
 // ============================================================
 router.post('/tickets/:id/schedule', (req, res) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'technician')
+    return res.status(403).json({ error: 'Forbidden' });
   const ticketId = parseInt(req.params.id, 10);
   if (!ticketId) return res.status(400).json({ error: 'Invalid ticket ID' });
 
