@@ -365,7 +365,7 @@ function getAllUsers() {
 function getUsersSorted(sort, order) {
   const dir = order === 'desc' ? 'DESC' : 'ASC';
   const cols = {
-    name:              "COALESCE(u.name, u.email) COLLATE NOCASE",
+    name:              "u.name COLLATE NOCASE",
     email:             "u.email COLLATE NOCASE",
     role:              "u.role",
     organization_name: "COALESCE(o.name, '') COLLATE NOCASE",
