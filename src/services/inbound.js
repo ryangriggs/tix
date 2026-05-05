@@ -469,17 +469,26 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
   // Add To:/CC: recipients as collaborators.
   // This handles the "reply to a user and CC the ticket system" workflow —
   // the To: party gets added and notified so they're part of the thread.
+  const senderCanAddParticipants = ['admin', 'technician'].includes(senderUser.role) ||
+    !!senderUser.is_group_superuser || !!senderUser.can_add_participants;
+
   const toAndCc = [
     ...(parsed.to?.value  || []),
     ...(parsed.cc?.value  || []),
   ];
   const ccCollaboratorEmails = [];
+  const blockedCcEmails = [];
+
   for (const addr of toAndCc) {
     const email = (addr.address || '').toLowerCase();
     if (!email) continue;
     if (isTicketSystemAddress(email)) continue;  // skip ourselves
     if (config.ticketSilentEmail && email === config.ticketSilentEmail.toLowerCase()) continue; // skip silent address
     if (email === fromEmail) continue;            // skip sender (already submitter)
+    if (!senderCanAddParticipants) {
+      blockedCcEmails.push(email);
+      continue;
+    }
     const u = db.findOrCreateUser(email, addr.name || null);
     if (u._isNew) sendAdminNewUserNotification(u, 'Inbound email — CC recipient on new ticket').catch(console.error);
     if (u.blocked_at) continue;
@@ -490,16 +499,28 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
     }
   }
 
+  if (blockedCcEmails.length) {
+    const noteBody = `User ${senderUser.name || senderUser.email} attempted to CC the ticket to other user(s) ${blockedCcEmails.join(', ')} but does not have permission to add collaborators to the ticket. Contact administrator for approval.`;
+    db.addComment(ticket.id, senderUser.id, noteBody, false, null, null, 'technician');
+    console.log(`[Inbound] Blocked CC attempt from ${fromEmail} to: ${blockedCcEmails.join(', ')}`);
+  }
+
   // If this looks like a forward, try to add the original sender too
   let originalSenderEmail = null;
   if (isForwarded(parsed)) {
     const origEmail = extractForwardedSender(parsed.text || '');
     if (origEmail && origEmail !== fromEmail) {
-      const origUser = db.findOrCreateUser(origEmail);
-      if (origUser._isNew) sendAdminNewUserNotification(origUser, 'Inbound email — forwarded sender').catch(console.error);
-      db.addParty(ticket.id, origUser.id, 'collaborator');
-      originalSenderEmail = origEmail;
-      console.log(`[Inbound] Forwarded email — added original sender ${origEmail} as collaborator`);
+      if (senderCanAddParticipants) {
+        const origUser = db.findOrCreateUser(origEmail);
+        if (origUser._isNew) sendAdminNewUserNotification(origUser, 'Inbound email — forwarded sender').catch(console.error);
+        db.addParty(ticket.id, origUser.id, 'collaborator');
+        originalSenderEmail = origEmail;
+        console.log(`[Inbound] Forwarded email — added original sender ${origEmail} as collaborator`);
+      } else {
+        const noteBody = `User ${senderUser.name || senderUser.email} attempted to CC the ticket to other user(s) ${origEmail} but does not have permission to add collaborators to the ticket. Contact administrator for approval.`;
+        db.addComment(ticket.id, senderUser.id, noteBody, false, null, null, 'technician');
+        console.log(`[Inbound] Blocked forwarded-sender CC from ${fromEmail}: ${origEmail}`);
+      }
     }
   }
 

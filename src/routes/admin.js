@@ -84,6 +84,9 @@ router.post('/users/:id/edit', (req, res) => {
   const notificationsMuted = req.body.notifications_muted === '1' ? 1 : 0;
   db.setUserNotificationsMuted(id, notificationsMuted);
 
+  const canAddParticipants = req.body.can_add_participants === '1' ? 1 : 0;
+  db.updateUserCanAddParticipants(id, canAddParticipants);
+
   audit.log(req, `edited user ${editTarget?.email || id}`);
   res.redirect('/admin/users?message=User+updated');
 });

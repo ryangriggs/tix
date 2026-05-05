@@ -43,10 +43,15 @@ function resolveAnnotationTarget(req, res, renderErrors) {
     return null;
   }
 
-  // Access control: admin bypasses; everyone else must be a party
+  // Access control: admin/technician/org-superuser/ticket-owner only
   const user = req.user;
-  if (user.role !== 'admin' && !db.getUserTicketRole(ticket.id, user.id)) {
-    if (renderErrors) res.status(403).render('error', { title: 'Forbidden', message: 'You do not have access to this ticket.' });
+  const isTechOrAdmin = ['admin', 'technician'].includes(user.role);
+  const isSuperuser = user.isGroupSuperuser && user.organization_id &&
+    (ticket.organization_id === user.organization_id ||
+     (user.techOrgIds || []).includes(ticket.organization_id));
+  const ticketRole = db.getUserTicketRole(ticket.id, user.id);
+  if (!isTechOrAdmin && !isSuperuser && ticketRole !== 'owner') {
+    if (renderErrors) res.status(403).render('error', { title: 'Forbidden', message: 'You do not have access to annotate this attachment.' });
     else res.status(403).json({ error: 'Forbidden' });
     return null;
   }

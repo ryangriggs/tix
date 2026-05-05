@@ -77,6 +77,12 @@ function canManage(ticket, user) {
 function canCloseTicket(user)  { return user.role === 'admin' || user.role === 'technician'; }
 function canReopenTicket(user) { return user.role === 'admin'; }
 
+function canAddParticipants(user) {
+  if (['admin', 'technician'].includes(user.role)) return true;
+  if (user.isGroupSuperuser) return true;
+  return !!user.can_add_participants;
+}
+
 const VISIBILITY_RANK = { user: 0, technician: 1, admin: 2 };
 function userVisibilityCap(user) {
   if (user.role === 'admin') return 'admin';
@@ -345,20 +351,22 @@ router.post('/', upload, async (req, res) => {
   db.addParty(ticket.id, req.user.id, 'submitter');
 
   // Add collaborators specified at creation time — collect emails for notification
-  const collabIds    = [].concat(req.body['collaboratorIds[]']    || req.body.collaboratorIds    || []).filter(Boolean);
-  const collabEmails = [].concat(req.body['collaboratorEmails[]'] || req.body.collaboratorEmails || []).filter(Boolean);
   const notifyCollabEmails = [];
-  for (const id of collabIds) {
-    const u = db.getUserById(parseInt(id, 10));
-    if (u && u.id !== req.user.id) { db.addParty(ticket.id, u.id, 'collaborator'); notifyCollabEmails.push(u.email); }
-  }
-  for (const email of collabEmails) {
-    const e = email.trim().toLowerCase();
-    if (e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e !== req.user.email) {
-      const u = db.findOrCreateUser(e);
-      if (u._isNew) sendAdminNewUserNotification(u, 'Added as collaborator on new ticket (web)').catch(console.error);
-      db.addParty(ticket.id, u.id, 'collaborator');
-      notifyCollabEmails.push(e);
+  if (canAddParticipants(req.user)) {
+    const collabIds    = [].concat(req.body['collaboratorIds[]']    || req.body.collaboratorIds    || []).filter(Boolean);
+    const collabEmails = [].concat(req.body['collaboratorEmails[]'] || req.body.collaboratorEmails || []).filter(Boolean);
+    for (const id of collabIds) {
+      const u = db.getUserById(parseInt(id, 10));
+      if (u && u.id !== req.user.id) { db.addParty(ticket.id, u.id, 'collaborator'); notifyCollabEmails.push(u.email); }
+    }
+    for (const email of collabEmails) {
+      const e = email.trim().toLowerCase();
+      if (e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e !== req.user.email) {
+        const u = db.findOrCreateUser(e);
+        if (u._isNew) sendAdminNewUserNotification(u, 'Added as collaborator on new ticket (web)').catch(console.error);
+        db.addParty(ticket.id, u.id, 'collaborator');
+        notifyCollabEmails.push(e);
+      }
     }
   }
 
@@ -408,12 +416,15 @@ router.post('/', upload, async (req, res) => {
   res.redirect(`/tickets/${ticket.id}`);
 });
 
-// POST /tickets/attachments/:storedName/rename — admin only; must be before /:id
+// POST /tickets/attachments/:storedName/rename — admin/tech/owner/superuser
 router.post('/attachments/:storedName/rename', (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).render('error', { title: '403', message: 'Forbidden.' });
-
   const att = db.getAttachmentByStoredName(req.params.storedName);
   if (!att) return res.status(404).render('error', { title: '404', message: 'Attachment not found.' });
+
+  const ticket = db.getTicketById(att.ticket_id);
+  const access = ticket ? getTicketAccess(ticket, req.user) : null;
+  if (!['admin', 'technician'].includes(req.user.role) && !['owner', 'superuser'].includes(access))
+    return res.status(403).render('error', { title: '403', message: 'Forbidden.' });
 
   const newName = (req.body.original_name || '').trim();
   if (!newName) return res.status(400).render('error', { title: 'Bad request', message: 'Name cannot be empty.' });
@@ -424,12 +435,15 @@ router.post('/attachments/:storedName/rename', (req, res) => {
   res.redirect(`/tickets/${att.ticket_id}#attachments`);
 });
 
-// POST /tickets/attachments/:storedName/delete — admin only; must be before /:id
+// POST /tickets/attachments/:storedName/delete — admin/tech/owner/superuser
 router.post('/attachments/:storedName/delete', (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).render('error', { title: '403', message: 'Forbidden.' });
-
   const att = db.getAttachmentByStoredName(req.params.storedName);
   if (!att) return res.status(404).render('error', { title: '404', message: 'Attachment not found.' });
+
+  const ticket = db.getTicketById(att.ticket_id);
+  const access = ticket ? getTicketAccess(ticket, req.user) : null;
+  if (!['admin', 'technician'].includes(req.user.role) && !['owner', 'superuser'].includes(access))
+    return res.status(403).render('error', { title: '403', message: 'Forbidden.' });
 
   db.deleteAttachment(att.stored_name);
   try { fs.unlinkSync(path.join(config.uploadsDir, att.stored_name)); } catch (_) {}
@@ -871,6 +885,7 @@ router.post('/:id/parties', async (req, res) => {
   const ticket = db.getTicketById(req.params.id);
   if (!ticket) return res.status(404).json({ error: 'Not found' });
   if (!canManage(ticket, req.user)) return res.status(403).json({ error: 'Forbidden' });
+  if (!canAddParticipants(req.user)) return res.status(403).json({ error: 'You do not have permission to add participants to tickets.' });
 
   const role = ['owner', 'collaborator'].includes(req.body.role) ? req.body.role : 'collaborator';
   let newUser;
