@@ -177,6 +177,9 @@
       <% if (tickets.length === 0) { %>
         <div class="empty-state">
           <p>No tickets found.</p>
+          <% if (filters.q) { %>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="clearFiltersKeepSearch()">Clear filters</button>
+          <% } %>
           <% if (filters.since) { %>
             <a href="/tickets?status=<%= filters.status %>&priority=<%= filters.priority %>&sort=<%= filters.sort %>&order=<%= filters.order %>&since=" class="btn btn-secondary btn-sm">Show all time</a>
           <% } %>
@@ -330,6 +333,18 @@ function soloFilter(name, value) {
 function toggleAll(name) {
   document.getElementById('filter-' + name).value = '';
   document.getElementById('filter-form').submit();
+}
+
+function clearFiltersKeepSearch() {
+  const form = document.getElementById('filter-form');
+  document.getElementById('filter-status').value = '';
+  document.getElementById('filter-priority').value = '';
+  document.getElementById('filter-since').value = '';
+  const orgSel = form.querySelector('select[name="org"]');
+  if (orgSel) orgSel.value = '';
+  const ownerSel = form.querySelector('select[name="owner"]');
+  if (ownerSel) ownerSel.value = '';
+  form.submit();
 }
 
 function resetFilters() {

@@ -218,8 +218,22 @@ function setUserSort(col) {
   const isCurrent = sortEl.value === col;
   orderEl.value = isCurrent && orderEl.value === 'asc' ? 'desc' : 'asc';
   sortEl.value  = col;
+  try { localStorage.setItem('adminUserSort', JSON.stringify({ sort: col, order: orderEl.value })); } catch (_) {}
   document.getElementById('user-sort-form').submit();
 }
+
+(function restoreSort() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('sort')) return;
+  try {
+    const saved = JSON.parse(localStorage.getItem('adminUserSort') || 'null');
+    if (saved && saved.sort) {
+      params.set('sort', saved.sort);
+      if (saved.order) params.set('order', saved.order);
+      window.location.replace('/admin/users?' + params.toString());
+    }
+  } catch (_) {}
+})();
 
 let _dialogUserId = null;
 let _dialogBlocked = false;
