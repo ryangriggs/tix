@@ -270,7 +270,17 @@ async function sendMagicLink(toEmail, magicLinkUrl, otp) {
   });
 }
 
-async function sendTicketNotification({ to, ticketSubject, body, ticketId, messageId, inReplyTo, references, replyToken }) {
+function stripImagesFromBody(html, ticketId, commentId) {
+  if (!/<img\s/i.test(html)) return html;
+  const anchor  = commentId ? `#comment-${commentId}` : '';
+  const ticketUrl = `${config.appUrl}/tickets/${ticketId}${anchor}`;
+  const notice  = `<p style="font-size:.85em;color:#6b7280;margin:8px 0 0">` +
+    `&#128248; This message contains images. ` +
+    `<a href="${ticketUrl}">Open ticket to view them.</a></p>`;
+  return html.replace(/<img\s[^>]*>/gi, '') + notice;
+}
+
+async function sendTicketNotification({ to, ticketSubject, body, ticketId, commentId, messageId, inReplyTo, references, replyToken }) {
   let replyTo;
   if (replyToken) {
     const mailDomain = config.ticketEmail.includes('@') ? config.ticketEmail.split('@')[1] : 'tix.local';
@@ -278,7 +288,8 @@ async function sendTicketNotification({ to, ticketSubject, body, ticketId, messa
     replyTo = `${config.mailFromName} <${localPart}+${replyToken}@${mailDomain}>`;
   }
 
-  const html    = await renderEmail('ticket-notification', { body, ticketId, ticketSubject });
+  const cleanBody = stripImagesFromBody(body, ticketId, commentId);
+  const html    = await renderEmail('ticket-notification', { body: cleanBody, ticketId, ticketSubject });
   const text    = html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
   const subject = `${ticketSubject} [Ticket #${config.ticketPrefix}${ticketId}]`;
 

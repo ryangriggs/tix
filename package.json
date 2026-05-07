@@ -1,6 +1,6 @@
 {
   "name": "tix",
-  "version": "1.2.17",
+  "version": "1.2.18",
   "description": "Simple email-based ticketing system",
   "main": "src/tix.js",
   "scripts": {

@@ -168,6 +168,7 @@ async function notifyParties(ticket, actorEmail, messageBody, commentId, inReply
     ticketSubject: ticket.subject,
     body: messageBody,
     ticketId: ticket.id,
+    commentId,
     messageId: msgId,
     inReplyTo: inReplyTo || `<ticket-${ticket.id}@${domain}>`,
     replyToken: ticket.reply_token,
