@@ -1,6 +1,6 @@
 {
   "name": "tix",
-  "version": "1.2.18",
+  "version": "1.2.19",
   "description": "Simple email-based ticketing system",
   "main": "src/tix.js",
   "scripts": {
@@ -21,6 +21,7 @@
     "googleapis": "^171.4.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "mailauth": "^4.13.2",
     "mailgun.js": "^10.2.1",
     "mailparser": "^3.7.1",
     "multer": "^2.0.0",

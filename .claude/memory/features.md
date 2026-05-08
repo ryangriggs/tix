@@ -83,7 +83,7 @@ There are two distinct role systems: **account role** (admin/technician/user) an
 
 ### How roles are assigned automatically (inbound email)
 - Email sender → submitter (or owner if using silent ticket address)
-- To:/CC: recipients → collaborator
+- To:/CC: recipients → collaborator (only if sender has `can_add_participants` — see below)
 - default_assignee_email → owner (if not already a party)
 
 ### Important: addParty uses ON CONFLICT DO UPDATE SET role
@@ -103,6 +103,7 @@ assigns to tech/other admin as owner, removes themselves as submitter to exit th
 
 ### notifyParties
 Sends to ALL parties (all roles) except the actor. No distinction between roles for notifications.
+Visibility param filters which staff tiers receive (admin/tech-only comments go to staff only).
 
 ### Account role vs party role interaction
 - canManage: true if account role is admin/technician, OR party role is submitter/owner
@@ -137,6 +138,43 @@ Priority order for matching email to ticket:
 **SMTP path (processInboundEmail):** inline CID images ARE re-embedded in body. ✓
 **Mailgun webhook path (processMailgunWebhook):** ⚠️ MISSING FEATURE — multer files have no contentId, cidMap is always empty, so cid: refs in the HTML body are stripped by the sanitizer. Inline images arrive as orphaned attachments only. Fix: parse Mailgun's `content-id-map` field and attach contentId to the matching multer file before calling prepareAttachments.
 
+## Inbound Email — CC Auto-Add (can_add_participants gate)
+On new ticket creation (`handleNewTicket` in inbound.js), To:/CC: recipients are added as collaborators
+ONLY if the sender has `can_add_participants` permission.
+
+Permission check (snake_case from DB — inbound.js uses senderUser.is_group_superuser):
+```js
+const ok = ['admin','technician'].includes(senderUser.role)
+  || !!senderUser.is_group_superuser
+  || !!senderUser.can_add_participants;
+```
+
+When blocked: all blocked email addresses are collected, then a single internal technician-visibility
+comment is added to the ticket:
+> "User X attempted to CC the ticket to other user(s) a@b, c@d but does not have permission to add
+> collaborators to the ticket. Contact administrator for approval."
+
+Same gate applies to forwarded-sender extraction (the `From:` line parsed from forwarded body).
+CC auto-add does NOT exist in `handleReply` — only in `handleNewTicket`.
+
+## can_add_participants Permission
+- Column: `users.can_add_participants INTEGER NOT NULL DEFAULT 0`
+- Controls BOTH email CC auto-add AND web UI "Add Participant" (POST /tickets/:id/parties)
+- Also gates collaborator fields on web new-ticket form (POST /tickets)
+- Bypassed for: admin role, technician role, is_group_superuser=1
+- Regular users (including owners/submitters) require explicit admin grant
+- Admin toggles via checkbox in user edit dialog (`/admin/users`)
+- DB function: `updateUserCanAddParticipants(userId, val)`
+
+## Outbound Email — Image Handling
+`sendTicketNotification` in `src/services/mail.js` strips all `<img>` tags from the body before
+sending, replacing them with a notice:
+> "📷 This message contains images. Open ticket to view them." (links to ticket, anchored to
+> `#comment-{commentId}` when a comment ID is available)
+
+This keeps notification emails lightweight and avoids broken-image problems (attachments require login).
+`commentId` is passed from `notifyParties` → `sendTicketNotification` so the anchor points to the right comment.
+
 ## Admin Impersonation
 Admin can impersonate another user. Current admin session stashed in `admin_session` cookie.
 Banner shown when impersonating. Can restore original session.
@@ -150,12 +188,16 @@ Sends email to `config.adminEmail` with the new user's email and the source labe
 
 ## Attachment Management
 - Upload: stored as `{ticketId}-{uuid}.{ext}` on disk for manual recovery
-- Download/view: `GET /tickets/attachments/:storedName` — inline for images/PDF/video/audio, download otherwise
-- Delete: admin only via `POST /tickets/attachments/:storedName/delete`
-- Rename: admin only via `POST /tickets/attachments/:storedName/rename` — changes `original_name` in DB, disk file unchanged
-- Annotate: PDF/image files get an annotate button → `/tickets/:id/attachments/:storedName/annotate`
+- Download/view: `GET /tickets/attachments/:storedName` — inline for images/PDF/video/audio, download otherwise; requires login
+- Delete: admin/tech/owner/superuser via `POST /tickets/attachments/:storedName/delete`
+- Rename: admin/tech/owner/superuser via `POST /tickets/attachments/:storedName/rename` — changes `original_name` in DB, disk file unchanged
+- Annotate: PDF/image files; access restricted to admin/tech/superuser/ticket-owner only
   - Uses fabric.js (canvas) + pdf.js (for PDFs), both self-hosted in `src/public/js/`
   - Annotations stored as JSON files in `config.annotationsDir`
+- UI: "..." button per attachment opens a dropdown with: View, Annotate (if annotatable + canManageAtt), Rename (canManageAtt), Delete (canManageAtt)
+  - `canManageAtt = isTechOrAdmin || ['owner','superuser'].includes(access)`
+  - Dropdown: `.attach-btn-wrap` > `<button>` + `.attach-menu.attach-actions-menu`
+  - `toggleAttachActionsMenu(btn)` opens/closes; document click listener closes all open menus
 
 ## Git Hooks (version increment)
 - `.githooks/pre-commit` — increments patch version in package.json on every commit

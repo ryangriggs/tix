@@ -11,8 +11,8 @@ const db     = require('../db');
 // ============================================================
 // Unsubscribe token helpers (used by mail + unsubscribe route)
 // ============================================================
-function makeUnsubToken(replyToken, email) {
-  const payload = Buffer.from(JSON.stringify({ r: replyToken, e: email })).toString('base64url');
+function makeUnsubToken(ticketId, email) {
+  const payload = Buffer.from(JSON.stringify({ tid: ticketId, e: email })).toString('base64url');
   const sig = crypto.createHmac('sha256', config.jwtSecret)
     .update('unsub:' + payload).digest('base64url').slice(0, 16);
   return payload + '.' + sig;
@@ -299,7 +299,7 @@ async function sendTicketNotification({ to, ticketSubject, body, ticketId, comme
 
   // Per-recipient unsubscribe URL (signed token, no DB lookup needed)
   const unsubUrl = replyToken
-    ? email => `${config.appUrl}/unsubscribe?t=${makeUnsubToken(replyToken, email)}`
+    ? email => `${config.appUrl}/unsubscribe?t=${makeUnsubToken(ticketId, email)}`
     : () => null;
 
   // Resend batch: send all recipients in one API call to avoid the 2 msg/sec rate limit

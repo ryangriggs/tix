@@ -351,6 +351,28 @@
         </label>
         <p class="form-hint">Only needed when using Mailgun's inbound routing. Disable if not in use.</p>
       </div>
+
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:1.25rem 0">
+      <h3 class="settings-sub-title">Inbound Email Authentication</h3>
+      <p class="form-hint" style="margin-bottom:.75rem">
+        SPF and DKIM results are always logged to the Email Log for monitoring.
+        Enable enforcement only after confirming no legitimate senders are failing — check the log first.
+        Only hard failures are rejected; softfail, neutral, and unsigned emails are never blocked.
+      </p>
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" name="enforce_spf" value="true"
+                 <%= s.enforce_spf === 'true' ? 'checked' : '' %>>
+          Reject emails that hard-fail SPF (<code>fail</code> only — not softfail or none)
+        </label>
+      </div>
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" name="enforce_dkim" value="true"
+                 <%= s.enforce_dkim === 'true' ? 'checked' : '' %>>
+          Reject emails with an invalid DKIM signature (<code>fail</code> only — unsigned emails still pass)
+        </label>
+      </div>
     </div>
 
     <!-- ── Features ─────────────────────────────────────────── -->

@@ -15,7 +15,9 @@ DROP COLUMN requires SQLite 3.35+; sql.js WASM may or may not support it — use
 
 ### users
 id, email (unique), name, role (admin|technician|user), organization_id FK,
-is_group_superuser (0/1), blocked_at (timestamp or null), created_at
+is_group_superuser (0/1), blocked_at (timestamp or null), created_at,
+notifications_muted (0/1 default 0),
+can_add_participants (0/1 default 0) — gate for CC/web-UI collaborator add
 
 ### tickets
 id, subject, body (HTML), status (new|open|on_hold|closed), priority (low|normal|high|urgent),
@@ -34,8 +36,10 @@ Many-to-many. One row per user per ticket.
 ### comments
 id, ticket_id, user_id, body (HTML), is_email (0/1),
 billable_hours (REAL nullable), location_id (FK → locations, nullable),
+visibility (user|technician|admin — default 'user'),
 created_at
 NOTE: work_type was dropped (migration: DROP COLUMN work_type, try/catch)
+visibility='technician' means only admin/tech-role users see the comment (used for internal notes).
 
 ### attachments
 id, ticket_id, comment_id (nullable), original_name, stored_name, mime_type, size, created_at
@@ -73,7 +77,8 @@ Used for threading inbound email replies to the right ticket.
 - `createTicket(...)` — returns new ticket row
 
 ### Comments
-- `addComment(ticketId, userId, body, isEmail=false, billableHours=null, locationId=null)`
+- `addComment(ticketId, userId, body, isEmail=false, billableHours=null, locationId=null, visibility='user')`
+  - visibility='technician' creates an internal note visible only to admin/tech
 - `getComments(ticketId)` — JOINs users (email, name) + locations (location_name, location_distance). ORDER BY created_at DESC.
 - `deleteComment(id)`
 
@@ -119,4 +124,11 @@ Used for threading inbound email replies to the right ticket.
 - `setTicketRemindersSent(ticketId, count)` — updates counter WITHOUT touching updated_at
 
 ### Users
-- `findOrCreateUser(email)` — returns user; sets `_isNew = true` property when newly inserted (used to trigger admin notification)
+- `findOrCreateUser(email, name?)` — returns user; sets `_isNew = true` property when newly inserted
+- `getUserById(id)`, `getUserByEmail(email)`
+- `getUsersSorted(sort, order)` — name sort uses `u.name COLLATE NOCASE` (NULLs first in ASC, so blank-named users appear at top)
+- `updateUserRole(id, role)`, `updateUserName(id, name)`, `blockUser(id)`, `unblockUser(id)`
+- `updateUserOrganization(userId, orgId)`
+- `updateUserSuperuser(userId, val)`
+- `setUserNotificationsMuted(userId, val)`
+- `updateUserCanAddParticipants(userId, val)` — sets can_add_participants 0/1

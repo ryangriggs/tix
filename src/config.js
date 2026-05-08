@@ -25,6 +25,12 @@ const config = {
   // Automatically defaults to true when mail_transport is mailgun.
   mailgunWebhookEnabled: false, // set dynamically via applySettings
 
+  // Inbound email authentication enforcement (SPF/DKIM via mailauth for SMTP,
+  // or Mailgun's pre-checked headers for the webhook path).
+  // 'fail' = hard fail only. Softfail/neutral/none still pass.
+  enforceSPF:  false,
+  enforceDKIM: false,
+
   // Comma-separated extension lists (without leading dot, case-insensitive).
   // Whitelist: only these extensions are accepted. Empty = allow all.
   // Blacklist: always rejected, even if in the whitelist.
@@ -141,6 +147,9 @@ function applySettings(map) {
 
   if ('login_rate_limit_ip'    in map) config.loginRateLimitPerIpPerHour   = parseInt(map.login_rate_limit_ip,    10) || 20;
   if ('login_rate_limit_email' in map) config.loginRateLimitPerEmailPerMin = parseInt(map.login_rate_limit_email, 10) || 5;
+
+  if ('enforce_spf'  in map) config.enforceSPF  = map.enforce_spf  === 'true';
+  if ('enforce_dkim' in map) config.enforceDKIM = map.enforce_dkim === 'true';
 
   if ('mailgun_webhook_enabled' in map) {
     config.mailgunWebhookEnabled = map.mailgun_webhook_enabled === 'true';

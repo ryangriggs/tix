@@ -25,8 +25,13 @@ function startSMTPServer() {
       stream.on('data', chunk => chunks.push(Buffer.from(chunk)));
       stream.on('end', async () => {
         const rawEmail = Buffer.concat(chunks);
+        const smtpMeta = {
+          ip:   session.remoteAddress || '',
+          helo: session.clientHostname || session.hostNameAppearsAs || '',
+          envelopeFrom: session.envelope?.mailFrom?.address || '',
+        };
         try {
-          await processInboundEmail(rawEmail);
+          await processInboundEmail(rawEmail, smtpMeta);
           callback();
         } catch (err) {
           // Reject at the SMTP protocol level so the sender's MTA logs the failure

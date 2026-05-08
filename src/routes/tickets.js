@@ -462,7 +462,7 @@ router.get('/attachments/:storedName', (req, res) => {
   if (!att) return res.status(404).send('Not found');
 
   const ticket = db.getTicketById(att.ticket_id);
-  if (!getTicketAccess(ticket, req.user)) return res.status(403).send('Forbidden');
+  if (!getTicketAccess(ticket, req.user)) return res.status(404).send('Not found');
 
   const filePath = path.join(config.uploadsDir, att.stored_name);
   if (!fs.existsSync(filePath)) return res.status(404).send('File not found on disk');
@@ -562,7 +562,7 @@ router.get('/:id', (req, res) => {
   if (!ticket) return res.status(404).render('error', { title: '404', message: 'Ticket not found.' });
 
   const access = getTicketAccess(ticket, req.user);
-  if (!access) return res.status(403).render('error', { title: '403', message: 'You do not have access to this ticket.' });
+  if (!access) return res.status(404).render('error', { title: '404', message: 'Ticket not found.' });
 
   const comments = db.getComments(ticket.id).filter(c => canSeeComment(c, req.user));
   const parties = db.getParties(ticket.id);

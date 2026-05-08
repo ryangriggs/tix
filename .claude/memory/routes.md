@@ -15,13 +15,18 @@ Note: SSE (/events) was removed. No real-time updates; page refreshes manually.
 ## src/routes/tickets.js
 
 ### Key helpers
-- `canManage(ticket, user)` — admin, assigned tech, or group superuser can manage
+- `getTicketAccess(ticket, user)` — returns 'admin'|'technician'|'superuser'|'owner'|'submitter'|'collaborator'|null
+- `canManage(ticket, user)` — true if admin, technician (in org), superuser, submitter, or owner
 - `canCloseTicket(user)` — admin or technician
 - `canReopenTicket(user)` — admin only
-- `getTicketAccess(ticket, user)` — returns access level or null if forbidden
+- `canAddParticipants(user)` — true if admin, technician, isGroupSuperuser, OR `user.can_add_participants === 1`
+
+### GET /tickets
+Filter bar: status, priority, since (date), org, owner, q (search), sort, order, per_page.
+Empty-state shows "Clear filters" button when `filters.q` is set and no results — calls `clearFiltersKeepSearch()` which resets all filters except the search text.
 
 ### GET /:id
-Passes to detail.ejs: `ticket`, `comments`, `attachments`, `parties`, `isTechOrAdmin`, `canClose`, `canReopen`, `canManage`
+Passes to detail.ejs: `ticket`, `comments`, `attachments`, `parties`, `isTechOrAdmin`, `canClose`, `canReopen`, `canManage`, `access`
 
 ### POST /:id/comments
 - Validates access, optional status change, close/reopen permission checks
@@ -40,14 +45,29 @@ Passes to detail.ejs: `ticket`, `comments`, `attachments`, `parties`, `isTechOrA
 ### POST /:id/due-date
 - Resets `reminders_sent` to 0 when due date changes
 
-### POST /attachments/:storedName/rename (admin only)
+### POST /:id/parties — add a party
+- Requires `canManage` AND `canAddParticipants`
+- Adds user by userId or email (findOrCreateUser). Notifies the new party.
+
+### POST /attachments/:storedName/rename
+- Access: admin, technician, or ticket owner/superuser (uses `getTicketAccess`)
 - Updates `original_name` in DB. Stored filename on disk unchanged.
 - Redirects to `/tickets/:id#attachments`
 
-### POST /attachments/:storedName/delete (admin only)
+### POST /attachments/:storedName/delete
+- Access: same as rename (admin, technician, owner, superuser)
 - Deletes DB record + file from disk
 
+### notifyParties(ticket, actorEmail, messageBody, commentId, inReplyTo, visibility)
+Sends to ALL parties except the actor. Visibility filters which parties receive (technician/admin visibility comments go to staff only).
+Passes `commentId` to `sendTicketNotification` for use in image-stripped email anchor links.
+
 ## src/routes/admin.js
+
+### Users
+- `GET  /users` — list; sorted by `sort` query param; sort preference saved in localStorage client-side and restored on next visit if no sort in URL
+- `GET  /users/:id/tech-orgs` — JSON list of technician's additional orgs
+- `POST /users/:id/edit` — saves: name, role, org, is_group_superuser, active/blocked, notifications_muted, can_add_participants
 
 ### Organizations
 - `GET  /organizations` — list page
@@ -67,7 +87,7 @@ Passes to detail.ejs: `ticket`, `comments`, `attachments`, `parties`, `isTechOrA
 
 ## src/routes/api.js
 All require auth. Technicians/users see filtered results.
-- `GET /users/search?q=` — admin/tech see all; user scoped to own org
+- `GET /users/search?q=` — admin/tech see all; user scoped to own org (returns [] if no org)
 - `GET /organizations/search?q=`
 - `GET /organizations/:id/locations?q=` — admin/tech only; returns locations for autocomplete
 
@@ -86,6 +106,8 @@ Mounted under `/tickets` in tix.js. Handles PDF/image annotation.
 - `GET  /:ticketId/attachments/:storedName/annotations/:page` — load annotations JSON
 - `POST /:ticketId/attachments/:storedName/annotations/:page` — save annotations JSON
 - `storedName` validated against regex: `(\d+-)?UUID(.ext)?` (ticketId prefix is optional)
+- Access: admin, technician, org-superuser, or ticket owner only (tightened — collaborators/submitters excluded)
+  - Check in `resolveAnnotationTarget`: `['admin','technician'].includes(user.role) || isSuperuser || ticketRole === 'owner'`
 
 ## CSRF
 `verifyCsrf` reads `req.body._csrf` OR `req.headers['x-csrf-token']`. Token is HMAC-SHA256 of session cookie (stateless).

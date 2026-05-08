@@ -5,7 +5,8 @@ Generated from audit of full codebase. Last updated: 2026-05.
 ---
 
 ## 1. Annotation route missing ticket access check ✅ FIXED
-`src/routes/annotate.js` — Added party-membership / admin check in `resolveAnnotationTarget`.
+`src/routes/annotate.js` — `resolveAnnotationTarget` now requires admin, technician, org-superuser,
+OR ticket owner. Collaborators and submitters are excluded (matches UI restriction).
 
 ## 2. Path traversal in annotation file path ✅ FIXED
 `src/routes/annotate.js` — `storedName` now validated against regex before use in file path.
@@ -57,14 +58,15 @@ storedName is UUID-generated server-side. Not user-supplied.
 ## 15. CORS not configured ⏳ DEFERRED / LOW
 No CORS headers set. Fine for same-origin app. CSRF token required for mutations anyway.
 
-## 16. Inbound email To/CC auto-adds arbitrary users ⚠️ HIGH — DEFERRED (user reviewed, not urgent)
-`src/services/inbound.js` — To/CC addresses auto-added as collaborators.
-Attacker can force a third party onto a ticket's party list.
-Fix: remove To/CC auto-add loop, or require confirmation link.
+## 16. Inbound email To/CC auto-adds arbitrary users ✅ MITIGATED
+`src/services/inbound.js` — To/CC auto-add now gated by `can_add_participants` flag on the sender.
+Admins/technicians/org-superusers bypass. Regular users require explicit admin grant.
+When blocked, an internal technician-visibility note is added to the ticket listing the blocked addresses.
+Remaining risk: admins/techs with the flag can still force third parties onto ticket threads — acceptable.
 
-## 17. Forwarded-email sender auto-extracted and added ⚠️ MEDIUM — DEFERRED
-`src/services/inbound.js` — regex-parses email body for `From:` line, adds as collaborator.
-Fix: remove forwarded-sender extraction, or require confirmation.
+## 17. Forwarded-email sender auto-extracted and added ✅ MITIGATED
+Same `can_add_participants` gate applied to forwarded-sender extraction in `handleNewTicket`.
+Same internal note written when blocked.
 
 ## 18. Message-ID reply adds non-party as collaborator ⚠️ LOW — DEFERRED
 In-Reply-To match bypasses party check. Practical risk low (Message-IDs are unguessable).
@@ -94,6 +96,10 @@ Fix: log to audit; reduce maxAge to 30 minutes.
 `src/routes/api.js` — `GET /api/users/search`. Regular users scoped to `organization_id`, but if that was null the org filter was skipped and all users were returned, allowing full email enumeration.
 Fix: early return `[]` for non-privileged users with no org. They can still add collaborators by typing an email directly.
 
+## 25. Web UI collaborator-add unguarded for regular users ✅ FIXED
+`POST /tickets/:id/parties` — now requires `canAddParticipants(user)` in addition to `canManage`.
+New-ticket collaborator fields also skipped if `!canAddParticipants(req.user)`.
+
 ---
 
 ## Findings NOT confirmed / dismissed
@@ -103,3 +109,4 @@ Fix: early return `[]` for non-privileged users with no org. They can still add 
 - **Bulk delete not scoped**: NOT an issue — admins see all tickets.
 - **Unsubscribe rate limiting**: NOT needed — operation is idempotent.
 - **Plaintext credentials in DB**: TRUE but standard for self-hosted apps. Deferred.
+- **Inline images in notification emails**: RESOLVED by stripping `<img>` tags and replacing with link to ticket. No public attachment access needed.

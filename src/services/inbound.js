@@ -1,6 +1,7 @@
 'use strict';
 
 const { simpleParser } = require('mailparser');
+const { authenticate: mailauthAuthenticate } = require('mailauth');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
@@ -10,6 +11,76 @@ const config = require('../config');
 const db = require('../db');
 const { sendTicketNotification, sendAdminNewUserNotification, logEmail } = require('./mail');
 const audit = require('./audit');
+
+// ============================================================
+// Inbound email authentication (SPF + DKIM via mailauth)
+// ============================================================
+
+// Returns { spf, dkim, summary } where spf/dkim are result strings like 'pass'/'fail'/'none'.
+// Logs result to email log. Throws if enforcement is on and result is 'fail'.
+async function checkEmailAuth(rawEmail, { ip, helo, envelopeFrom } = {}) {
+  if (!ip) return; // no IP available (e.g. test path) — skip silently
+
+  let auth;
+  try {
+    auth = await mailauthAuthenticate(rawEmail, {
+      ip,
+      helo: helo || ip,
+      sender: envelopeFrom || '',
+      mta: (config.ticketEmail.split('@')[1] || 'localhost'),
+    });
+  } catch (err) {
+    console.error('[Inbound] mailauth error:', err.message);
+    return; // auth check failure → don't block email
+  }
+
+  const spfResult  = auth.spf?.status?.result  || 'none';
+  const dkimResult = (auth.dkim?.results || []).find(r => r.status?.result === 'pass')
+    ? 'pass'
+    : (auth.dkim?.results || []).find(r => r.status?.result === 'fail')
+      ? 'fail'
+      : 'none';
+
+  const summary = `SPF=${spfResult} DKIM=${dkimResult}`;
+  const from    = envelopeFrom || '?';
+  logEmail(`[INBOUND] ${from}`, summary);
+  console.log(`[Inbound] Auth ${summary} for ${from} (ip=${ip})`);
+
+  if (config.enforceSPF && spfResult === 'fail') {
+    const err = new Error(`SPF check failed for ${from}`);
+    err.smtpCode = 550;
+    throw err;
+  }
+  if (config.enforceDKIM && dkimResult === 'fail') {
+    const err = new Error(`DKIM check failed for ${from}`);
+    err.smtpCode = 550;
+    throw err;
+  }
+}
+
+// Read Mailgun's pre-computed auth headers (used in webhook path where we have no raw envelope).
+function checkMailgunAuth(fields, fromEmail) {
+  const spfResult  = (fields['X-Mailgun-Spf']        || fields['x-mailgun-spf']        || 'none').toLowerCase().trim();
+  const dkimResult = (fields['X-Mailgun-Dkim-Check']  || fields['x-mailgun-dkim-check'] || 'none').toLowerCase().trim();
+  // Normalise Mailgun's 'Pass'/'Fail' to lowercase 'pass'/'fail'
+  const spf  = spfResult  === 'pass' ? 'pass' : spfResult  === 'fail' ? 'fail' : spfResult;
+  const dkim = dkimResult === 'pass' ? 'pass' : dkimResult === 'fail' ? 'fail' : dkimResult;
+
+  const summary = `SPF=${spf} DKIM=${dkim} (via Mailgun)`;
+  logEmail(`[INBOUND] ${fromEmail}`, summary);
+  console.log(`[Inbound] Auth ${summary} for ${fromEmail}`);
+
+  if (config.enforceSPF && spf === 'fail') {
+    const err = new Error(`SPF check failed for ${fromEmail}`);
+    err.smtpCode = 550;
+    throw err;
+  }
+  if (config.enforceDKIM && dkim === 'fail') {
+    const err = new Error(`DKIM check failed for ${fromEmail}`);
+    err.smtpCode = 550;
+    throw err;
+  }
+}
 
 // ============================================================
 // Auto-response / bounce detection (RFC 3834 + common conventions)
@@ -286,9 +357,12 @@ function extractReplyToken(addressValues) {
 // Main entry point called by the SMTP server
 // ============================================================
 
-async function processInboundEmail(rawEmail) {
+async function processInboundEmail(rawEmail, smtpMeta = {}) {
   let fromEmail = null;
   try {
+    // SPF / DKIM check — runs before any parsing so a rejection throws before we do any work
+    await checkEmailAuth(rawEmail, smtpMeta);
+
     const parsed = await simpleParser(rawEmail);
 
     const fromAddr = parsed.from?.value?.[0];
@@ -311,7 +385,7 @@ async function processInboundEmail(rawEmail) {
     // 2. In-Reply-To / References Message-ID lookup (legacy fallback)
     // 3. Subject tag [Ticket #N] — only trusted for existing parties
     let existingTicketId = null;
-    let subjectFallback  = false;
+    let tokenMatch       = false;
 
     const toAddrs = [
       ...(parsed.to?.value  || []),
@@ -320,6 +394,7 @@ async function processInboundEmail(rawEmail) {
     const replyToken = extractReplyToken(toAddrs);
     if (replyToken) {
       existingTicketId = db.findTicketByReplyToken(replyToken);
+      if (existingTicketId) tokenMatch = true;
     }
 
     if (!existingTicketId && parsed.inReplyTo) {
@@ -338,14 +413,14 @@ async function processInboundEmail(rawEmail) {
       const pfx = config.ticketPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const m = parsed.subject.match(new RegExp(`\\[Ticket\\s*#${pfx}(\\d+)\\]`, 'i'))
              || parsed.subject.match(new RegExp(`\\[#${pfx}(\\d+)\\]`, 'i'));
-      if (m) { existingTicketId = parseInt(m[1], 10); subjectFallback = true; }
+      if (m) { existingTicketId = parseInt(m[1], 10); }
     }
 
     const isSilent = !!(config.ticketSilentEmail &&
       toAddrs.some(a => (a.address || '').toLowerCase() === config.ticketSilentEmail.toLowerCase()));
 
     if (existingTicketId) {
-      await handleReply(existingTicketId, fromEmail, parsed, subjectFallback);
+      await handleReply(existingTicketId, fromEmail, parsed, !tokenMatch);
     } else {
       await handleNewTicket(fromEmail, parsed, { silent: isSilent });
     }
@@ -360,7 +435,7 @@ async function processInboundEmail(rawEmail) {
 // Reply to an existing ticket
 // ============================================================
 
-async function handleReply(ticketId, fromEmail, parsed, subjectFallback = false) {
+async function handleReply(ticketId, fromEmail, parsed, requireParty = false) {
   const ticket = db.getTicketById(ticketId);
   if (!ticket) {
     console.log(`[Inbound] Reply references unknown ticket #${ticketId} — creating new ticket instead`);
@@ -382,12 +457,11 @@ async function handleReply(ticketId, fromEmail, parsed, subjectFallback = false)
     return;
   }
 
-  // Subject-tag matches ([Ticket #N]) are only trusted if the sender is already
-  // a party — otherwise anyone who knows a ticket number could post to it.
-  // Reply-token and Message-ID matches are always trusted because the tokens are
-  // unguessable; the token also survives email forwarding.
-  if (subjectFallback && !db.getUserTicketRole(ticketId, user.id)) {
-    console.log(`[Inbound] Subject-tag reply from non-party ${fromEmail} to #${ticketId} — treating as new ticket`);
+  // Reply-token matches are always trusted (the token is the auth credential).
+  // Subject-tag and Message-ID matches require the sender to already be a party —
+  // Message-IDs are structured and potentially guessable; subject tags are trivially known.
+  if (requireParty && !db.getUserTicketRole(ticketId, user.id)) {
+    console.log(`[Inbound] Non-party ${fromEmail} matched ticket #${ticketId} via subject/message-id — treating as new ticket`);
     await handleNewTicket(fromEmail, parsed);
     return;
   }
@@ -679,6 +753,9 @@ async function processMailgunWebhook(fields, files) {
     return;
   }
 
+  // SPF / DKIM — read Mailgun's pre-computed results from webhook fields
+  checkMailgunAuth(fields, fromEmail);
+
   // Parse the message-headers JSON array: [[name, value], ...]
   let headers = {};
   try {
@@ -732,13 +809,14 @@ async function processMailgunWebhook(fields, files) {
 
   // Reply detection — same order as processInboundEmail
   let existingTicketId = null;
-  let subjectFallback  = false;
+  let tokenMatch       = false;
 
   // 1. Reply-token: Mailgun provides the envelope RCPT TO as `recipient`
   const recipientAddr = (fields.recipient || fields.to || '').trim();
   const replyToken = extractReplyToken([{ address: recipientAddr }]);
   if (replyToken) {
     existingTicketId = db.findTicketByReplyToken(replyToken);
+    if (existingTicketId) tokenMatch = true;
   }
 
   if (!existingTicketId && inReplyTo) {
@@ -754,7 +832,7 @@ async function processMailgunWebhook(fields, files) {
     const pfx = config.ticketPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const m = parsed.subject.match(new RegExp(`\\[Ticket\\s*#${pfx}(\\d+)\\]`, 'i'))
            || parsed.subject.match(new RegExp(`\\[#${pfx}(\\d+)\\]`, 'i'));
-    if (m) { existingTicketId = parseInt(m[1], 10); subjectFallback = true; }
+    if (m) { existingTicketId = parseInt(m[1], 10); }
   }
 
   const allAddrs = [
@@ -766,7 +844,7 @@ async function processMailgunWebhook(fields, files) {
     allAddrs.some(a => (a.address || '').toLowerCase() === config.ticketSilentEmail.toLowerCase()));
 
   if (existingTicketId) {
-    await handleReply(existingTicketId, fromEmail, parsed, subjectFallback);
+    await handleReply(existingTicketId, fromEmail, parsed, !tokenMatch);
   } else {
     await handleNewTicket(fromEmail, parsed, { silent: isSilent });
   }

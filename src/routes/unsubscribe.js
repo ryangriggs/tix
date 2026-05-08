@@ -9,8 +9,8 @@ function resolve(req) {
   const token = (req.query.t || req.body.t || '').trim();
   if (!token) return null;
   const data = parseUnsubToken(token);
-  if (!data || !data.r || !data.e) return null;
-  const ticket = db.getTicketByReplyToken(data.r);
+  if (!data || !data.tid || !data.e) return null;
+  const ticket = db.getTicketById(data.tid);
   if (!ticket) return null;
   return { ticket, email: data.e, token };
 }
