@@ -656,6 +656,18 @@
             ['link'],
             ['clean'],
           ],
+          keyboard: {
+            bindings: {
+              submitEdit: {
+                key: 'Enter',
+                ctrlKey: true,
+                handler() {
+                  const btn = document.querySelector('#comment-edit-' + id + ' .btn-primary');
+                  saveEditComment(id, btn);
+                },
+              },
+            },
+          },
         },
       });
       attachPasteHandler(_editQuills[id]);
