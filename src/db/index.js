@@ -869,7 +869,7 @@ function getComments(ticketId, currentUserId) {
     LEFT JOIN locations l ON l.id = c.location_id
     WHERE c.ticket_id = ?
       AND (c.visibility != 'draft' OR c.user_id = ?)
-    ORDER BY c.is_pinned DESC, c.created_at DESC
+    ORDER BY c.is_pinned DESC, (c.visibility = 'draft') DESC, c.created_at DESC
   `).all(ticketId, currentUserId ?? 0);
 }
 

@@ -213,7 +213,7 @@
             const canChangeVis = user && (user.role === 'admin' || (c.user_id && c.user_id === user.id)) && userVisibilityCap !== 'user' && cVis !== 'draft';
             const visLabels = { user: 'All', technician: 'Tech+', admin: 'Admin only', draft: 'Draft' };
           %>
-          <div class="comment<%= c.is_pinned ? ' comment--pinned' : '' %>" id="comment-<%= c.id %>"
+          <div class="comment<%= c.is_pinned ? ' comment--pinned' : '' %><%= cVis === 'draft' ? ' comment--draft' : '' %>" id="comment-<%= c.id %>"
                data-comment-id="<%= c.id %>" data-pinned="<%= c.is_pinned ? '1' : '0' %>" data-comment-ts="<%= c.created_at %>">
             <div class="comment-header">
               <span class="comment-author">
