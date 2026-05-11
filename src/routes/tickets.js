@@ -90,6 +90,7 @@ function userVisibilityCap(user) {
   return 'user';
 }
 function canSeeComment(comment, user) {
+  if (comment.visibility === 'draft') return comment.user_id === user.id;
   return (VISIBILITY_RANK[comment.visibility || 'user'] ?? 0) <= (VISIBILITY_RANK[userVisibilityCap(user)] ?? 0);
 }
 
@@ -122,7 +123,8 @@ function sanitize(html) {
 // Helper: save uploaded files and create attachment records
 // Renames the stored file to {ticketId}-{uuid}.{ext} for easy manual recovery.
 function saveUploadedFiles(files, ticketId, commentId) {
-  if (!files || !files.length) return;
+  if (!files || !files.length) return [];
+  const created = [];
   for (const file of files) {
     const ext = path.extname(file.filename);
     const newName = `${ticketId}-${path.basename(file.filename, ext)}${ext}`;
@@ -136,7 +138,7 @@ function saveUploadedFiles(files, ticketId, commentId) {
     } catch (err) {
       console.error('[Upload] Could not rename file:', err.message);
     }
-    db.addAttachment({
+    const att = db.addAttachment({
       ticketId,
       commentId,
       originalName: file.originalname,
@@ -144,7 +146,9 @@ function saveUploadedFiles(files, ticketId, commentId) {
       mimeType: file.mimetype,
       size: file.size,
     });
+    created.push(att);
   }
+  return created;
 }
 
 // Helper: notify all parties except the actor
@@ -513,6 +517,26 @@ router.post('/:id/attachments/inline', (req, res, next) => {
   });
 });
 
+// POST /tickets/:id/attachments/pre-upload — immediate file upload; files linked to comment on submit
+// Returns JSON { ok, files: [{ storedName, originalName, size, mimeType }] }
+router.post('/:id/attachments/pre-upload', upload, (req, res) => {
+  const ticket = db.getTicketById(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+  if (!getTicketAccess(ticket, req.user)) return res.status(403).json({ error: 'Forbidden' });
+  if (!req.files || !req.files.length) return res.status(400).json({ error: 'No files received' });
+
+  const created = saveUploadedFiles(req.files, ticket.id, null);
+  res.json({
+    ok: true,
+    files: created.map(a => ({
+      storedName:   a.stored_name,
+      originalName: a.original_name,
+      size:         a.size,
+      mimeType:     a.mime_type,
+    })),
+  });
+});
+
 // POST /tickets/bulk — bulk delete or status change (admin only)
 router.post('/bulk', (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
@@ -564,7 +588,7 @@ router.get('/:id', (req, res) => {
   const access = getTicketAccess(ticket, req.user);
   if (!access) return res.status(404).render('error', { title: '404', message: 'Ticket not found.' });
 
-  const comments = db.getComments(ticket.id).filter(c => canSeeComment(c, req.user));
+  const comments = db.getComments(ticket.id, req.user.id).filter(c => canSeeComment(c, req.user));
   const parties = db.getParties(ticket.id);
 
   const attachments = db.getAttachments(ticket.id);
@@ -644,6 +668,8 @@ router.post('/:id/comments', upload, async (req, res) => {
 
   const comment = db.addComment(ticket.id, req.user.id, body, false, billableHours, locationId, visibility);
   saveUploadedFiles(req.files, ticket.id, comment.id);
+  const preUploaded = [].concat(req.body.pre_uploaded_files || []).filter(Boolean);
+  if (preUploaded.length) db.linkAttachmentsToComment(preUploaded, comment.id, ticket.id);
 
   if (willChangeStatus) {
     const closeFields = { status: statusChange };
@@ -684,7 +710,7 @@ router.post('/:id/comments/:commentId/edit', (req, res) => {
   if (!ticket) return res.status(404).json({ error: 'Ticket not found.' });
 
   const commentId = parseInt(req.params.commentId, 10);
-  const comment = db.getComments(ticket.id).find(c => c.id === commentId);
+  const comment = db.getComments(ticket.id, req.user.id).find(c => c.id === commentId);
   if (!comment) return res.status(404).json({ error: 'Comment not found.' });
 
   const isAdmin = req.user.role === 'admin';
@@ -707,7 +733,7 @@ router.post('/:id/comments/:commentId/visibility', (req, res) => {
   if (!getTicketAccess(ticket, req.user)) return res.status(403).json({ error: 'Forbidden' });
 
   const commentId = parseInt(req.params.commentId, 10);
-  const comment = db.getComments(ticket.id).find(c => c.id === commentId);
+  const comment = db.getComments(ticket.id, req.user.id).find(c => c.id === commentId);
   if (!comment || !canSeeComment(comment, req.user)) return res.status(404).json({ error: 'Comment not found' });
 
   const isAdmin = req.user.role === 'admin';

@@ -380,7 +380,7 @@ function _buildCameraModal() {
       <div class="camera-inner">
         <div class="camera-hdr">
           <span id="camera-modal-label">Take Photo</span>
-          <button type="button" id="camera-modal-close" class="btn-icon" title="Close">×</button>
+          <button type="button" id="camera-modal-close" class="btn-icon" title="Close">\xd7</button>
         </div>
         <video id="camera-video" autoplay playsinline muted></video>
         <canvas id="camera-canvas" style="display:none"></canvas>
@@ -441,20 +441,31 @@ function _closeCameraModal() {
 }
 
 /**
- * initAttachmentUI({ stageId, inputId, btnWrapperId, prefix })
- *   stageId      — id of the <div> that will show staged file rows
- *   inputId      — id of the hidden <input type="file" name="attachments" multiple>
- *   btnWrapperId — id of the <div> where the Attach button will be injected
- *   prefix       — unique string to namespace ids within this page
+ * initAttachmentUI({ stageId, inputId, btnWrapperId, prefix, uploadUrl, csrfToken, onBusyChange })
+ *
+ * Staged mode (no uploadUrl): files accumulate in a DataTransfer and submit with the form.
+ * Immediate mode (uploadUrl set): each file uploads right away via AJAX; stored names are
+ *   posted as hidden pre_uploaded_files inputs when the form submits.
+ *
+ * onBusyChange(isBusy) — called when upload-in-flight count crosses zero (immediate mode only).
  */
-function initAttachmentUI({ stageId, inputId, btnWrapperId, prefix }) {
+function initAttachmentUI({ stageId, inputId, btnWrapperId, prefix, uploadUrl, csrfToken, onBusyChange }) {
   const stageEl = document.getElementById(stageId);
   const inputEl = document.getElementById(inputId);
   const btnWrap = document.getElementById(btnWrapperId);
   if (!stageEl || !inputEl || !btnWrap) return;
 
-  let stagedFiles = []; // array of File objects
-  let photoCount  = 0;
+  const immediateMode = !!uploadUrl;
+
+  // Staged-mode state
+  let stagedFiles = [];
+
+  // Immediate-mode state
+  let preUploaded = []; // { storedName, originalName, size, mimeType }
+  let _inFlight   = 0;
+  let _rowSeq     = 0;
+
+  let photoCount = 0;
 
   function fmtBytes(n) {
     if (n < 1024) return n + ' B';
@@ -462,13 +473,14 @@ function initAttachmentUI({ stageId, inputId, btnWrapperId, prefix }) {
     return (n / 1048576).toFixed(1) + ' MB';
   }
 
+  // ---- Staged mode ----
   function syncInput() {
     const dt = new DataTransfer();
     stagedFiles.forEach(f => dt.items.add(f));
     inputEl.files = dt.files;
   }
 
-  function render() {
+  function renderStaged() {
     stageEl.innerHTML = '';
     if (!stagedFiles.length) { stageEl.style.display = 'none'; return; }
     stageEl.style.display = '';
@@ -477,20 +489,103 @@ function initAttachmentUI({ stageId, inputId, btnWrapperId, prefix }) {
       row.className = 'attach-file-row';
       row.innerHTML = `<span class="attach-file-name">${_escHtml(f.name)}</span>`
         + `<span class="attach-file-size">${fmtBytes(f.size)}</span>`
-        + `<button type="button" class="btn-icon" title="Remove">×</button>`;
+        + `<button type="button" class="btn-icon" title="Remove">\xd7</button>`;
       row.querySelector('button').addEventListener('click', () => {
         stagedFiles.splice(idx, 1);
         syncInput();
-        render();
+        renderStaged();
       });
       stageEl.appendChild(row);
     });
   }
 
+  // ---- Immediate mode ----
+  function _setBusy(delta) {
+    _inFlight += delta;
+    if (onBusyChange) onBusyChange(_inFlight > 0);
+  }
+
+  function _syncHiddenInputs() {
+    const form = stageEl.closest('form');
+    if (!form) return;
+    form.querySelectorAll('input[name="pre_uploaded_files"]').forEach(el => el.remove());
+    preUploaded.forEach(f => {
+      const inp = document.createElement('input');
+      inp.type = 'hidden'; inp.name = 'pre_uploaded_files'; inp.value = f.storedName;
+      form.appendChild(inp);
+    });
+  }
+
+  function _addUploadRow(fileName) {
+    const rowId = `${prefix}-ur-${_rowSeq++}`;
+    stageEl.style.display = '';
+    const row = document.createElement('div');
+    row.id = rowId; row.className = 'attach-file-row attach-uploading';
+    row.innerHTML = `<span class="attach-file-name">${_escHtml(fileName)}</span>`
+      + `<span class="attach-file-size"><span class="attach-spinner"></span>Uploading…</span>`
+      + `<button type="button" class="btn-icon" title="Remove" disabled>\xd7</button>`;
+    stageEl.appendChild(row);
+    return rowId;
+  }
+
+  function _resolveRow(rowId, info) {
+    const row = document.getElementById(rowId);
+    if (!row) return;
+    row.classList.remove('attach-uploading');
+    row.querySelector('.attach-file-size').textContent = fmtBytes(info.size);
+    const btn = row.querySelector('button');
+    btn.disabled = false;
+    btn.addEventListener('click', () => {
+      preUploaded = preUploaded.filter(f => f.storedName !== info.storedName);
+      _syncHiddenInputs();
+      row.remove();
+      if (!stageEl.children.length) stageEl.style.display = 'none';
+    });
+  }
+
+  function _errorRow(rowId, msg) {
+    const row = document.getElementById(rowId);
+    if (!row) return;
+    row.classList.remove('attach-uploading');
+    row.classList.add('attach-error');
+    row.querySelector('.attach-file-size').textContent = '⚠ ' + msg;
+    const btn = row.querySelector('button');
+    btn.disabled = false;
+    btn.addEventListener('click', () => {
+      row.remove();
+      if (!stageEl.children.length) stageEl.style.display = 'none';
+    });
+  }
+
+  async function _uploadFile(file) {
+    const rowId = _addUploadRow(file.name);
+    _setBusy(+1);
+    try {
+      const fd = new FormData();
+      fd.append('attachments', file);
+      const res  = await fetch(uploadUrl, { method: 'POST', headers: { 'X-CSRF-Token': csrfToken }, body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      const info = data.files[0];
+      preUploaded.push(info);
+      _syncHiddenInputs();
+      _resolveRow(rowId, info);
+    } catch (err) {
+      _errorRow(rowId, err.message);
+    } finally {
+      _setBusy(-1);
+    }
+  }
+
+  // ---- Shared ----
   function addFiles(list) {
-    Array.from(list).forEach(f => stagedFiles.push(f));
-    syncInput();
-    render();
+    if (immediateMode) {
+      Array.from(list).forEach(f => _uploadFile(f));
+    } else {
+      Array.from(list).forEach(f => stagedFiles.push(f));
+      syncInput();
+      renderStaged();
+    }
   }
 
   function addPhoto(blob) {
@@ -516,8 +611,8 @@ function initAttachmentUI({ stageId, inputId, btnWrapperId, prefix }) {
       btn.addEventListener('click', () => picker.click());
       btnWrap.appendChild(btn);
     } else {
-      // Cameras available — Attach ▾ dropdown
-      const wrap   = document.createElement('div');
+      // Cameras available — Attach dropdown
+      const wrap = document.createElement('div');
       wrap.className = 'attach-btn-wrap';
 
       const toggle = document.createElement('button');
@@ -551,7 +646,7 @@ function initAttachmentUI({ stageId, inputId, btnWrapperId, prefix }) {
         freshCams.forEach(cam => {
           const item = document.createElement('button');
           item.type = 'button'; item.className = 'attach-menu-item';
-          item.textContent = '\uD83D\uDCF7 ' + cam.label;
+          item.textContent = '📷 ' + cam.label;
           item.addEventListener('click', () => {
             menu.classList.remove('open');
             _openCameraModal(cam.constraint, cam.label, blob => addPhoto(blob));

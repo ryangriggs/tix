@@ -856,7 +856,7 @@ function updateCommentVisibility(id, visibility) {
   prepare('UPDATE comments SET visibility = ? WHERE id = ?').run(visibility, id);
 }
 
-function getComments(ticketId) {
+function getComments(ticketId, currentUserId) {
   return prepare(`
     SELECT c.*, u.email AS user_email, u.name AS user_name,
            l.name AS location_name, l.distance_miles AS location_distance
@@ -864,8 +864,9 @@ function getComments(ticketId) {
     LEFT JOIN users u ON c.user_id = u.id
     LEFT JOIN locations l ON l.id = c.location_id
     WHERE c.ticket_id = ?
+      AND (c.visibility != 'draft' OR c.user_id = ?)
     ORDER BY c.is_pinned DESC, c.created_at DESC
-  `).all(ticketId);
+  `).all(ticketId, currentUserId ?? 0);
 }
 
 function toggleCommentPin(id) {
@@ -883,6 +884,13 @@ function addAttachment({ ticketId, commentId = null, originalName, storedName, m
     VALUES (?, ?, ?, ?, ?, ?)
   `).run(ticketId, commentId, originalName, storedName, mimeType, size);
   return prepare('SELECT * FROM attachments WHERE id = ?').get(result.lastInsertRowid);
+}
+
+function linkAttachmentsToComment(storedNames, commentId, ticketId) {
+  if (!storedNames || !storedNames.length) return;
+  const placeholders = storedNames.map(() => '?').join(',');
+  prepare(`UPDATE attachments SET comment_id = ? WHERE stored_name IN (${placeholders}) AND ticket_id = ? AND comment_id IS NULL`)
+    .run(commentId, ...storedNames, ticketId);
 }
 
 function getAttachments(ticketId) {
@@ -1233,7 +1241,7 @@ module.exports = {
   // Comments
   addComment, getComments, deleteComment, updateComment, updateCommentVisibility, toggleCommentPin,
   // Attachments
-  addAttachment, getAttachments, getAttachmentsByComment, getAttachmentByStoredName, deleteAttachment, renameAttachment,
+  addAttachment, linkAttachmentsToComment, getAttachments, getAttachmentsByComment, getAttachmentByStoredName, deleteAttachment, renameAttachment,
   // Email threading
   recordEmailMessage, findTicketByMessageId, findTicketByReplyToken,
   // Settings
