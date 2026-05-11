@@ -1763,7 +1763,8 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   border-bottom: 1px solid var(--border);
 }
 .comment--pinned { border-left: 3px solid #3b82f6; padding-left: .6rem; }
-.comment--draft  { background: #fefce8; border-left: 3px solid #eab308; padding-left: .6rem; }
+.comment--draft        { background: #fefce8; border-left: 3px solid #eab308; padding-left: .6rem; cursor: pointer; }
+.comment--draft:hover  { background: #fef9c3; }
 .btn-pin         { color: var(--text-muted); }
 .btn-pin.pinned  { color: #3b82f6; }
 
