@@ -847,6 +847,7 @@
   let _draftLastSavedLen = 0;
   let _draftTimer = null;
   let _draftSaving = false;
+  let _suppressDraftSave = false;
 
   function _setDraftStatus(msg, fade) {
     const el = document.getElementById('draft-status');
@@ -887,6 +888,7 @@
   }
 
   function scheduleDraftSave() {
+    if (_suppressDraftSave) return;
     clearTimeout(_draftTimer);
     const len = quill.getText().trim().length;
     if (!len) return;
@@ -904,12 +906,14 @@
     if (quill.getText().trim() && _draftCommentId !== id) {
       if (!confirm('Replace the current reply with this draft?')) return;
     }
-    quill.clipboard.dangerouslyPasteHTML(bodyEl.innerHTML);
     _draftCommentId = id;
     document.getElementById('draft-id-input').value = id;
-    document.getElementById('comment-' + id).style.display = 'none';
+    _suppressDraftSave = true;
+    quill.clipboard.dangerouslyPasteHTML(bodyEl.innerHTML);
+    _suppressDraftSave = false;
     _draftLastSavedLen = quill.getText().trim().length;
     _quillDirty = true;
+    document.getElementById('comment-' + id).style.display = 'none';
     document.querySelector('.comment-form-section')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     quill.focus();
   }
