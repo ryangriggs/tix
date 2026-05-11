@@ -675,11 +675,12 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 /* +/− toggle button inside status filter pills */
 .filter-tab-solo {
   display: inline-flex; align-items: center; justify-content: center;
-  margin-left: .35rem; padding: 0 .3rem;
+  margin-left: .35rem; padding: 0 .5rem;
+  margin-top: -.35rem; margin-bottom: -.35rem;
   border-left: 1px solid currentColor; opacity: .5;
-  font-size: .75rem; font-weight: 700; line-height: 1; cursor: pointer;
+  font-size: .85rem; font-weight: 700; line-height: 1; cursor: pointer;
   background: none; border-top: none; border-right: none; border-bottom: none;
-  color: inherit; font-family: inherit; vertical-align: middle;
+  color: inherit; font-family: inherit; align-self: stretch;
 }
 .filter-tab-solo:hover { opacity: 1; }
 .filter-tab-solo--remove { opacity: .7; }

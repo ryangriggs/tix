@@ -56,7 +56,7 @@
                   onclick="soloFilter('status','<%= s %>')" title="Show only: <%= statusNames[s] %>"><%= statusNames[s] %><span
                     class="filter-tab-solo<%= _sActive ? ' filter-tab-solo--remove' : '' %>"
                     title="<%= _sActive ? 'Remove from filter' : 'Add to filter' %>"
-                    onclick="event.stopPropagation();toggleFilter('status','<%= s %>')" ><%= _sActive ? '&#8722;' : '&#43;' %></span></button>
+                    onclick="event.stopPropagation();toggleFilter('status','<%= s %>')" ><%= _sActive ? '−' : '+' %></span></button>
         <% } %>
       </div>
 
