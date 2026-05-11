@@ -672,16 +672,17 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 .filter-tab-s-on_hold.active { background: #ffedd5; border-color: #f97316; color: #9a3412; }
 .filter-tab-s-closed.active  { background: #d1d5db; border-color: #9ca3af; color: #111827; }
 
-/* Solo button inside status filter pills */
+/* +/− toggle button inside status filter pills */
 .filter-tab-solo {
   display: inline-flex; align-items: center; justify-content: center;
   margin-left: .35rem; padding: 0 .3rem;
-  border-left: 1px solid currentColor; opacity: .45;
-  font-size: .65rem; line-height: 1; cursor: pointer;
+  border-left: 1px solid currentColor; opacity: .5;
+  font-size: .75rem; font-weight: 700; line-height: 1; cursor: pointer;
   background: none; border-top: none; border-right: none; border-bottom: none;
   color: inherit; font-family: inherit; vertical-align: middle;
 }
 .filter-tab-solo:hover { opacity: 1; }
+.filter-tab-solo--remove { opacity: .7; }
 
 /* Per-priority active states — indicator (dot) colors */
 .filter-tab-p-urgent.active { background: #ede9fe; border-color: #6d28d9; color: #4c1d95; }

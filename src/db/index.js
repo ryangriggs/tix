@@ -856,6 +856,10 @@ function updateCommentVisibility(id, visibility) {
   prepare('UPDATE comments SET visibility = ? WHERE id = ?').run(visibility, id);
 }
 
+function getDraftComment(id, ticketId, userId) {
+  return prepare(`SELECT * FROM comments WHERE id = ? AND ticket_id = ? AND user_id = ? AND visibility = 'draft'`).get(id, ticketId, userId);
+}
+
 function getComments(ticketId, currentUserId) {
   return prepare(`
     SELECT c.*, u.email AS user_email, u.name AS user_name,
@@ -1239,7 +1243,7 @@ module.exports = {
   // Parties
   addParty, removeParty, getParties, getUserTicketRole, getPartyUserIds,
   // Comments
-  addComment, getComments, deleteComment, updateComment, updateCommentVisibility, toggleCommentPin,
+  addComment, getComments, deleteComment, updateComment, updateCommentVisibility, getDraftComment, toggleCommentPin,
   // Attachments
   addAttachment, linkAttachmentsToComment, getAttachments, getAttachmentsByComment, getAttachmentByStoredName, deleteAttachment, renameAttachment,
   // Email threading

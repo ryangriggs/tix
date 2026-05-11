@@ -112,6 +112,7 @@
             <% } %>
           </div>
           <% } %>
+          <p id="draft-status" class="form-hint" style="margin:.25rem 0 0;min-height:1.2em;transition:opacity .5s"></p>
           <div class="form-actions" style="flex-wrap:wrap;gap:.5rem">
             <% if (canManage) { %>
               <select name="status_change" class="form-select form-select-sm" style="width:auto">
@@ -126,6 +127,7 @@
               </select>
             <% } %>
             <input type="hidden" name="visibility" id="post-visibility" value="user">
+            <input type="hidden" name="draft_id" id="draft-id-input" value="">
             <label style="display:flex;align-items:center;gap:.3rem;font-size:.875rem;cursor:pointer;white-space:nowrap">
               <input type="checkbox" name="notify" value="1" checked id="comment-notify"> Notify
             </label>
@@ -622,6 +624,7 @@
     document.getElementById('comment-required-err')?.remove();
 
     document.getElementById('comment-body').value = quill.root.innerHTML;
+    clearTimeout(_draftTimer);
     _quillDirty = false;
   });
 
@@ -835,11 +838,68 @@
   let _quillDirty = false;
   quill.on('text-change', () => {
     _quillDirty = quill.getText().trim().length > 0;
+    scheduleDraftSave();
   });
+
+  // ---- Draft autosave ----
+  let _draftCommentId = 0;
+  let _draftLastSavedLen = 0;
+  let _draftTimer = null;
+  let _draftSaving = false;
+
+  function _setDraftStatus(msg, fade) {
+    const el = document.getElementById('draft-status');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.opacity = '1';
+    clearTimeout(el._ft);
+    if (fade) el._ft = setTimeout(() => { el.style.opacity = '0'; }, 3000);
+  }
+
+  async function saveDraft() {
+    if (_draftSaving) return;
+    const text = quill.getText().trim();
+    if (!text) return;
+    _draftSaving = true;
+    _setDraftStatus('Saving draft…', false);
+    try {
+      const res = await fetch('/tickets/<%= ticket.id %>/comments/draft', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': '<%= csrfToken %>', 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ body: quill.root.innerHTML, draft_id: _draftCommentId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        _draftCommentId = data.draft_id;
+        document.getElementById('draft-id-input').value = _draftCommentId;
+        _draftLastSavedLen = quill.getText().trim().length;
+        _setDraftStatus('Draft saved', true);
+      } else {
+        _setDraftStatus('Draft save failed', true);
+      }
+    } catch {
+      _setDraftStatus('Draft save failed', true);
+    } finally {
+      _draftSaving = false;
+    }
+  }
+
+  function scheduleDraftSave() {
+    clearTimeout(_draftTimer);
+    const len = quill.getText().trim().length;
+    if (!len) return;
+    const charsSinceLastSave = Math.abs(len - _draftLastSavedLen);
+    if (charsSinceLastSave >= 5) {
+      saveDraft();
+    } else {
+      _draftTimer = setTimeout(saveDraft, 5000);
+    }
+  }
 
   // Warn before leaving the page if there are unsaved changes
   function _hasUnsavedChanges() {
-    if (_quillDirty) return true;
+    if (_quillDirty && !_draftCommentId) return true;
     const subj = document.getElementById('subject-input');
     if (subj && subj.dataset.dirty === 'true') return true;
     return false;

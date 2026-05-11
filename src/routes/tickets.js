@@ -671,6 +671,13 @@ router.post('/:id/comments', upload, async (req, res) => {
   const preUploaded = [].concat(req.body.pre_uploaded_files || []).filter(Boolean);
   if (preUploaded.length) db.linkAttachmentsToComment(preUploaded, comment.id, ticket.id);
 
+  // Delete draft if one was autosaved before this publish
+  const publishedDraftId = parseInt(req.body.draft_id, 10) || 0;
+  if (publishedDraftId) {
+    const draft = db.getDraftComment(publishedDraftId, ticket.id, req.user.id);
+    if (draft) db.deleteComment(publishedDraftId);
+  }
+
   if (willChangeStatus) {
     const closeFields = { status: statusChange };
     if (statusChange === 'closed') closeFields.close_date = Math.floor(Date.now() / 1000);
@@ -702,6 +709,30 @@ router.post('/:id/comments', upload, async (req, res) => {
   }
 
   res.redirect(`/tickets/${ticket.id}#comment-${comment.id}`);
+});
+
+// POST /tickets/:id/comments/draft — create or update autosaved draft
+router.post('/:id/comments/draft', (req, res) => {
+  const ticket = db.getTicketById(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Not found' });
+  if (!getTicketAccess(ticket, req.user)) return res.status(403).json({ error: 'Forbidden' });
+
+  const body = sanitize(req.body.body || '');
+  const draftId = parseInt(req.body.draft_id, 10) || 0;
+
+  let draftComment;
+  if (draftId) {
+    const existing = db.getDraftComment(draftId, ticket.id, req.user.id);
+    if (existing) {
+      db.updateComment(draftId, body);
+      draftComment = { id: draftId };
+    }
+  }
+  if (!draftComment) {
+    draftComment = db.addComment(ticket.id, req.user.id, body, false, null, null, 'draft');
+  }
+
+  res.json({ ok: true, draft_id: draftComment.id });
 });
 
 // POST /tickets/:id/comments/:commentId/edit — admin or comment owner
