@@ -920,13 +920,23 @@
 
   // Warn before leaving the page if there are unsaved changes
   function _hasUnsavedChanges() {
-    if (_quillDirty && !_draftCommentId) return true;
     const subj = document.getElementById('subject-input');
     if (subj && subj.dataset.dirty === 'true') return true;
     return false;
   }
 
+  function _beaconSaveDraft() {
+    if (!_quillDirty || !quill.getText().trim()) return;
+    const params = new URLSearchParams({
+      _csrf:    '<%= csrfToken %>',
+      body:     quill.root.innerHTML,
+      draft_id: _draftCommentId,
+    });
+    navigator.sendBeacon('/tickets/<%= ticket.id %>/comments/draft', params);
+  }
+
   window.addEventListener('beforeunload', e => {
+    _beaconSaveDraft();
     if (_hasUnsavedChanges()) {
       e.preventDefault();
       e.returnValue = '';
