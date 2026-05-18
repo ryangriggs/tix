@@ -83,10 +83,15 @@
       <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:.6rem">
         Override the global list for tickets belonging to this organization. Leave empty to use the global default.
       </p>
-      <select id="org-urgent-select" multiple
-              style="width:100%;height:9rem;font-size:.85rem;border:1px solid var(--border);border-radius:var(--radius);padding:.25rem"></select>
+      <div id="org-urgent-wrap"
+           style="display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;padding:.4rem .5rem;border:1px solid var(--border);border-radius:var(--radius);min-height:2.5rem;background:var(--surface);cursor:text"
+           onclick="document.getElementById('org-urgent-input').focus()">
+        <input type="text" id="org-urgent-input" autocomplete="off"
+               placeholder="Search users to add…"
+               style="border:none;outline:none;background:none;flex:1;min-width:120px;font-size:.85rem;padding:.1rem 0;color:var(--text)">
+      </div>
       <div style="display:flex;gap:.5rem;margin-top:.6rem;align-items:center">
-        <button class="btn btn-secondary btn-sm" onclick="saveOrgUrgentNotify()">Save urgent notify list</button>
+        <button class="btn btn-secondary btn-sm" onclick="saveOrgUrgentNotify()">Save</button>
         <span id="org-urgent-status" style="font-size:.8rem;color:var(--text-muted)"></span>
       </div>
     </div>
@@ -118,25 +123,65 @@ async function loadLocations() {
   renderUrgentSelect(data.org.urgent_notify_user_ids || '');
 }
 
+// ---- Org urgent-notify pill selector ----
+const _orgUrgentSelected = new Set();
+
 function renderUrgentSelect(currentIds) {
-  const sel = document.getElementById('org-urgent-select');
-  const selected = new Set(String(currentIds).split(',').map(Number).filter(Boolean));
-  sel.innerHTML = _allUsers.map(u =>
-    `<option value="${u.id}"${selected.has(u.id) ? ' selected' : ''}>${escHtml(u.label)}</option>`
-  ).join('');
+  const wrap  = document.getElementById('org-urgent-wrap');
+  const input = document.getElementById('org-urgent-input');
+  if (!wrap || !input) return;
+  // Remove all existing pills (leave the input in place)
+  wrap.querySelectorAll('[data-urgent-user-id]').forEach(el => el.remove());
+  _orgUrgentSelected.clear();
+  const ids = String(currentIds || '').split(',').map(Number).filter(Boolean);
+  ids.forEach(id => {
+    const u = _allUsers.find(u => u.id === id);
+    if (u) _addOrgUrgentPill(id, u.label);
+  });
+}
+
+function _addOrgUrgentPill(id, label) {
+  id = Number(id);
+  if (_orgUrgentSelected.has(id)) return;
+  _orgUrgentSelected.add(id);
+  const wrap  = document.getElementById('org-urgent-wrap');
+  const input = document.getElementById('org-urgent-input');
+  const pill  = document.createElement('span');
+  pill.dataset.urgentUserId = id;
+  pill.style.cssText = 'display:inline-flex;align-items:center;gap:.2rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;padding:.15rem .5rem .15rem .65rem;font-size:.8rem;white-space:nowrap';
+  pill.innerHTML = `<span>${escHtml(label)}</span><button type="button" title="Remove" style="background:none;border:none;cursor:pointer;font-size:1.1rem;line-height:1;color:#64748b;padding:0 .15rem">×</button>`;
+  pill.querySelector('button').addEventListener('click', () => {
+    _orgUrgentSelected.delete(id);
+    pill.remove();
+  });
+  wrap.insertBefore(pill, input);
 }
 
 async function saveOrgUrgentNotify() {
-  const sel = document.getElementById('org-urgent-select');
-  const ids = Array.from(sel.selectedOptions).map(o => o.value);
   const statusEl = document.getElementById('org-urgent-status');
   statusEl.textContent = 'Saving…';
   const body = new URLSearchParams({ _csrf: _csrfToken });
-  ids.forEach(id => body.append('urgent_notify_user_ids', id));
+  _orgUrgentSelected.forEach(id => body.append('urgent_notify_user_ids', id));
   const res  = await fetch('/admin/organizations/' + _orgDialogId + '/urgent-notify', { method: 'POST', body });
   const data = await res.json();
   statusEl.textContent = data.ok ? 'Saved.' : (data.error || 'Error');
   setTimeout(() => { statusEl.textContent = ''; }, 2500);
+}
+
+// Init autocomplete for the org urgent-notify input (runs once on page load)
+if (typeof createAutocomplete === 'function') {
+  createAutocomplete(document.getElementById('org-urgent-input'), {
+    fetchUrl: q => `/api/users/search?q=${encodeURIComponent(q)}`,
+    formatItem: item => {
+      const name = item.name ? `<strong>${escHtml(item.name)}</strong> ` : '';
+      const org  = item.org  ? ` <em style="color:#6b7280">[${escHtml(item.org)}]</em>` : '';
+      return `${name}(${escHtml(item.email)})${org}`;
+    },
+    onSelect: item => {
+      _addOrgUrgentPill(item.id, item.name ? `${item.name} (${item.email})` : item.email);
+      document.getElementById('org-urgent-input').value = '';
+    },
+  });
 }
 
 function renderLocations(locs) {
