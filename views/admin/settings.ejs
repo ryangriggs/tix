@@ -829,7 +829,7 @@ async function checkNow() {
 </script>
 
 <script>
-(function () {
+document.addEventListener('DOMContentLoaded', function () {
   if (typeof createAutocomplete !== 'function') return;
 
   const wrap    = document.getElementById('urgent-notify-wrap');
@@ -885,7 +885,7 @@ async function checkNow() {
       input.value = '';
     },
   });
-}());
+});
 </script>
 
 <%- include('../partials/foot') %>

@@ -168,8 +168,9 @@ async function saveOrgUrgentNotify() {
   setTimeout(() => { statusEl.textContent = ''; }, 2500);
 }
 
-// Init autocomplete for the org urgent-notify input (runs once on page load)
-if (typeof createAutocomplete === 'function') {
+// Init autocomplete for the org urgent-notify input (runs once after tix.js loads)
+document.addEventListener('DOMContentLoaded', function () {
+  if (typeof createAutocomplete !== 'function') return;
   createAutocomplete(document.getElementById('org-urgent-input'), {
     fetchUrl: q => `/api/users/search?q=${encodeURIComponent(q)}`,
     formatItem: item => {
@@ -182,7 +183,7 @@ if (typeof createAutocomplete === 'function') {
       document.getElementById('org-urgent-input').value = '';
     },
   });
-}
+});
 
 function renderLocations(locs) {
   const el = document.getElementById('org-locations-list');
