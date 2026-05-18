@@ -219,6 +219,7 @@ router.get('/organizations', (req, res) => {
   res.render('admin/organizations', {
     title: 'Organizations',
     organizations,
+    allUsers: db.getAllUsers(),
     message: req.query.message || null,
   });
 });
@@ -229,6 +230,16 @@ router.get('/organizations/:id/json', (req, res) => {
   const org = db.getOrganizationById(id);
   if (!org) return res.status(404).json({ error: 'Not found' });
   res.json({ org, locations: db.getLocationsByOrg(id) });
+});
+
+// POST /admin/organizations/:id/urgent-notify — set per-org urgent notify user list
+router.post('/organizations/:id/urgent-notify', (req, res) => {
+  const id  = parseInt(req.params.id, 10);
+  const ids = [].concat(req.body.urgent_notify_user_ids || [])
+    .map(i => parseInt(i, 10)).filter(i => i > 0).join(',');
+  db.setOrgUrgentNotifyUserIds(id, ids || null);
+  audit.log(req, `updated urgent notify list for organization ${id}`);
+  res.json({ ok: true });
 });
 
 // POST /admin/organizations/:id/rename
@@ -399,6 +410,7 @@ router.get('/settings', async (req, res) => {
   res.render('admin/settings', {
     title:   'Settings',
     s,
+    allUsers: db.getAllUsers(),
     infra: {
       PORT:       config.port,
       SMTP_PORT:  config.smtpPort,
@@ -514,6 +526,8 @@ router.post('/settings', (req, res) => {
     inactivity_hours_high:          String(Math.max(0, flt('inactivity_hours_high',   0))),
     inactivity_hours_medium:        String(Math.max(0, flt('inactivity_hours_medium', 0))),
     inactivity_hours_low:           String(Math.max(0, flt('inactivity_hours_low',    0))),
+    urgent_notify_user_ids:         [].concat(req.body.urgent_notify_user_ids || [])
+                                      .map(id => parseInt(id, 10)).filter(id => id > 0).join(','),
   };
 
   for (const [key, val] of Object.entries(updates)) {

@@ -76,12 +76,27 @@
       </div>
       <p id="loc-add-error" class="form-hint" style="color:var(--danger);display:none"></p>
     </div>
+
+    <!-- Urgent ticket notifications -->
+    <div style="margin-top:1.5rem;border-top:1px solid var(--border);padding-top:1.25rem">
+      <h3 style="font-size:.85rem;font-weight:600;margin-bottom:.35rem">Urgent Ticket Notifications</h3>
+      <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:.6rem">
+        Override the global list for tickets belonging to this organization. Leave empty to use the global default.
+      </p>
+      <select id="org-urgent-select" multiple
+              style="width:100%;height:9rem;font-size:.85rem;border:1px solid var(--border);border-radius:var(--radius);padding:.25rem"></select>
+      <div style="display:flex;gap:.5rem;margin-top:.6rem;align-items:center">
+        <button class="btn btn-secondary btn-sm" onclick="saveOrgUrgentNotify()">Save urgent notify list</button>
+        <span id="org-urgent-status" style="font-size:.8rem;color:var(--text-muted)"></span>
+      </div>
+    </div>
   </div>
 </dialog>
 
 <script>
 let _orgDialogId  = null;
 let _csrfToken    = '<%= csrfToken %>';
+const _allUsers   = <%- JSON.stringify(allUsers.map(u => ({ id: u.id, label: u.name ? `${u.name} (${u.email})` : u.email }))) %>;
 
 function openOrgDialog(orgId, orgName) {
   _orgDialogId = orgId;
@@ -89,6 +104,7 @@ function openOrgDialog(orgId, orgName) {
   document.getElementById('org-name-input').value = orgName;
   document.getElementById('org-name-error').style.display = 'none';
   document.getElementById('loc-add-error').style.display  = 'none';
+  document.getElementById('org-urgent-status').textContent = '';
   document.getElementById('new-loc-name').value = '';
   document.getElementById('new-loc-dist').value = '';
   loadLocations();
@@ -99,6 +115,28 @@ async function loadLocations() {
   const res  = await fetch('/admin/organizations/' + _orgDialogId + '/json');
   const data = await res.json();
   renderLocations(data.locations);
+  renderUrgentSelect(data.org.urgent_notify_user_ids || '');
+}
+
+function renderUrgentSelect(currentIds) {
+  const sel = document.getElementById('org-urgent-select');
+  const selected = new Set(String(currentIds).split(',').map(Number).filter(Boolean));
+  sel.innerHTML = _allUsers.map(u =>
+    `<option value="${u.id}"${selected.has(u.id) ? ' selected' : ''}>${escHtml(u.label)}</option>`
+  ).join('');
+}
+
+async function saveOrgUrgentNotify() {
+  const sel = document.getElementById('org-urgent-select');
+  const ids = Array.from(sel.selectedOptions).map(o => o.value);
+  const statusEl = document.getElementById('org-urgent-status');
+  statusEl.textContent = 'Saving…';
+  const body = new URLSearchParams({ _csrf: _csrfToken });
+  ids.forEach(id => body.append('urgent_notify_user_ids', id));
+  const res  = await fetch('/admin/organizations/' + _orgDialogId + '/urgent-notify', { method: 'POST', body });
+  const data = await res.json();
+  statusEl.textContent = data.ok ? 'Saved.' : (data.error || 'Error');
+  setTimeout(() => { statusEl.textContent = ''; }, 2500);
 }
 
 function renderLocations(locs) {

@@ -283,6 +283,7 @@ async function initDb() {
   try { _db.exec('ALTER TABLE tickets ADD COLUMN schedule_exact_at     INTEGER'); } catch (_) {}
   try { _db.exec('ALTER TABLE comments ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   try { _db.exec('ALTER TABLE users ADD COLUMN can_add_participants INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
+  try { _db.exec('ALTER TABLE organizations ADD COLUMN urgent_notify_user_ids TEXT'); } catch (_) {}
   _db.exec('CREATE INDEX IF NOT EXISTS idx_comments_location ON comments(location_id)');
   // Back-fill close_date for tickets closed before this column existed
   _db.exec(`UPDATE tickets SET close_date = updated_at WHERE status = 'closed' AND close_date IS NULL`);
@@ -1025,6 +1026,26 @@ function getOrganizationById(id) {
   return prepare('SELECT * FROM organizations WHERE id = ?').get(id);
 }
 
+function setOrgUrgentNotifyUserIds(orgId, ids) {
+  prepare('UPDATE organizations SET urgent_notify_user_ids = ? WHERE id = ?').run(ids || null, orgId);
+}
+
+// Resolve the correct urgent-notify email list for a ticket's org.
+// Uses org-specific list when set, falls back to global setting.
+function getUrgentNotifyEmails(orgId) {
+  let ids = null;
+  if (orgId) {
+    const org = getOrganizationById(orgId);
+    if (org && org.urgent_notify_user_ids) ids = org.urgent_notify_user_ids;
+  }
+  if (!ids) ids = getSetting('urgent_notify_user_ids') || '';
+  return ids.split(',')
+    .map(s => parseInt(s.trim(), 10))
+    .filter(id => id > 0)
+    .map(id => getUserById(id)?.email)
+    .filter(Boolean);
+}
+
 // ============================================================
 // Locations
 // ============================================================
@@ -1261,6 +1282,7 @@ module.exports = {
   // Organizations
   findOrCreateOrganization, getAllOrganizations, getOrganizationsByIds, searchOrganizations,
   renameOrganization, deleteOrganization, getOrganizationById,
+  setOrgUrgentNotifyUserIds, getUrgentNotifyEmails,
   // Locations
   getLocationsByOrg, getLocationById, createLocation, findOrCreateLocation,
   updateLocation, isLocationReferenced, deleteLocation, getTravelReport,

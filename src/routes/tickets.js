@@ -151,6 +151,24 @@ function saveUploadedFiles(files, ticketId, commentId) {
   return created;
 }
 
+// Helper: email urgent-notify recipients when a ticket becomes urgent
+async function notifyUrgent(ticket, actorEmail) {
+  const emails = db.getUrgentNotifyEmails(ticket.organization_id || null);
+  const filtered = db.filterNotificationRecipients(emails.filter(e => e !== actorEmail));
+  if (!filtered.length) return;
+  const ticketUrl = `${config.appUrl}/tickets/${ticket.id}`;
+  await sendTicketNotification({
+    to: filtered,
+    ticketSubject: ticket.subject,
+    body: `<p>A ticket has been marked <strong>Urgent</strong>:</p>
+           <p><strong>#${config.ticketPrefix}${ticket.id} &mdash; ${ticket.subject}</strong></p>
+           <p>Submitted by: <strong>${actorEmail}</strong></p>
+           <p><a href="${ticketUrl}">View ticket</a></p>`,
+    ticketId: ticket.id,
+    replyToken: ticket.reply_token,
+  });
+}
+
 // Helper: notify all parties except the actor
 async function notifyParties(ticket, actorEmail, messageBody, commentId, inReplyTo, visibility = 'user') {
   const parties = db.getParties(ticket.id);
@@ -354,6 +372,8 @@ router.post('/', upload, async (req, res) => {
 
   const ticket = db.createTicket({ subject: subject.trim(), body: cleanBody, priority: priority || 'medium', dueDate, organizationId: orgId });
   db.addParty(ticket.id, req.user.id, 'submitter');
+  if (ticket.priority === 'urgent')
+    notifyUrgent(ticket, req.user.email).catch(err => console.error('[Tickets] Urgent notify error:', err));
 
   // Add collaborators specified at creation time — collect emails for notification
   const notifyCollabEmails = [];
@@ -895,6 +915,8 @@ router.post('/:id/priority', async (req, res) => {
 
   db.updateTicket(ticket.id, { priority });
   audit.log(req, `changed priority to ${priority}`, ticket.id);
+  if (priority === 'urgent' && ticket.priority !== 'urgent')
+    notifyUrgent(ticket, req.user.email).catch(err => console.error('[Tickets] Urgent notify error:', err));
 
   if (req.accepts('json')) return res.json({ ok: true, priority });
   res.redirect(`/tickets/${ticket.id}`);

@@ -14,6 +14,7 @@
   <a href="#s-uploads"        class="settings-sidenav-link">Uploads &amp; Rate Limits</a>
   <a href="#s-features"       class="settings-sidenav-link">Features</a>
   <a href="#s-updates"        class="settings-sidenav-link">Updates</a>
+  <a href="#s-urgent-notify"  class="settings-sidenav-link">Urgent Notifications</a>
   <a href="#s-inactivity"     class="settings-sidenav-link">Inactivity Reminders</a>
   <a href="#s-backups"        class="settings-sidenav-link">Backups</a>
   <a href="#s-update-status"  class="settings-sidenav-link">Update Status</a>
@@ -431,6 +432,31 @@
       </p>
     </div>
 
+    <!-- ── Urgent Ticket Notifications ─────────────────────── -->
+    <div class="card" id="s-urgent-notify" style="margin-bottom:1.5rem">
+      <h2 class="settings-section-title">Urgent Ticket Notifications</h2>
+      <p class="form-hint" style="margin-bottom:1rem">
+        These users are emailed immediately when any ticket is created as Urgent or has its priority changed to Urgent.
+        Per-organization overrides can be set on the <a href="/admin/organizations">Organizations</a> page.
+      </p>
+      <div class="form-group">
+        <label for="urgent_notify_user_ids">Notify these users (global default)</label>
+        <%
+          const _urgentIds = (s.urgent_notify_user_ids || '').split(',')
+            .map(Number).filter(Boolean);
+        %>
+        <select id="urgent_notify_user_ids" name="urgent_notify_user_ids"
+                multiple class="form-input" size="6" style="height:auto">
+          <% for (const u of allUsers) { %>
+            <option value="<%= u.id %>" <%= _urgentIds.includes(u.id) ? 'selected' : '' %>>
+              <%= u.name ? `${u.name} (${u.email})` : u.email %>
+            </option>
+          <% } %>
+        </select>
+        <p class="form-hint">Hold Ctrl / Cmd to select multiple. Leave empty to disable global urgent notifications.</p>
+      </div>
+    </div>
+
     <!-- ── Inactivity Reminders ─────────────────────────────── -->
     <div class="card" id="s-inactivity" style="margin-bottom:1.5rem">
       <h2 class="settings-section-title">Inactivity Reminders</h2>
@@ -697,7 +723,7 @@
 
   const sectionIds = [
     's-general','s-security','s-due-reminders','s-email','s-uploads','s-features',
-    's-updates','s-inactivity','s-backups','s-update-status','s-backup-status',
+    's-updates','s-urgent-notify','s-inactivity','s-backups','s-update-status','s-backup-status',
     's-infrastructure','s-server-stats','s-browser-cache',
   ];
 
