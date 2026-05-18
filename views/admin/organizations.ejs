@@ -96,7 +96,7 @@
 <script>
 let _orgDialogId  = null;
 let _csrfToken    = '<%= csrfToken %>';
-const _allUsers   = <%- JSON.stringify(allUsers.map(u => ({ id: u.id, label: u.name ? `${u.name} (${u.email})` : u.email }))) %>;
+const _allUsers   = <%- JSON.stringify(allUsers.map(u => ({ id: u.id, label: u.name ? `${u.name} (${u.email})` : u.email }))).replace(/</g, '\\u003C') %>;
 
 function openOrgDialog(orgId, orgName) {
   _orgDialogId = orgId;
