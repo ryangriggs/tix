@@ -154,7 +154,7 @@ function saveUploadedFiles(files, ticketId, commentId) {
 // Helper: email urgent-notify recipients when a ticket becomes urgent
 async function notifyUrgent(ticket, actorEmail) {
   const emails = db.getUrgentNotifyEmails(ticket.organization_id || null);
-  const filtered = db.filterNotificationRecipients(emails.filter(e => e !== actorEmail));
+  const filtered = db.filterNotificationRecipients(emails);
   if (!filtered.length) return;
   const ticketUrl = `${config.appUrl}/tickets/${ticket.id}`;
   await sendTicketNotification({
