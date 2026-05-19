@@ -276,14 +276,22 @@ router.get('/', (req, res) => {
 
   // Owner filter — admin and technician only
   const canFilterOwner = req.user.role === 'admin' || req.user.role === 'technician';
-  let ownerFilter = null;
+  let ownerFilters = [];
   if (canFilterOwner) {
-    const ov = savedPrefs.owner;
-    if (ov === 'me')          ownerFilter = 'me';
-    else if (ov === 'unassigned' && req.user.role === 'admin') ownerFilter = 'unassigned';
-    else if (/^\d+$/.test(ov)) ownerFilter = parseInt(ov, 10);
-    // empty string ('') = no filter (show all)
+    ownerFilters = (savedPrefs.owner || '').split(',').map(s => s.trim()).filter(Boolean).map(s => {
+      if (s === 'me') return 'me';
+      if (s === 'unassigned' && req.user.role === 'admin') return 'unassigned';
+      if (/^\d+$/.test(s)) return parseInt(s, 10);
+      return null;
+    }).filter(v => v !== null);
   }
+
+  // Org filter — parse comma-separated; 'unassigned' maps to -1
+  const orgFilters = (savedPrefs.org || '').split(',').map(s => s.trim()).filter(Boolean).map(s => {
+    if (s === 'unassigned') return -1;
+    const n = parseInt(s, 10);
+    return (!isNaN(n) && n > 0) ? n : null;
+  }).filter(v => v !== null);
 
   const { rows: tickets, total: ticketTotal } = db.getTickets({
     userId:          req.user.id,
@@ -299,8 +307,8 @@ router.get('/', (req, res) => {
     idSearch,
     dateFrom,
     dateTo,
-    orgFilter:       org === 'unassigned' ? -1 : (org ? parseInt(org, 10) : null),
-    ownerFilter,
+    orgFilters,
+    ownerFilters,
     limit:           perPage > 0 ? perPage : 0,
     offset:          perPage > 0 ? (currentPage - 1) * perPage : 0,
   });

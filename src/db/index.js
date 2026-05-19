@@ -635,8 +635,8 @@ function ticketAccessCondition({ userId, userRole, userOrgId, userIsSuperuser, u
 
 function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgIds = [],
                       status, priority, sort = 'updated_at', order = 'desc', search = '',
-                      dateFrom = null, dateTo = null, orgFilter = null, idSearch = null,
-                      ownerFilter = null, limit = 0, offset = 0 }) {
+                      dateFrom = null, dateTo = null, orgFilters = [], idSearch = null,
+                      ownerFilters = [], limit = 0, offset = 0 }) {
   const validSorts = {
     created_at:    't.created_at',
     updated_at:    't.updated_at',
@@ -675,8 +675,14 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
     params.push(userId);
   }
 
-  if (orgFilter === -1) { conditions.push('t.organization_id IS NULL'); }
-  else if (orgFilter)  { conditions.push('t.organization_id = ?'); params.push(orgFilter); }
+  if (orgFilters && orgFilters.length) {
+    const orClauses = [];
+    for (const f of orgFilters) {
+      if (f === -1) { orClauses.push('t.organization_id IS NULL'); }
+      else          { orClauses.push('t.organization_id = ?'); params.push(f); }
+    }
+    conditions.push(`(${orClauses.join(' OR ')})`);
+  }
   if (status && status.length) {
     const ph = status.map(() => '?').join(',');
     conditions.push(`t.status IN (${ph})`);
@@ -690,14 +696,20 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
   if (dateFrom)  { conditions.push('t.updated_at >= ?');     params.push(dateFrom); }
   if (dateTo)    { conditions.push('t.updated_at <= ?');     params.push(dateTo); }
   if (idSearch)  { conditions.push('t.id = ?');              params.push(idSearch); }
-  if (ownerFilter === 'me') {
-    conditions.push('EXISTS (SELECT 1 FROM ticket_parties tp_o WHERE tp_o.ticket_id = t.id AND tp_o.role = \'owner\' AND tp_o.user_id = ?)');
-    params.push(userId);
-  } else if (ownerFilter === 'unassigned') {
-    conditions.push('NOT EXISTS (SELECT 1 FROM ticket_parties tp_o WHERE tp_o.ticket_id = t.id AND tp_o.role = \'owner\')');
-  } else if (typeof ownerFilter === 'number') {
-    conditions.push('EXISTS (SELECT 1 FROM ticket_parties tp_o WHERE tp_o.ticket_id = t.id AND tp_o.role = \'owner\' AND tp_o.user_id = ?)');
-    params.push(ownerFilter);
+  if (ownerFilters && ownerFilters.length) {
+    const orClauses = [];
+    for (const f of ownerFilters) {
+      if (f === 'me') {
+        orClauses.push("EXISTS (SELECT 1 FROM ticket_parties tp_o WHERE tp_o.ticket_id = t.id AND tp_o.role = 'owner' AND tp_o.user_id = ?)");
+        params.push(userId);
+      } else if (f === 'unassigned') {
+        orClauses.push("NOT EXISTS (SELECT 1 FROM ticket_parties tp_o WHERE tp_o.ticket_id = t.id AND tp_o.role = 'owner')");
+      } else if (typeof f === 'number') {
+        orClauses.push("EXISTS (SELECT 1 FROM ticket_parties tp_o WHERE tp_o.ticket_id = t.id AND tp_o.role = 'owner' AND tp_o.user_id = ?)");
+        params.push(f);
+      }
+    }
+    if (orClauses.length) conditions.push(`(${orClauses.join(' OR ')})`);
   }
   if (search && !idSearch) {
     // Build an FTS4 MATCH query: each whitespace-delimited token becomes a prefix search.

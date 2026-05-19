@@ -25,7 +25,8 @@
     <input type="hidden" name="priority" id="filter-priority" value="<%= filters.priority %>">
     <input type="hidden" name="sort"     value="<%= filters.sort %>">
     <input type="hidden" name="order"    value="<%= filters.order %>">
-    <% if (!organizations || !organizations.length) { %><input type="hidden" name="org" value=""><% } %>
+    <input type="hidden" name="org"      id="filter-org"      value="<%= filters.org || '' %>">
+    <input type="hidden" name="owner"    id="filter-owner"    value="<%= filters.owner || '' %>">
 
     <!-- Search — prominent, top row -->
     <div class="filter-search-row">
@@ -92,33 +93,104 @@
 
       <!-- Org group -->
       <% if (organizations && organizations.length) { %>
+      <%
+        const _activeOrgs = (filters.org || '').split(',').filter(Boolean);
+        function _orgLabel() {
+          if (!_activeOrgs.length) return 'Any org';
+          const parts = [];
+          if (_activeOrgs.includes('unassigned')) parts.push('Not assigned');
+          for (const _oid of _activeOrgs.filter(v => v !== 'unassigned')) {
+            const _o = organizations.find(o => String(o.id) === _oid);
+            if (_o) parts.push(_o.name);
+          }
+          if (!parts.length) return 'Any org';
+          return parts.length === 1 ? parts[0] : parts[0] + ' +' + (parts.length - 1);
+        }
+      %>
         <div class="filter-group">
-          <select name="org" class="form-select" onchange="this.form.submit()">
-            <option value="" <%= !filters.org ? 'selected' : '' %>>Any org</option>
-            <option value="unassigned" <%= filters.org === 'unassigned' ? 'selected' : '' %>>Not assigned</option>
-            <% for (const o of organizations) { %>
-              <option value="<%= o.id %>" <%= filters.org == o.id ? 'selected' : '' %>><%= o.name %></option>
-            <% } %>
-          </select>
+          <span class="filter-row-label">Org</span>
+          <div class="filter-dropdown" id="org-fdd">
+            <button type="button" id="org-fdd-btn"
+                    class="filter-dropdown-btn <%= _activeOrgs.length ? 'fdd-active' : '' %>"
+                    onclick="fddToggle('org')">
+              <span id="org-fdd-label"><%= _orgLabel() %></span>
+              <span class="filter-dropdown-arrow">▾</span>
+            </button>
+            <div class="filter-dropdown-panel" id="org-fdd-panel">
+              <label class="filter-dropdown-item">
+                <input type="checkbox" id="org-cb-all" <%= !_activeOrgs.length ? 'checked' : '' %>
+                       onchange="orgCbChange('all', this)"> Any org
+              </label>
+              <label class="filter-dropdown-item">
+                <input type="checkbox" class="org-spec-cb" data-val="unassigned"
+                       <%= _activeOrgs.includes('unassigned') ? 'checked' : '' %>
+                       onchange="orgCbChange('unassigned', this)"> Not assigned
+              </label>
+              <% if (organizations.length) { %><hr class="filter-dropdown-sep"><% } %>
+              <% for (const o of organizations) { %>
+                <label class="filter-dropdown-item">
+                  <input type="checkbox" class="org-spec-cb" data-val="<%= o.id %>"
+                         <%= _activeOrgs.includes(String(o.id)) ? 'checked' : '' %>
+                         onchange="orgCbChange(<%= o.id %>, this)"> <%= o.name %>
+                </label>
+              <% } %>
+            </div>
+          </div>
         </div>
       <% } %>
 
       <!-- Assigned To group -->
       <% if (canFilterOwner) { %>
+      <%
+        const _activeOwners = (filters.owner || '').split(',').filter(Boolean);
+        function _ownerLabel() {
+          if (!_activeOwners.length) return 'All';
+          if (_activeOwners.length === 1) {
+            if (_activeOwners[0] === 'me') return 'Assigned to me';
+            if (_activeOwners[0] === 'unassigned') return 'Not assigned';
+            const _u = distinctOwners.find(u => String(u.id) === _activeOwners[0]);
+            return _u ? (_u.name || _u.email) : 'Selected';
+          }
+          return _activeOwners.length + ' selected';
+        }
+      %>
         <div class="filter-group">
-          <select name="owner" class="form-select" onchange="this.form.submit()">
-            <option value="me" <%= filters.owner === 'me' ? 'selected' : '' %>>Assigned to me</option>
-            <option value=""   <%= !filters.owner || filters.owner === '' ? 'selected' : '' %>>All</option>
-            <% if (user && user.role === 'admin') { %>
-              <option value="unassigned" <%= filters.owner === 'unassigned' ? 'selected' : '' %>>Unassigned</option>
-            <% } %>
-            <% for (const o of distinctOwners) { %>
-              <option value="<%= o.id %>" <%= filters.owner == o.id ? 'selected' : '' %>><%= fmtUser(o) %></option>
-            <% } %>
-          </select>
+          <span class="filter-row-label">Owner</span>
+          <div class="filter-dropdown" id="owner-fdd">
+            <button type="button" id="owner-fdd-btn"
+                    class="filter-dropdown-btn <%= _activeOwners.length ? 'fdd-active' : '' %>"
+                    onclick="fddToggle('owner')">
+              <span id="owner-fdd-label"><%= _ownerLabel() %></span>
+              <span class="filter-dropdown-arrow">▾</span>
+            </button>
+            <div class="filter-dropdown-panel" id="owner-fdd-panel">
+              <label class="filter-dropdown-item">
+                <input type="checkbox" id="owner-cb-all" <%= !_activeOwners.length ? 'checked' : '' %>
+                       onchange="ownerCbChange('all', this)"> All
+              </label>
+              <label class="filter-dropdown-item">
+                <input type="checkbox" class="owner-spec-cb" data-val="me"
+                       <%= _activeOwners.includes('me') ? 'checked' : '' %>
+                       onchange="ownerCbChange('me', this)"> Assigned to me
+              </label>
+              <% if (user && user.role === 'admin') { %>
+              <label class="filter-dropdown-item">
+                <input type="checkbox" class="owner-spec-cb" data-val="unassigned"
+                       <%= _activeOwners.includes('unassigned') ? 'checked' : '' %>
+                       onchange="ownerCbChange('unassigned', this)"> Not assigned
+              </label>
+              <% } %>
+              <% if (distinctOwners.length) { %><hr class="filter-dropdown-sep"><% } %>
+              <% for (const o of distinctOwners) { %>
+                <label class="filter-dropdown-item">
+                  <input type="checkbox" class="owner-spec-cb" data-val="<%= o.id %>"
+                         <%= _activeOwners.includes(String(o.id)) ? 'checked' : '' %>
+                         onchange="ownerCbChange(<%= o.id %>, this)"> <%= fmtUser(o) %>
+                </label>
+              <% } %>
+            </div>
+          </div>
         </div>
-      <% } else { %>
-        <input type="hidden" name="owner" value="">
       <% } %>
 
     </div>
@@ -338,14 +410,16 @@ function toggleAll(name) {
 }
 
 function clearFiltersKeepSearch() {
-  const form = document.getElementById('filter-form');
   document.getElementById('filter-status').value = '';
   document.getElementById('filter-priority').value = '';
   document.getElementById('filter-since').value = '';
-  const orgSel = form.querySelector('select[name="org"]');
-  if (orgSel) orgSel.value = '';
-  const ownerSel = form.querySelector('select[name="owner"]');
-  if (ownerSel) ownerSel.value = '';
+  document.getElementById('filter-org').value = '';
+  document.getElementById('filter-owner').value = '';
+  const form = document.getElementById('filter-form');
+  const df = form.querySelector('[name="date_from"]');
+  const dt = form.querySelector('[name="date_to"]');
+  if (df) df.value = '';
+  if (dt) dt.value = '';
   form.submit();
 }
 
@@ -358,15 +432,75 @@ function resetFilters() {
   document.getElementById('filter-since').value = '';
   document.getElementById('search-input').value = '';
   document.getElementById('search-clear').style.display = 'none';
-  const orgSel = form.querySelector('select[name="org"]');
-  if (orgSel) orgSel.value = '';
-  const ownerSel = form.querySelector('select[name="owner"]');
-  if (ownerSel) ownerSel.value = 'me';
+  document.getElementById('filter-org').value = '';
+  document.getElementById('filter-owner').value = 'me';
   const df = form.querySelector('[name="date_from"]');
   const dt = form.querySelector('[name="date_to"]');
   if (df) df.value = '';
   if (dt) dt.value = '';
   form.submit();
+}
+
+// ---- Multi-select filter dropdowns ----
+let _fddDirty = false;
+
+function fddToggle(name) {
+  const panel = document.getElementById(name + '-fdd-panel');
+  const isOpen = panel.classList.contains('fdd-open');
+  _closeAllFdd(true);
+  if (!isOpen) {
+    panel.classList.add('fdd-open');
+    _fddDirty = false;
+  }
+}
+
+function _closeAllFdd(submit) {
+  let wasOpen = false;
+  document.querySelectorAll('.filter-dropdown-panel.fdd-open').forEach(p => {
+    p.classList.remove('fdd-open');
+    wasOpen = true;
+  });
+  if (wasOpen && submit && _fddDirty) {
+    _fddDirty = false;
+    document.getElementById('filter-form').submit();
+  }
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.filter-dropdown')) _closeAllFdd(true);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') _closeAllFdd(true);
+});
+
+function _syncFddHidden(name) {
+  const checked = [...document.querySelectorAll('.' + name + '-spec-cb:checked')].map(cb => cb.dataset.val);
+  document.getElementById('filter-' + name).value = checked.join(',');
+  const allCb = document.getElementById(name + '-cb-all');
+  if (allCb) allCb.checked = checked.length === 0;
+  _fddDirty = true;
+}
+
+function orgCbChange(val, el) {
+  if (val === 'all') {
+    document.querySelectorAll('.org-spec-cb').forEach(cb => { cb.checked = false; });
+    document.getElementById('filter-org').value = '';
+    _fddDirty = true;
+  } else {
+    document.getElementById('org-cb-all').checked = false;
+    _syncFddHidden('org');
+  }
+}
+
+function ownerCbChange(val, el) {
+  if (val === 'all') {
+    document.querySelectorAll('.owner-spec-cb').forEach(cb => { cb.checked = false; });
+    document.getElementById('filter-owner').value = '';
+    _fddDirty = true;
+  } else {
+    document.getElementById('owner-cb-all').checked = false;
+    _syncFddHidden('owner');
+  }
 }
 
 function setSort(col) {
