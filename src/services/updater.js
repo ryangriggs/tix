@@ -7,12 +7,14 @@ const localVersion = require('../../package.json').version;
 let state = { available: false, latestVersion: null, localVersion, checkedAt: null, error: null };
 let _timer = null;
 
-// Convert a GitHub repo URL to the raw package.json URL on main branch
-function repoToRawUrl(repoUrl) {
+// Convert a GitHub repo URL to the Contents API URL for package.json
+// raw.githubusercontent.com ignores query-string cache busting (Fastly strips it);
+// api.github.com/repos/.../contents/... has a max-age of 60s and honours no-cache.
+function repoToApiUrl(repoUrl) {
   const url = repoUrl.trim().replace(/\.git$/, '');
   const m = url.match(/github\.com[/:]([\w.-]+)\/([\w.-]+)/);
   if (!m) throw new Error('Cannot parse GitHub URL: ' + repoUrl);
-  return `https://raw.githubusercontent.com/${m[1]}/${m[2]}/main/package.json`;
+  return `https://api.github.com/repos/${m[1]}/${m[2]}/contents/package.json`;
 }
 
 function compareVersions(a, b) {
@@ -27,11 +29,15 @@ function compareVersions(a, b) {
 
 async function checkForUpdates(repoUrl) {
   try {
-    const rawUrl = repoToRawUrl(repoUrl) + '?t=' + Date.now(); // bust CDN cache
-    console.log(`[Updater] Fetching ${rawUrl}`);
-    const resp = await fetch(rawUrl, {
+    const apiUrl = repoToApiUrl(repoUrl);
+    console.log(`[Updater] Fetching ${apiUrl}`);
+    const resp = await fetch(apiUrl, {
       signal: AbortSignal.timeout(15000),
-      headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+      headers: {
+        'Accept':        'application/vnd.github.raw+json',
+        'User-Agent':    'tix-updater',
+        'Cache-Control': 'no-cache',
+      },
     });
     console.log(`[Updater] Response status: ${resp.status}`);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
