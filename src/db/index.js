@@ -1276,7 +1276,7 @@ function setInactivityReminderSent(ticketId) {
 // ============================================================
 
 function getSavedViews(userId) {
-  return prepare('SELECT * FROM saved_views WHERE user_id = ? ORDER BY name ASC COLLATE NOCASE').all(userId);
+  return prepare('SELECT * FROM saved_views WHERE user_id = ? ORDER BY name COLLATE NOCASE ASC').all(userId);
 }
 
 function getSavedViewById(id, userId) {
