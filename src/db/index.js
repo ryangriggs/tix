@@ -167,6 +167,16 @@ const SCHEMA = `
     UNIQUE(organization_id, name COLLATE NOCASE)
   );
 
+  CREATE TABLE IF NOT EXISTS saved_views (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name       TEXT    NOT NULL,
+    filters    TEXT    NOT NULL DEFAULT '{}',
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_saved_views_user ON saved_views(user_id);
   CREATE INDEX IF NOT EXISTS idx_tech_orgs_tech ON technician_organizations(technician_id);
   CREATE INDEX IF NOT EXISTS idx_tech_orgs_org  ON technician_organizations(organization_id);
   CREATE INDEX IF NOT EXISTS idx_ticket_parties_ticket ON ticket_parties(ticket_id);
@@ -1261,6 +1271,35 @@ function setInactivityReminderSent(ticketId) {
   prepare('UPDATE tickets SET inactivity_reminder_sent_at = unixepoch() WHERE id = ?').run(ticketId);
 }
 
+// ============================================================
+// Saved Views
+// ============================================================
+
+function getSavedViews(userId) {
+  return prepare('SELECT * FROM saved_views WHERE user_id = ? ORDER BY name ASC COLLATE NOCASE').all(userId);
+}
+
+function getSavedViewById(id, userId) {
+  return prepare('SELECT * FROM saved_views WHERE id = ? AND user_id = ?').get(id, userId);
+}
+
+function createSavedView(userId, name, filtersJson) {
+  const r = prepare('INSERT INTO saved_views (user_id, name, filters) VALUES (?, ?, ?)').run(userId, name.trim(), filtersJson);
+  return getSavedViewById(r.lastInsertRowid, userId);
+}
+
+function updateSavedViewFilters(id, userId, filtersJson) {
+  prepare('UPDATE saved_views SET filters = ?, updated_at = unixepoch() WHERE id = ? AND user_id = ?').run(filtersJson, id, userId);
+}
+
+function renameSavedView(id, userId, name) {
+  prepare('UPDATE saved_views SET name = ?, updated_at = unixepoch() WHERE id = ? AND user_id = ?').run(name.trim(), id, userId);
+}
+
+function deleteSavedView(id, userId) {
+  prepare('DELETE FROM saved_views WHERE id = ? AND user_id = ?').run(id, userId);
+}
+
 module.exports = {
   initDb,
   // Users
@@ -1300,4 +1339,6 @@ module.exports = {
   updateLocation, isLocationReferenced, deleteLocation, getTravelReport,
   // Technician orgs
   getTechnicianOrganizations, addTechnicianOrganization, removeTechnicianOrganization,
+  // Saved views
+  getSavedViews, getSavedViewById, createSavedView, updateSavedViewFilters, renameSavedView, deleteSavedView,
 };

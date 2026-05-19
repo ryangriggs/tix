@@ -222,7 +222,7 @@ router.get('/', (req, res) => {
     return res.redirect(`/tickets?${qs}`);
   }
 
-  const { status, priority, sort, order, q, since, org, date_from, date_to, owner, page: pageParam, per_page: perPageParam } = req.query;
+  const { status, priority, sort, order, q, since, org, date_from, date_to, owner, view: viewParam, page: pageParam, per_page: perPageParam } = req.query;
 
   // Strip ticket prefix from search term; if remainder is a plain integer treat as ID lookup
   const prefix = config.ticketPrefix;
@@ -252,6 +252,7 @@ router.get('/', (req, res) => {
     date_to:   date_to   || '',
     owner:     owner !== undefined ? (owner || '') : 'me',
     per_page:  String(perPage),
+    view:      viewParam || '',
   };
   res.cookie(FILTER_COOKIE, JSON.stringify(savedPrefs), {
     httpOnly: false,
@@ -335,6 +336,8 @@ router.get('/', (req, res) => {
     : [];
 
   const assignableUsers = req.user.role === 'admin' ? db.getAssignableUsers() : [];
+  const savedViews  = db.getSavedViews(req.user.id);
+  const activeViewId = parseInt(savedPrefs.view, 10) || null;
 
   res.render('tickets/list', {
     title: 'Tickets',
@@ -343,6 +346,8 @@ router.get('/', (req, res) => {
     distinctOwners,
     canFilterOwner,
     assignableUsers,
+    savedViews,
+    activeViewId,
     filters: savedPrefs,
     pagination: {
       page:       currentPage,
@@ -351,6 +356,48 @@ router.get('/', (req, res) => {
       totalPages,
     },
   });
+});
+
+// ============================================================
+// Saved Views CRUD — /tickets/views/*
+// ============================================================
+
+// POST /tickets/views — create new saved view
+router.post('/views', (req, res) => {
+  const name = (req.body.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'Name is required.' });
+  const filtersJson = req.body.filters || '{}';
+  try { JSON.parse(filtersJson); } catch (_) { return res.status(400).json({ error: 'Invalid filters.' }); }
+  const view = db.createSavedView(req.user.id, name, filtersJson);
+  res.json({ ok: true, view });
+});
+
+// POST /tickets/views/:id/save — overwrite filters on existing view
+router.post('/views/:id/save', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!db.getSavedViewById(id, req.user.id)) return res.status(404).json({ error: 'Not found.' });
+  const filtersJson = req.body.filters || '{}';
+  try { JSON.parse(filtersJson); } catch (_) { return res.status(400).json({ error: 'Invalid filters.' }); }
+  db.updateSavedViewFilters(id, req.user.id, filtersJson);
+  res.json({ ok: true });
+});
+
+// POST /tickets/views/:id/rename — rename a saved view
+router.post('/views/:id/rename', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const name = (req.body.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'Name is required.' });
+  if (!db.getSavedViewById(id, req.user.id)) return res.status(404).json({ error: 'Not found.' });
+  db.renameSavedView(id, req.user.id, name);
+  res.json({ ok: true });
+});
+
+// POST /tickets/views/:id/delete — delete a saved view
+router.post('/views/:id/delete', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!db.getSavedViewById(id, req.user.id)) return res.status(404).json({ error: 'Not found.' });
+  db.deleteSavedView(id, req.user.id);
+  res.json({ ok: true });
 });
 
 // GET /tickets/new

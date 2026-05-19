@@ -690,6 +690,21 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 .filter-tab-p-high.active   { background: #ffedd5; border-color: #f97316; color: #9a3412; }
 .filter-tab-p-medium.active { background: #dbeafe; border-color: #3b82f6; color: #1e40af; }
 .filter-tab-p-low.active    { background: #f3f4f6; border-color: #9ca3af; color: #374151; }
+/* Views filter group — saved view action buttons */
+.view-action-btn {
+  padding: .2rem .45rem;
+  font-size: .75rem;
+  border-radius: 4px;
+}
+.view-action-btn:disabled { opacity: .4; cursor: not-allowed; }
+.view-action-btn-del { color: var(--danger); border-color: var(--danger) !important; }
+.view-action-btn-del:hover:not(:disabled) { background: var(--danger); color: #fff; }
+.views-item { cursor: pointer; justify-content: space-between; gap: .75rem; }
+.views-item:hover { background: var(--bg); }
+.views-item-active { font-weight: 600; color: var(--accent); }
+.views-item-active .views-check { color: var(--accent); flex-shrink: 0; }
+#view-status { font-size: .75rem; color: var(--text-muted); white-space: nowrap; }
+
 /* Multi-select filter dropdowns (Org, Owner) */
 .filter-dropdown { position: relative; }
 .filter-dropdown-btn {

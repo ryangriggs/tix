@@ -27,6 +27,7 @@
     <input type="hidden" name="order"    value="<%= filters.order %>">
     <input type="hidden" name="org"      id="filter-org"      value="<%= filters.org || '' %>">
     <input type="hidden" name="owner"    id="filter-owner"    value="<%= filters.owner || '' %>">
+    <input type="hidden" name="view"     id="filter-view"     value="<%= activeViewId || '' %>">
 
     <!-- Search — prominent, top row -->
     <div class="filter-search-row">
@@ -192,6 +193,48 @@
           </div>
         </div>
       <% } %>
+
+      <!-- Views group -->
+      <%
+        const _activeView = savedViews.find(v => v.id === activeViewId);
+        function _viewsBtnLabel() {
+          return _activeView ? _activeView.name : 'Load view';
+        }
+      %>
+      <div class="filter-group" id="views-filter-group">
+        <span class="filter-row-label">Views</span>
+        <div class="filter-dropdown" id="views-fdd">
+          <button type="button" id="views-fdd-btn"
+                  class="filter-dropdown-btn <%= _activeView ? 'fdd-active' : '' %>"
+                  onclick="fddToggle('views')">
+            <span id="views-fdd-label"><%= _viewsBtnLabel() %></span>
+            <span class="filter-dropdown-arrow">▾</span>
+          </button>
+          <div class="filter-dropdown-panel" id="views-fdd-panel">
+            <% if (!savedViews.length) { %>
+              <div class="filter-dropdown-item" style="color:var(--text-muted);font-style:italic;cursor:default">No saved views yet</div>
+            <% } %>
+            <% for (const v of savedViews) { %>
+              <div class="filter-dropdown-item views-item <%= v.id === activeViewId ? 'views-item-active' : '' %>"
+                   onclick="loadView(<%= v.id %>)">
+                <span class="views-item-name"><%= v.name %></span>
+                <% if (v.id === activeViewId) { %><span class="views-check">✓</span><% } %>
+              </div>
+            <% } %>
+          </div>
+        </div>
+        <button type="button" class="btn btn-secondary view-action-btn" id="view-save-btn"
+                onclick="viewSave()" title="Overwrite this view with current filters"
+                <%= _activeView ? '' : 'disabled' %>>Save</button>
+        <button type="button" class="btn btn-secondary view-action-btn" id="view-rename-btn"
+                onclick="viewRename()" title="Rename this view"
+                <%= _activeView ? '' : 'disabled' %>>Rename</button>
+        <button type="button" class="btn btn-secondary view-action-btn view-action-btn-del" id="view-delete-btn"
+                onclick="viewDelete()" title="Delete this view"
+                <%= _activeView ? '' : 'disabled' %>>Del</button>
+        <button type="button" class="btn btn-secondary view-action-btn" onclick="viewNew()" title="Save current filters as a new view">+ New</button>
+        <span id="view-status"></span>
+      </div>
 
     </div>
   </form>
@@ -415,6 +458,7 @@ function clearFiltersKeepSearch() {
   document.getElementById('filter-since').value = '';
   document.getElementById('filter-org').value = '';
   document.getElementById('filter-owner').value = '';
+  document.getElementById('filter-view').value = '';
   const form = document.getElementById('filter-form');
   const df = form.querySelector('[name="date_from"]');
   const dt = form.querySelector('[name="date_to"]');
@@ -434,6 +478,7 @@ function resetFilters() {
   document.getElementById('search-clear').style.display = 'none';
   document.getElementById('filter-org').value = '';
   document.getElementById('filter-owner').value = 'me';
+  document.getElementById('filter-view').value = '';
   const df = form.querySelector('[name="date_from"]');
   const dt = form.querySelector('[name="date_to"]');
   if (df) df.value = '';
@@ -500,6 +545,93 @@ function ownerCbChange(val, el) {
   } else {
     document.getElementById('owner-cb-all').checked = false;
     _syncFddHidden('owner');
+  }
+}
+
+// ---- Saved Views ----
+const _savedViews  = <%- JSON.stringify(savedViews).replace(/</g, '\\u003C') %>;
+const _activeViewId = <%= activeViewId || 'null' %>;
+const _viewCsrf     = '<%= csrfToken %>';
+
+function _captureFilters() {
+  const form = document.getElementById('filter-form');
+  return JSON.stringify({
+    status:    document.getElementById('filter-status').value,
+    priority:  document.getElementById('filter-priority').value,
+    sort:      form.querySelector('[name="sort"]').value,
+    order:     form.querySelector('[name="order"]').value,
+    since:     document.getElementById('filter-since').value,
+    date_from: form.querySelector('[name="date_from"]')?.value || '',
+    date_to:   form.querySelector('[name="date_to"]')?.value   || '',
+    org:       document.getElementById('filter-org').value,
+    owner:     document.getElementById('filter-owner').value,
+    q:         document.getElementById('search-input').value,
+  });
+}
+
+function _viewStatus(msg, isError) {
+  const el = document.getElementById('view-status');
+  el.textContent = msg;
+  el.style.color = isError ? 'var(--danger)' : 'var(--text-muted)';
+  if (msg) setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 2500);
+}
+
+function loadView(id) {
+  const view = _savedViews.find(v => v.id === id);
+  if (!view) return;
+  const f = JSON.parse(view.filters);
+  const params = new URLSearchParams();
+  const keys = ['status','priority','sort','order','since','date_from','date_to','org','owner','q'];
+  keys.forEach(k => { if (f[k] != null && f[k] !== '') params.set(k, f[k]); });
+  params.set('view', id);
+  window.location.href = '/tickets?' + params.toString();
+}
+
+async function viewSave() {
+  if (!_activeViewId) return;
+  const body = new URLSearchParams({ _csrf: _viewCsrf, filters: _captureFilters() });
+  const res  = await fetch('/tickets/views/' + _activeViewId + '/save', { method: 'POST', body });
+  const data = await res.json();
+  _viewStatus(data.ok ? 'Saved.' : (data.error || 'Error'), !data.ok);
+}
+
+async function viewRename() {
+  if (!_activeViewId) return;
+  const view = _savedViews.find(v => v.id === _activeViewId);
+  const name = prompt('Rename view:', view?.name || '');
+  if (!name || !name.trim()) return;
+  const body = new URLSearchParams({ _csrf: _viewCsrf, name: name.trim() });
+  const res  = await fetch('/tickets/views/' + _activeViewId + '/rename', { method: 'POST', body });
+  const data = await res.json();
+  if (data.ok) { location.reload(); } else { _viewStatus(data.error || 'Error', true); }
+}
+
+async function viewDelete() {
+  if (!_activeViewId) return;
+  const view = _savedViews.find(v => v.id === _activeViewId);
+  if (!confirm('Delete view "' + (view?.name || '') + '"?')) return;
+  const body = new URLSearchParams({ _csrf: _viewCsrf });
+  const res  = await fetch('/tickets/views/' + _activeViewId + '/delete', { method: 'POST', body });
+  const data = await res.json();
+  if (data.ok) {
+    document.getElementById('filter-view').value = '';
+    document.getElementById('filter-form').submit();
+  } else {
+    _viewStatus(data.error || 'Error', true);
+  }
+}
+
+async function viewNew() {
+  const name = prompt('View name:');
+  if (!name || !name.trim()) return;
+  const body = new URLSearchParams({ _csrf: _viewCsrf, name: name.trim(), filters: _captureFilters() });
+  const res  = await fetch('/tickets/views', { method: 'POST', body });
+  const data = await res.json();
+  if (data.ok && data.view) {
+    document.getElementById('filter-view').value = data.view.id;
+    document.getElementById('filter-form').submit();
+  } else {
+    _viewStatus(data.error || 'Error', true);
   }
 }
 
