@@ -19,6 +19,10 @@
   <form method="GET" action="/tickets" class="filter-bar" id="filter-form">
     <% const activeStatuses   = (filters.status   || '').split(',').filter(Boolean); %>
     <% const activePriorities = (filters.priority || '').split(',').filter(Boolean); %>
+    <% const _srtCols = (filters.sort  || '').split(',').map(s => s.trim()).filter(Boolean); %>
+    <% const _srtDirs = (filters.order || '').split(',').map(s => s.trim()).filter(Boolean); %>
+    <% const _multi   = _srtCols.length > 1; %>
+    <% function _sh(col) { const i = _srtCols.indexOf(col); if (i < 0) return ''; const arrow = (_srtDirs[i] || 'desc') === 'desc' ? ' ↓' : ' ↑'; return arrow + (_multi ? `<span class="sort-prec">${i + 1}</span>` : ''); } %>
 
     <!-- Hidden inputs -->
     <input type="hidden" name="status"   id="filter-status"   value="<%= filters.status %>">
@@ -243,17 +247,6 @@
   </div>
 
   <!-- Column headers -->
-  <%
-    const _srtCols = (filters.sort  || '').split(',').map(s => s.trim()).filter(Boolean);
-    const _srtDirs = (filters.order || '').split(',').map(s => s.trim()).filter(Boolean);
-    const _multi   = _srtCols.length > 1;
-    function _sh(col) {
-      const i = _srtCols.indexOf(col);
-      if (i < 0) return '';
-      const arrow = (_srtDirs[i] || 'desc') === 'desc' ? ' ↓' : ' ↑';
-      return arrow + (_multi ? `<span class="sort-prec">${i + 1}</span>` : '');
-    }
-  %>
   <div class="ticket-list-header">
     <div class="tlh-inner">
       <div class="tc-num" style="display:flex;align-items:center;gap:.25rem">
