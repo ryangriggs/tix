@@ -781,7 +781,7 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 .tlh-inner {
   display: grid;
   grid-template-columns: 90px 1fr 130px 80px 110px;
-  grid-template-areas: "num subject org updated actor";
+  grid-template-areas: "num subject org updated created";
   align-items: center;
   gap: 0.625rem;
   padding: 0 1rem 0 calc(1rem + 4px); /* +4px aligns with card content past border-left */
@@ -929,7 +929,7 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 .ticket-card-link {
   display: grid;
   grid-template-columns: 90px 1fr 130px 80px 110px;
-  grid-template-areas: "num subject org updated actor";
+  grid-template-areas: "num subject org updated created";
   align-items: center;
   gap: 0.625rem;
   padding: 0.6rem 1rem;
@@ -973,13 +973,13 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.tc-actor {
-  grid-area: actor;
-  font-size: 0.78rem;
+.tc-created {
+  grid-area: created;
+  font-size: 0.75rem;
   color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: right;
+  cursor: default;
 }
 
 .tc-subject {
@@ -1741,7 +1741,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   .tc-subject { font-size: 0.85rem; }
   .tc-org     { font-size: 0.72rem; }
   .tc-updated { font-size: 0.72rem; text-align: right; }
-  .tc-actor   { font-size: 0.72rem; text-align: right; white-space: nowrap; }
+  .tc-created { font-size: 0.72rem; text-align: right; white-space: nowrap; }
 
   .ticket-list-header { display: none; }
   .mobile-sort-bar    { display: flex; }

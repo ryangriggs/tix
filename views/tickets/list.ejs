@@ -258,8 +258,8 @@
       </div>
       <button type="button" class="tc-subject tlh-sort-btn <%= _srtCols.includes('subject')      ? 'tlh-active':'' %>" onclick="setSort('subject',      event)" title="Ctrl+click to add to sort">Subject<%- _sh('subject') %></button>
       <button type="button" class="tc-org     tlh-sort-btn <%= _srtCols.includes('organization') ? 'tlh-active':'' %>" onclick="setSort('organization', event)" title="Ctrl+click to add to sort">Org<%- _sh('organization') %></button>
-      <button type="button" class="tc-updated tlh-sort-btn <%= _srtCols.includes('updated_at')   ? 'tlh-active':'' %>" onclick="setSort('updated_at',   event)" title="Ctrl+click to add to sort">Updated<%- _sh('updated_at') %></button>
-      <span class="tc-actor tlh-col">Updated by</span>
+      <button type="button" class="tc-updated tlh-sort-btn <%= _srtCols.includes('updated_at') ? 'tlh-active':'' %>" onclick="setSort('updated_at', event)" title="Ctrl+click to add to sort">Updated<%- _sh('updated_at') %></button>
+      <button type="button" class="tc-created tlh-sort-btn <%= _srtCols.includes('created_at') ? 'tlh-active':'' %>" onclick="setSort('created_at', event)" title="Ctrl+click to add to sort">Created<%- _sh('created_at') %></button>
     </div>
     <% if (user && user.role === 'admin' && tickets.length > 0) { %>
     <div class="ticket-select-wrap tlh-ticket-count">

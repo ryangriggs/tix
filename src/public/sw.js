@@ -1,4 +1,4 @@
-const CACHE = 'tix-v1.2.39';
+const CACHE = 'tix-v1.2.40';
 
 // Static assets to cache on install
 const PRECACHE = [
