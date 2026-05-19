@@ -1852,6 +1852,86 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 .settings-section-title { font-size: 1rem; font-weight: 600; margin-bottom: 1.25rem; }
 .settings-sub-title { font-size: .875rem; font-weight: 600; margin: 1rem 0 .5rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
 .settings-transport-section { border-top: 1px solid var(--border); margin-top: 1rem; padding-top: .75rem; }
+.settings-hr { border: none; border-top: 1px solid var(--border); margin: 1.25rem 0; }
+.settings-section-group-label {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+  padding: .25rem 0 .6rem;
+  margin-top: .5rem;
+}
+
+/* Settings mobile ToC */
+.settings-mobile-toc {
+  display: none;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+.settings-mobile-toc summary {
+  padding: .6rem .85rem;
+  font-size: .875rem;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+.settings-mobile-toc summary::-webkit-details-marker { display: none; }
+.settings-mobile-toc summary::after {
+  content: '▾';
+  font-size: .75rem;
+  color: var(--text-muted);
+  transition: transform .15s;
+}
+.settings-mobile-toc[open] summary::after { transform: rotate(-180deg); }
+.settings-mobile-toc-nav {
+  border-top: 1px solid var(--border);
+  padding: .35rem 0;
+}
+.settings-mobile-toc-nav a {
+  display: block;
+  padding: .32rem .85rem;
+  font-size: .84rem;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.settings-mobile-toc-nav a:hover { color: var(--text); background: var(--bg); }
+.settings-mobile-toc-nav .toc-group-label {
+  display: block;
+  font-size: .68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--text-muted);
+  padding: .55rem .85rem .2rem;
+  opacity: .75;
+}
+.settings-mobile-toc-nav .toc-sub { padding-left: 1.5rem; }
+@media (max-width: 767px) { .settings-mobile-toc { display: block; } }
+
+/* Settings sidenav sub-links and group label */
+.settings-sidenav-group {
+  font-size: .62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+  padding: .55rem .75rem .2rem;
+  margin-top: .1rem;
+  border-top: 1px solid var(--border);
+  opacity: .8;
+}
+.settings-sidenav-link.sub {
+  padding-left: 1.35rem;
+  font-size: .73rem;
+}
 
 /* Settings floating side-nav */
 .settings-sidenav {

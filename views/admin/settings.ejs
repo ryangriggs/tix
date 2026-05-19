@@ -7,21 +7,18 @@
     <button type="button" class="btn btn-primary" style="width:100%;font-size:.78rem;padding:.3rem .5rem"
             onclick="document.querySelector('.ticket-form').requestSubmit()">Save</button>
   </div>
-  <a href="#s-general"        class="settings-sidenav-link">General</a>
-  <a href="#s-security"       class="settings-sidenav-link">Security</a>
-  <a href="#s-due-reminders"  class="settings-sidenav-link">Due-date Reminders</a>
-  <a href="#s-email"          class="settings-sidenav-link">Email Transport</a>
-  <a href="#s-uploads"        class="settings-sidenav-link">Uploads &amp; Rate Limits</a>
-  <a href="#s-features"       class="settings-sidenav-link">Features</a>
-  <a href="#s-updates"        class="settings-sidenav-link">Updates</a>
-  <a href="#s-urgent-notify"  class="settings-sidenav-link">Urgent Notifications</a>
-  <a href="#s-inactivity"     class="settings-sidenav-link">Inactivity Reminders</a>
-  <a href="#s-backups"        class="settings-sidenav-link">Backups</a>
-  <a href="#s-update-status"  class="settings-sidenav-link">Update Status</a>
-  <a href="#s-backup-status"  class="settings-sidenav-link">Backup Status</a>
-  <a href="#s-infrastructure" class="settings-sidenav-link">Infrastructure</a>
-  <a href="#s-server-stats"   class="settings-sidenav-link">Server Stats</a>
-  <a href="#s-browser-cache"  class="settings-sidenav-link">Browser Cache</a>
+  <a href="#s-site"          class="settings-sidenav-link">Site &amp; Identity</a>
+  <a href="#s-email"         class="settings-sidenav-link">Email Transport</a>
+  <a href="#s-notifications" class="settings-sidenav-link">Notifications</a>
+  <a href="#s-security"      class="settings-sidenav-link">Security</a>
+  <a href="#s-uploads"       class="settings-sidenav-link">Uploads</a>
+  <a href="#s-features"      class="settings-sidenav-link">Features</a>
+  <div class="settings-sidenav-group">System</div>
+  <a href="#s-updates"        class="settings-sidenav-link sub">Updates</a>
+  <a href="#s-backups"        class="settings-sidenav-link sub">Backups</a>
+  <a href="#s-infrastructure" class="settings-sidenav-link sub">Infrastructure</a>
+  <a href="#s-server-stats"   class="settings-sidenav-link sub">Server Stats</a>
+  <a href="#s-browser-cache"  class="settings-sidenav-link sub">Browser Cache</a>
 </aside>
 
 <main class="container container-narrow">
@@ -31,12 +28,31 @@
     <div class="alert alert-info"><%= message %></div>
   <% } %>
 
+  <!-- Mobile Table of Contents -->
+  <details class="settings-mobile-toc">
+    <summary>Jump to section</summary>
+    <nav class="settings-mobile-toc-nav">
+      <a href="#s-site">Site &amp; Identity</a>
+      <a href="#s-email">Email Transport</a>
+      <a href="#s-notifications">Notifications &amp; Reminders</a>
+      <a href="#s-security">Security</a>
+      <a href="#s-uploads">Uploads</a>
+      <a href="#s-features">Features</a>
+      <span class="toc-group-label">System</span>
+      <a href="#s-updates"        class="toc-sub">Updates</a>
+      <a href="#s-backups"        class="toc-sub">Backups</a>
+      <a href="#s-infrastructure" class="toc-sub">Infrastructure</a>
+      <a href="#s-server-stats"   class="toc-sub">Server Stats</a>
+      <a href="#s-browser-cache"  class="toc-sub">Browser Cache</a>
+    </nav>
+  </details>
+
   <form method="POST" action="/admin/settings" class="ticket-form">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 
-    <!-- ── General ─────────────────────────────────────────── -->
-    <div class="card" id="s-general" style="margin-bottom:1.5rem">
-      <h2 class="settings-section-title">General</h2>
+    <!-- ── Site & Identity ──────────────────────────────────── -->
+    <div class="card" id="s-site" style="margin-bottom:1.5rem">
+      <h2 class="settings-section-title">Site &amp; Identity</h2>
 
       <div class="form-group">
         <label for="site_name">Site name</label>
@@ -53,6 +69,16 @@
       </div>
 
       <div class="form-group">
+        <label for="ticket_prefix">Ticket ID prefix <span class="optional">(optional)</span></label>
+        <input type="text" id="ticket_prefix" name="ticket_prefix"
+               value="<%= s.ticket_prefix || '' %>" placeholder="TKT-" class="form-input" style="width:10rem">
+        <p class="form-hint">Prepended to ticket numbers in subject lines, e.g. <code>TKT-42</code>. Leave blank for plain numbers.</p>
+      </div>
+
+      <hr class="settings-hr">
+      <h3 class="settings-sub-title">Email Addresses</h3>
+
+      <div class="form-group">
         <label for="ticket_email">Ticket email address</label>
         <input type="email" id="ticket_email" name="ticket_email"
                value="<%= s.ticket_email || '' %>" placeholder="tickets@example.com" class="form-input">
@@ -67,18 +93,14 @@
       </div>
 
       <div class="form-group">
-        <label for="ticket_prefix">Ticket ID prefix <span class="optional">(optional)</span></label>
-        <input type="text" id="ticket_prefix" name="ticket_prefix"
-               value="<%= s.ticket_prefix || '' %>" placeholder="TKT-" class="form-input" style="width:10rem">
-        <p class="form-hint">Prepended to ticket numbers in subject lines, e.g. <code>TKT-42</code>. Leave blank for plain numbers.</p>
-      </div>
-
-      <div class="form-group">
         <label for="mail_from_name">Mail from name</label>
         <input type="text" id="mail_from_name" name="mail_from_name"
                value="<%= s.mail_from_name || '' %>" placeholder="Tix" class="form-input">
         <p class="form-hint">Display name used in the From header of outbound emails.</p>
       </div>
+
+      <hr class="settings-hr">
+      <h3 class="settings-sub-title">Users</h3>
 
       <div class="form-group">
         <label for="admin_email">Admin email <span class="optional">(optional)</span></label>
@@ -93,90 +115,9 @@
                value="<%= s.default_assignee_email || '' %>" placeholder="assignee@example.com" class="form-input">
         <p class="form-hint">Tickets created via inbound email or web (by others) are automatically assigned to this person.</p>
       </div>
-
-      <div class="form-group">
-        <label class="checkbox-label">
-          <input type="checkbox" name="notify_email_submitter" value="1"
-                 <%= s.notify_email_submitter !== 'false' ? 'checked' : '' %>>
-          Notify email submitter on new ticket creation
-        </label>
-        <p class="form-hint">Send a confirmation email to the sender when their inbound email creates a new ticket.</p>
-      </div>
-
-      <div class="form-group">
-        <label class="checkbox-label">
-          <input type="checkbox" name="notify_email_status_change" value="1"
-                 <%= s.notify_email_status_change !== 'false' ? 'checked' : '' %>>
-          Notify parties on ticket status changes
-        </label>
-        <p class="form-hint">Send an email to all ticket parties when the status is changed via the sidebar. Comments that include a status change always send a notification.</p>
-      </div>
     </div>
 
-    <!-- ── Security ──────────────────────────────────────────── -->
-    <div class="card" id="s-security" style="margin-bottom:1.5rem">
-      <h2 class="settings-section-title">Security</h2>
-
-      <div class="form-group">
-        <label for="jwt_secret">JWT secret</label>
-        <input type="password" id="jwt_secret" name="jwt_secret"
-               value="<%= s.jwt_secret || '' %>" autocomplete="new-password" class="form-input">
-        <p class="form-hint">Signs session cookies. Changing this logs out all users. Use a long random string in production.</p>
-      </div>
-
-      <div class="form-group">
-        <label>Secure session cookie</label>
-        <label class="checkbox-label">
-          <input type="checkbox" name="secure_session" value="1"
-                 <%= s.secure_session === 'true' ? 'checked' : '' %>>
-          Require HTTPS for session cookie (enable in production behind TLS)
-        </label>
-      </div>
-
-      <div class="form-row" style="gap:.75rem;flex-wrap:wrap">
-        <div class="form-group" style="flex:0 0 auto">
-          <label for="otp_max_tries">OTP max tries</label>
-          <input type="number" id="otp_max_tries" name="otp_max_tries"
-                 value="<%= s.otp_max_tries || '5' %>" min="1" step="1"
-                 class="form-input form-input-sm" style="width:5rem">
-        </div>
-        <div class="form-group" style="flex:0 0 auto">
-          <label for="otp_lockout_seconds">OTP lockout (seconds)</label>
-          <input type="number" id="otp_lockout_seconds" name="otp_lockout_seconds"
-                 value="<%= s.otp_lockout_seconds || '300' %>" min="0" step="1"
-                 class="form-input form-input-sm" style="width:6rem">
-        </div>
-      </div>
-      <p class="form-hint">After this many failed OTP attempts, the account is locked for the specified number of seconds.</p>
-    </div>
-
-    <!-- ── Due-date reminders ─────────────────────────────────── -->
-    <div class="card" id="s-due-reminders" style="margin-bottom:1.5rem">
-      <h2 class="settings-section-title">Due-date reminders</h2>
-
-      <div class="form-row" style="gap:.75rem;flex-wrap:wrap">
-        <div style="flex:0 0 auto">
-          <label for="reminder_count" style="font-size:.85rem;font-weight:normal">Number of reminders</label>
-          <input type="number" id="reminder_count" name="reminder_count"
-                 value="<%= s.reminder_count || '1' %>" min="0" step="1"
-                 class="form-input form-input-sm" style="width:5rem">
-        </div>
-        <div style="flex:0 0 auto">
-          <label for="reminder_frequency_hours" style="font-size:.85rem;font-weight:normal">Frequency (hours apart)</label>
-          <input type="number" id="reminder_frequency_hours" name="reminder_frequency_hours"
-                 value="<%= s.reminder_frequency_hours || '24' %>" min="0.5" step="0.5"
-                 class="form-input form-input-sm" style="width:6rem">
-        </div>
-      </div>
-      <p class="form-hint">
-        Reminders are sent only to ticket owners with admin or technician roles.
-        Example: 3 reminders, 24 hours apart → sent 72h, 48h, and 24h before the due date.
-        Past reminder slots are skipped if the due date was set less than <em>count × frequency</em> hours in advance.
-        Set to 0 reminders to disable.
-      </p>
-    </div>
-
-    <!-- ── Email transport ──────────────────────────────────── -->
+    <!-- ── Email Transport ──────────────────────────────────── -->
     <div class="card" id="s-email" style="margin-bottom:1.5rem">
       <h2 class="settings-section-title">Email Transport</h2>
 
@@ -278,73 +219,16 @@
                  value="<%= s.gmail_user || '' %>" placeholder="you@gmail.com" class="form-input">
         </div>
       </div>
-    </div>
 
-    <!-- ── Uploads & Rate Limits ─────────────────────────────── -->
-    <div class="card" id="s-uploads" style="margin-bottom:1.5rem">
-      <h2 class="settings-section-title">Uploads &amp; Rate Limits</h2>
-
-      <div class="form-group">
-        <label for="annotation_extensions">Annotatable file extensions</label>
-        <input type="text" id="annotation_extensions" name="annotation_extensions"
-               value="<%= s.annotation_extensions || 'pdf,jpg,jpeg,gif,png,svg' %>" class="form-input">
-        <p class="form-hint">Comma-separated. Attachments with these extensions show an Annotate button.</p>
-      </div>
-
-      <div class="form-group" style="max-width:14rem">
-        <label for="upload_max_size_mb">Max upload size (MB)</label>
-        <input type="number" id="upload_max_size_mb" name="upload_max_size_mb"
-               value="<%= s.upload_max_size_mb || '25' %>" min="1" step="1"
-               class="form-input form-input-sm" style="width:6rem">
-      </div>
+      <hr class="settings-hr">
+      <h3 class="settings-sub-title">Inbound Email Security</h3>
+      <p class="form-hint" style="margin-bottom:.75rem">
+        SPF and DKIM results are always logged to the Email Log for monitoring.
+        Enable enforcement only after confirming no legitimate senders are failing — check the log first.
+        Only hard failures are rejected; softfail, neutral, and unsigned emails are never blocked.
+      </p>
 
       <div class="form-group">
-        <label for="upload_allowed_extensions">Allowed file extensions</label>
-        <input type="text" id="upload_allowed_extensions" name="upload_allowed_extensions"
-               value="<%= s.upload_allowed_extensions || '' %>" class="form-input">
-        <p class="form-hint">Comma-separated, no dots, case-insensitive. Leave blank to allow all (subject to blocked list).</p>
-      </div>
-
-      <div class="form-group">
-        <label for="upload_blocked_extensions">Blocked file extensions</label>
-        <input type="text" id="upload_blocked_extensions" name="upload_blocked_extensions"
-               value="<%= s.upload_blocked_extensions || '' %>" class="form-input">
-        <p class="form-hint">Always rejected even if in the allowed list. Leave blank to block nothing.</p>
-      </div>
-
-      <div class="form-row" style="gap:.75rem;flex-wrap:wrap">
-        <div class="form-group" style="flex:0 0 auto">
-          <label for="email_rate_limit_per_ticket">Rate limit per ticket (msgs/min)</label>
-          <input type="number" id="email_rate_limit_per_ticket" name="email_rate_limit_per_ticket"
-                 value="<%= s.email_rate_limit_per_ticket || '10' %>" min="0" step="1"
-                 class="form-input form-input-sm" style="width:6rem">
-        </div>
-        <div class="form-group" style="flex:0 0 auto">
-          <label for="email_rate_limit_new_tickets">Rate limit new tickets (msgs/min)</label>
-          <input type="number" id="email_rate_limit_new_tickets" name="email_rate_limit_new_tickets"
-                 value="<%= s.email_rate_limit_new_tickets || '3' %>" min="0" step="1"
-                 class="form-input form-input-sm" style="width:6rem">
-        </div>
-      </div>
-      <p class="form-hint">Maximum inbound email messages per minute. 0 disables the limit.</p>
-
-      <div class="form-row" style="gap:.75rem;flex-wrap:wrap;margin-top:.75rem">
-        <div class="form-group" style="flex:0 0 auto">
-          <label for="login_rate_limit_ip">Login attempts per IP / hour</label>
-          <input type="number" id="login_rate_limit_ip" name="login_rate_limit_ip"
-                 value="<%= s.login_rate_limit_ip || '20' %>" min="1" step="1"
-                 class="form-input form-input-sm" style="width:6rem">
-        </div>
-        <div class="form-group" style="flex:0 0 auto">
-          <label for="login_rate_limit_email">Login attempts per email / minute</label>
-          <input type="number" id="login_rate_limit_email" name="login_rate_limit_email"
-                 value="<%= s.login_rate_limit_email || '5' %>" min="1" step="1"
-                 class="form-input form-input-sm" style="width:6rem">
-        </div>
-      </div>
-      <p class="form-hint">Limits magic link requests to prevent email bombing. Resets on server restart.</p>
-
-      <div class="form-group" style="margin-top:.75rem">
         <label class="checkbox-label">
           <input type="checkbox" name="mailgun_webhook_enabled" value="true"
                  <%= s.mailgun_webhook_enabled === 'true' ? 'checked' : '' %>>
@@ -353,13 +237,6 @@
         <p class="form-hint">Only needed when using Mailgun's inbound routing. Disable if not in use.</p>
       </div>
 
-      <hr style="border:none;border-top:1px solid #e5e7eb;margin:1.25rem 0">
-      <h3 class="settings-sub-title">Inbound Email Authentication</h3>
-      <p class="form-hint" style="margin-bottom:.75rem">
-        SPF and DKIM results are always logged to the Email Log for monitoring.
-        Enable enforcement only after confirming no legitimate senders are failing — check the log first.
-        Only hard failures are rejected; softfail, neutral, and unsigned emails are never blocked.
-      </p>
       <div class="form-group">
         <label class="checkbox-label">
           <input type="checkbox" name="enforce_spf" value="true"
@@ -376,65 +253,30 @@
       </div>
     </div>
 
-    <!-- ── Features ─────────────────────────────────────────── -->
-    <div class="card" id="s-features" style="margin-bottom:1.5rem">
-      <h2 class="settings-section-title">Features</h2>
+    <!-- ── Notifications & Reminders ────────────────────────── -->
+    <div class="card" id="s-notifications" style="margin-bottom:1.5rem">
+      <h2 class="settings-section-title">Notifications &amp; Reminders</h2>
 
       <div class="form-group">
         <label class="checkbox-label">
-          <input type="checkbox" name="enable_billable_hours" value="1"
-                 <%= s.enable_billable_hours !== 'false' ? 'checked' : '' %>>
-          Enable billable hours
+          <input type="checkbox" name="notify_email_submitter" value="1"
+                 <%= s.notify_email_submitter !== 'false' ? 'checked' : '' %>>
+          Notify email submitter on new ticket creation
         </label>
-        <p class="form-hint">Show the billable hours field on ticket replies and include the Billing Report in Reports.</p>
+        <p class="form-hint">Send a confirmation email to the sender when their inbound email creates a new ticket.</p>
       </div>
 
       <div class="form-group">
         <label class="checkbox-label">
-          <input type="checkbox" name="enable_location" value="1"
-                 <%= s.enable_location !== 'false' ? 'checked' : '' %>>
-          Enable location tracking
+          <input type="checkbox" name="notify_email_status_change" value="1"
+                 <%= s.notify_email_status_change !== 'false' ? 'checked' : '' %>>
+          Notify parties on ticket status changes
         </label>
-        <p class="form-hint">Show the location field on ticket replies and include the Travel Report in Reports.</p>
-      </div>
-    </div>
-
-    <!-- ── Updates ──────────────────────────────────────────── -->
-    <div class="card" id="s-updates" style="margin-bottom:1.5rem">
-      <h2 class="settings-section-title">Updates</h2>
-
-      <div class="form-group">
-        <label class="checkbox-label">
-          <input type="checkbox" name="update_check_enabled" value="1"
-                 <%= s.update_check_enabled === 'true' ? 'checked' : '' %>>
-          Automatically check for updates
-        </label>
+        <p class="form-hint">Send an email to all ticket parties when the status is changed via the sidebar. Comments that include a status change always send a notification.</p>
       </div>
 
-      <div class="form-group">
-        <label for="update_repo_url">Repository URL</label>
-        <input type="url" id="update_repo_url" name="update_repo_url"
-               value="<%= s.update_repo_url || 'https://github.com/ryangriggs/tix.git' %>"
-               class="form-input">
-        <p class="form-hint">GitHub repository to check for updates. Only the <code>main</code> branch is used.</p>
-      </div>
-
-      <div class="form-group">
-        <label for="update_check_interval_hours">Check every (hours)</label>
-        <input type="number" id="update_check_interval_hours" name="update_check_interval_hours"
-               value="<%= s.update_check_interval_hours || '24' %>" min="1" step="1"
-               class="form-input form-input-sm" style="width:6rem">
-      </div>
-
-      <p class="form-hint" style="margin-top:.5rem">
-        <strong>Note:</strong> Installing an update will run <code>git reset --hard origin/main</code> followed by
-        <code>npm install</code>. Any local file customisations will be overwritten.
-      </p>
-    </div>
-
-    <!-- ── Urgent Ticket Notifications ─────────────────────── -->
-    <div class="card" id="s-urgent-notify" style="margin-bottom:1.5rem">
-      <h2 class="settings-section-title">Urgent Ticket Notifications</h2>
+      <hr class="settings-hr">
+      <h3 class="settings-sub-title">Urgent Notifications</h3>
       <p class="form-hint" style="margin-bottom:1rem">
         These users are emailed immediately when any ticket is created as Urgent or has its priority changed to Urgent.
         Per-organization overrides can be set on the <a href="/admin/organizations">Organizations</a> page.
@@ -451,11 +293,32 @@
         <div id="urgent-notify-hiddens"></div>
         <p class="form-hint">Leave empty to disable global urgent notifications.</p>
       </div>
-    </div>
 
-    <!-- ── Inactivity Reminders ─────────────────────────────── -->
-    <div class="card" id="s-inactivity" style="margin-bottom:1.5rem">
-      <h2 class="settings-section-title">Inactivity Reminders</h2>
+      <hr class="settings-hr">
+      <h3 class="settings-sub-title">Due-Date Reminders</h3>
+      <div class="form-row" style="gap:.75rem;flex-wrap:wrap">
+        <div style="flex:0 0 auto">
+          <label for="reminder_count" style="font-size:.85rem;font-weight:normal">Number of reminders</label>
+          <input type="number" id="reminder_count" name="reminder_count"
+                 value="<%= s.reminder_count || '1' %>" min="0" step="1"
+                 class="form-input form-input-sm" style="width:5rem">
+        </div>
+        <div style="flex:0 0 auto">
+          <label for="reminder_frequency_hours" style="font-size:.85rem;font-weight:normal">Frequency (hours apart)</label>
+          <input type="number" id="reminder_frequency_hours" name="reminder_frequency_hours"
+                 value="<%= s.reminder_frequency_hours || '24' %>" min="0.5" step="0.5"
+                 class="form-input form-input-sm" style="width:6rem">
+        </div>
+      </div>
+      <p class="form-hint">
+        Reminders are sent only to ticket owners with admin or technician roles.
+        Example: 3 reminders, 24 hours apart → sent 72h, 48h, and 24h before the due date.
+        Past reminder slots are skipped if the due date was set less than <em>count × frequency</em> hours in advance.
+        Set to 0 reminders to disable.
+      </p>
+
+      <hr class="settings-hr">
+      <h3 class="settings-sub-title">Inactivity Reminders</h3>
       <p class="form-hint" style="margin-bottom:1rem">
         Send a reminder email to ticket owners when an open ticket has had no activity for the specified time.
         Set to 0 to disable for that priority. Reminders repeat each time the period elapses until the ticket is updated or closed.
@@ -489,21 +352,263 @@
       </div>
     </div>
 
-    <!-- ── Backups ──────────────────────────────────────────── -->
+    <!-- ── Security ──────────────────────────────────────────── -->
+    <div class="card" id="s-security" style="margin-bottom:1.5rem">
+      <h2 class="settings-section-title">Security</h2>
+
+      <div class="form-group">
+        <label for="jwt_secret">JWT secret</label>
+        <input type="password" id="jwt_secret" name="jwt_secret"
+               value="<%= s.jwt_secret || '' %>" autocomplete="new-password" class="form-input">
+        <p class="form-hint">Signs session cookies. Changing this logs out all users. Use a long random string in production.</p>
+      </div>
+
+      <div class="form-group">
+        <label>Secure session cookie</label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="secure_session" value="1"
+                 <%= s.secure_session === 'true' ? 'checked' : '' %>>
+          Require HTTPS for session cookie (enable in production behind TLS)
+        </label>
+      </div>
+
+      <hr class="settings-hr">
+      <h3 class="settings-sub-title">OTP &amp; Login Rate Limits</h3>
+
+      <div class="form-row" style="gap:.75rem;flex-wrap:wrap">
+        <div class="form-group" style="flex:0 0 auto">
+          <label for="otp_max_tries">OTP max tries</label>
+          <input type="number" id="otp_max_tries" name="otp_max_tries"
+                 value="<%= s.otp_max_tries || '5' %>" min="1" step="1"
+                 class="form-input form-input-sm" style="width:5rem">
+        </div>
+        <div class="form-group" style="flex:0 0 auto">
+          <label for="otp_lockout_seconds">OTP lockout (seconds)</label>
+          <input type="number" id="otp_lockout_seconds" name="otp_lockout_seconds"
+                 value="<%= s.otp_lockout_seconds || '300' %>" min="0" step="1"
+                 class="form-input form-input-sm" style="width:6rem">
+        </div>
+      </div>
+      <p class="form-hint">After this many failed OTP attempts, the account is locked for the specified number of seconds.</p>
+
+      <div class="form-row" style="gap:.75rem;flex-wrap:wrap;margin-top:.75rem">
+        <div class="form-group" style="flex:0 0 auto">
+          <label for="login_rate_limit_ip">Login attempts per IP / hour</label>
+          <input type="number" id="login_rate_limit_ip" name="login_rate_limit_ip"
+                 value="<%= s.login_rate_limit_ip || '20' %>" min="1" step="1"
+                 class="form-input form-input-sm" style="width:6rem">
+        </div>
+        <div class="form-group" style="flex:0 0 auto">
+          <label for="login_rate_limit_email">Login attempts per email / minute</label>
+          <input type="number" id="login_rate_limit_email" name="login_rate_limit_email"
+                 value="<%= s.login_rate_limit_email || '5' %>" min="1" step="1"
+                 class="form-input form-input-sm" style="width:6rem">
+        </div>
+      </div>
+      <p class="form-hint">Limits magic link requests to prevent email bombing. Resets on server restart.</p>
+    </div>
+
+    <!-- ── Uploads ────────────────────────────────────────────── -->
+    <div class="card" id="s-uploads" style="margin-bottom:1.5rem">
+      <h2 class="settings-section-title">Uploads</h2>
+
+      <div class="form-group">
+        <label for="upload_max_size_mb">Max upload size (MB)</label>
+        <input type="number" id="upload_max_size_mb" name="upload_max_size_mb"
+               value="<%= s.upload_max_size_mb || '25' %>" min="1" step="1"
+               class="form-input form-input-sm" style="width:6rem">
+      </div>
+
+      <div class="form-group">
+        <label for="upload_allowed_extensions">Allowed file extensions</label>
+        <input type="text" id="upload_allowed_extensions" name="upload_allowed_extensions"
+               value="<%= s.upload_allowed_extensions || '' %>" class="form-input">
+        <p class="form-hint">Comma-separated, no dots, case-insensitive. Leave blank to allow all (subject to blocked list).</p>
+      </div>
+
+      <div class="form-group">
+        <label for="upload_blocked_extensions">Blocked file extensions</label>
+        <input type="text" id="upload_blocked_extensions" name="upload_blocked_extensions"
+               value="<%= s.upload_blocked_extensions || '' %>" class="form-input">
+        <p class="form-hint">Always rejected even if in the allowed list. Leave blank to block nothing.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="annotation_extensions">Annotatable file extensions</label>
+        <input type="text" id="annotation_extensions" name="annotation_extensions"
+               value="<%= s.annotation_extensions || 'pdf,jpg,jpeg,gif,png,svg' %>" class="form-input">
+        <p class="form-hint">Comma-separated. Attachments with these extensions show an Annotate button.</p>
+      </div>
+
+      <hr class="settings-hr">
+      <h3 class="settings-sub-title">Inbound Email Rate Limits</h3>
+
+      <div class="form-row" style="gap:.75rem;flex-wrap:wrap">
+        <div class="form-group" style="flex:0 0 auto">
+          <label for="email_rate_limit_per_ticket">Rate limit per ticket (msgs/min)</label>
+          <input type="number" id="email_rate_limit_per_ticket" name="email_rate_limit_per_ticket"
+                 value="<%= s.email_rate_limit_per_ticket || '10' %>" min="0" step="1"
+                 class="form-input form-input-sm" style="width:6rem">
+        </div>
+        <div class="form-group" style="flex:0 0 auto">
+          <label for="email_rate_limit_new_tickets">Rate limit new tickets (msgs/min)</label>
+          <input type="number" id="email_rate_limit_new_tickets" name="email_rate_limit_new_tickets"
+                 value="<%= s.email_rate_limit_new_tickets || '3' %>" min="0" step="1"
+                 class="form-input form-input-sm" style="width:6rem">
+        </div>
+      </div>
+      <p class="form-hint">Maximum inbound email messages per minute. 0 disables the limit.</p>
+    </div>
+
+    <!-- ── Features ──────────────────────────────────────────── -->
+    <div class="card" id="s-features" style="margin-bottom:1.5rem">
+      <h2 class="settings-section-title">Features</h2>
+
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" name="enable_billable_hours" value="1"
+                 <%= s.enable_billable_hours !== 'false' ? 'checked' : '' %>>
+          Enable billable hours
+        </label>
+        <p class="form-hint">Show the billable hours field on ticket replies and include the Billing Report in Reports.</p>
+      </div>
+
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" name="enable_location" value="1"
+                 <%= s.enable_location !== 'false' ? 'checked' : '' %>>
+          Enable location tracking
+        </label>
+        <p class="form-hint">Show the location field on ticket replies and include the Travel Report in Reports.</p>
+      </div>
+    </div>
+
+    <!-- ── System ─────────────────────────────────────────────── -->
+    <div class="settings-section-group-label" id="s-system">System</div>
+
+    <!-- Updates -->
+    <div class="card" id="s-updates" style="margin-bottom:1rem">
+      <h2 class="settings-section-title">Updates</h2>
+
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" name="update_check_enabled" value="1"
+                 <%= s.update_check_enabled === 'true' ? 'checked' : '' %>>
+          Automatically check for updates
+        </label>
+      </div>
+
+      <div class="form-group">
+        <label for="update_repo_url">Repository URL</label>
+        <input type="url" id="update_repo_url" name="update_repo_url"
+               value="<%= s.update_repo_url || 'https://github.com/ryangriggs/tix.git' %>"
+               class="form-input">
+        <p class="form-hint">GitHub repository to check for updates. Only the <code>main</code> branch is used.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="update_check_interval_hours">Check every (hours)</label>
+        <input type="number" id="update_check_interval_hours" name="update_check_interval_hours"
+               value="<%= s.update_check_interval_hours || '24' %>" min="1" step="1"
+               class="form-input form-input-sm" style="width:6rem">
+      </div>
+
+      <p class="form-hint" style="margin-top:.5rem">
+        <strong>Note:</strong> Installing an update will run <code>git reset --hard origin/main</code> followed by
+        <code>npm install</code>. Any local file customisations will be overwritten.
+      </p>
+
+      <hr class="settings-hr">
+
+      <p style="font-size:.9rem;margin-bottom:1rem">
+        Running version: <strong>v<%= appVersion %></strong>
+        <% if (updateState.checkedAt) { %>
+          &mdash; Latest: <strong>v<%= updateState.latestVersion %></strong>
+          <% if (updateState.available) { %>
+            <span style="color:#d97706;font-weight:600"> — update available</span>
+          <% } else { %>
+            <span style="color:#16a34a"> — up to date</span>
+          <% } %>
+          <br><span style="font-size:.8rem;color:var(--text-muted)">Last checked: <%= new Date(updateState.checkedAt).toLocaleString() %></span>
+        <% } else { %>
+          <span style="color:var(--text-muted)"> — not yet checked</span>
+        <% } %>
+        <% if (updateState.error) { %>
+          <br><span style="color:#dc2626;font-size:.8rem">Check error: <%= updateState.error %></span>
+        <% } %>
+      </p>
+
+      <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
+        <button type="button" class="btn btn-secondary" id="check-now-btn" onclick="checkNow()">Check Now</button>
+        <% if (updateState.available) { %>
+          <button type="button" class="btn btn-primary" style="background:#d97706;border-color:#b45309"
+                  onclick="startInstall()">Install Update (v<%= updateState.latestVersion %>)</button>
+        <% } %>
+        <span id="check-result" style="font-size:.85rem"></span>
+      </div>
+    </div>
+
+    <!-- Backups -->
     <div class="card" id="s-backups" style="margin-bottom:1.5rem">
       <h2 class="settings-section-title">Backups</h2>
-      <div class="form-group">
-        <label class="form-label">Backup Frequency (hours, 0 = disabled)</label>
-        <input type="number" name="backup_frequency_hours" min="0"
-               class="form-input" style="width:8rem"
-               value="<%= s.backup_frequency_hours || '0' %>">
-        <p class="form-hint">Set BACKUP_DIR in .env to enable. Each backup is a .zip containing the database, .env, and all attachments.</p>
+
+      <div class="form-row" style="gap:1.5rem;flex-wrap:wrap">
+        <div class="form-group" style="flex:0 0 auto">
+          <label class="form-label">Frequency (hours, 0 = disabled)</label>
+          <input type="number" name="backup_frequency_hours" min="0"
+                 class="form-input" style="width:8rem"
+                 value="<%= s.backup_frequency_hours || '0' %>">
+        </div>
+        <div class="form-group" style="flex:0 0 auto">
+          <label class="form-label">Retention (days, 0 = keep forever)</label>
+          <input type="number" name="backup_retention_days" min="0"
+                 class="form-input" style="width:8rem"
+                 value="<%= s.backup_retention_days || '30' %>">
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Retention Period (days, 0 = keep forever)</label>
-        <input type="number" name="backup_retention_days" min="0"
-               class="form-input" style="width:8rem"
-               value="<%= s.backup_retention_days || '30' %>">
+      <p class="form-hint">Set BACKUP_DIR in .env to enable. Each backup is a .zip containing the database, .env, and all attachments.</p>
+
+      <hr class="settings-hr">
+
+      <table style="border-collapse:collapse;margin-bottom:1rem;width:100%">
+        <tr>
+          <td style="color:var(--text-muted);font-size:.875rem;padding:.3rem .5rem;white-space:nowrap;width:40%">Database size</td>
+          <td style="font-size:.875rem;padding:.3rem .5rem"><%= backupStatus.dbSizeMb %> MB</td>
+        </tr>
+        <tr>
+          <td style="color:var(--text-muted);font-size:.875rem;padding:.3rem .5rem;white-space:nowrap">Backup directory</td>
+          <td style="font-size:.875rem;padding:.3rem .5rem">
+            <% if (!backupStatus.backupDir) { %>
+              <span style="color:var(--text-muted)">(not configured &mdash; set BACKUP_DIR in .env)</span>
+            <% } else if (!backupStatus.dirExists) { %>
+              <span style="color:#b91c1c"><%= backupStatus.backupDir %> &mdash; does not exist</span>
+            <% } else { %>
+              <%= backupStatus.backupDir %> &mdash; <%= backupStatus.dirSizeMb %> MB used
+            <% } %>
+          </td>
+        </tr>
+        <tr>
+          <td style="color:var(--text-muted);font-size:.875rem;padding:.3rem .5rem;white-space:nowrap">Last backup</td>
+          <td style="font-size:.875rem;padding:.3rem .5rem">
+            <%= backupStatus.lastBackupAt ? formatDateFull(parseInt(backupStatus.lastBackupAt)) : 'Never' %>
+          </td>
+        </tr>
+      </table>
+
+      <% if (backupStatus.recentFiles.length) { %>
+      <div style="margin-bottom:1rem">
+        <div style="font-size:.875rem;font-weight:500;margin-bottom:.4rem">Recent backups</div>
+        <% for (const f of backupStatus.recentFiles) { %>
+          <div style="font-size:.85rem;margin:.2rem 0">
+            <a href="/admin/backup/download/<%= encodeURIComponent(f) %>"><%= f %></a>
+          </div>
+        <% } %>
+      </div>
+      <% } %>
+
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+        <button id="backup-now-btn" type="button" class="btn btn-secondary btn-sm">Backup Now</button>
+        <span id="backup-now-status" style="font-size:.875rem"></span>
       </div>
     </div>
 
@@ -512,121 +617,8 @@
     </div>
   </form>
 
-  <!-- ── Update status (outside main form) ────────────────────── -->
-  <div class="card" id="s-update-status" style="margin-top:1.5rem">
-    <h2 class="settings-section-title">Update Status</h2>
-
-    <p style="font-size:.9rem;margin-bottom:1rem">
-      Running version: <strong>v<%= appVersion %></strong>
-      <% if (updateState.checkedAt) { %>
-        &mdash; Latest: <strong>v<%= updateState.latestVersion %></strong>
-        <% if (updateState.available) { %>
-          <span style="color:#d97706;font-weight:600"> — update available</span>
-        <% } else { %>
-          <span style="color:#16a34a"> — up to date</span>
-        <% } %>
-        <br><span style="font-size:.8rem;color:var(--text-muted)">Last checked: <%= new Date(updateState.checkedAt).toLocaleString() %></span>
-      <% } else { %>
-        <span style="color:var(--text-muted)"> — not yet checked</span>
-      <% } %>
-      <% if (updateState.error) { %>
-        <br><span style="color:#dc2626;font-size:.8rem">Check error: <%= updateState.error %></span>
-      <% } %>
-    </p>
-
-    <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
-      <button type="button" class="btn btn-secondary" id="check-now-btn" onclick="checkNow()">Check Now</button>
-      <% if (updateState.available) { %>
-        <button type="button" class="btn btn-primary" style="background:#d97706;border-color:#b45309"
-                onclick="startInstall()">Install Update (v<%= updateState.latestVersion %>)</button>
-      <% } %>
-      <span id="check-result" style="font-size:.85rem"></span>
-    </div>
-  </div>
-
-  <!-- ── Backup Status (outside main form) ───────────────────── -->
-  <div class="card" id="s-backup-status" style="margin-top:1.5rem">
-    <h2 class="settings-section-title">Backup Status</h2>
-
-    <table style="border-collapse:collapse;margin-bottom:1rem;width:100%">
-      <tr>
-        <td style="color:var(--text-muted);font-size:.875rem;padding:.3rem .5rem;white-space:nowrap">Database size</td>
-        <td style="font-size:.875rem;padding:.3rem .5rem"><%= backupStatus.dbSizeMb %> MB</td>
-      </tr>
-      <tr>
-        <td style="color:var(--text-muted);font-size:.875rem;padding:.3rem .5rem;white-space:nowrap">Backup directory</td>
-        <td style="font-size:.875rem;padding:.3rem .5rem">
-          <% if (!backupStatus.backupDir) { %>
-            <span style="color:var(--text-muted)">(not configured &mdash; set BACKUP_DIR in .env)</span>
-          <% } else if (!backupStatus.dirExists) { %>
-            <span style="color:#b91c1c"><%= backupStatus.backupDir %> &mdash; does not exist</span>
-          <% } else { %>
-            <%= backupStatus.backupDir %> &mdash; <%= backupStatus.dirSizeMb %> MB used
-          <% } %>
-        </td>
-      </tr>
-      <tr>
-        <td style="color:var(--text-muted);font-size:.875rem;padding:.3rem .5rem;white-space:nowrap">Last backup</td>
-        <td style="font-size:.875rem;padding:.3rem .5rem">
-          <%= backupStatus.lastBackupAt ? formatDateFull(parseInt(backupStatus.lastBackupAt)) : 'Never' %>
-        </td>
-      </tr>
-    </table>
-
-    <% if (backupStatus.recentFiles.length) { %>
-    <div style="margin-bottom:1rem">
-      <div style="font-size:.875rem;font-weight:500;margin-bottom:.4rem">Recent backups</div>
-      <% for (const f of backupStatus.recentFiles) { %>
-        <div style="font-size:.85rem;margin:.2rem 0">
-          <a href="/admin/backup/download/<%= encodeURIComponent(f) %>"><%= f %></a>
-        </div>
-      <% } %>
-    </div>
-    <% } %>
-
-    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
-      <button id="backup-now-btn" type="button" class="btn btn-secondary btn-sm">Backup Now</button>
-      <span id="backup-now-status" style="font-size:.875rem"></span>
-    </div>
-  </div>
-
-  <script>
-  (function() {
-    var btn    = document.getElementById('backup-now-btn');
-    var status = document.getElementById('backup-now-status');
-    if (!btn) return;
-    btn.addEventListener('click', async function() {
-      btn.disabled = true;
-      btn.textContent = 'Backing up\u2026';
-      status.textContent = '';
-      status.style.color = '';
-      try {
-        var resp = await fetch('/admin/backup/now', {
-          method: 'POST',
-          headers: { 'X-CSRF-Token': '<%= csrfToken %>' },
-          credentials: 'include',
-        });
-        var data = await resp.json();
-        if (data.ok) {
-          status.textContent = 'Created: ' + data.filename;
-          status.style.color = 'var(--success, #15803d)';
-        } else {
-          status.textContent = 'Failed: ' + (data.error || 'Unknown error');
-          status.style.color = '#b91c1c';
-        }
-      } catch (err) {
-        status.textContent = 'Failed: ' + err.message;
-        status.style.color = '#b91c1c';
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Backup Now';
-      }
-    });
-  })();
-  </script>
-
   <!-- ── Infrastructure (read-only) ──────────────────────────── -->
-  <div class="card" id="s-infrastructure" style="margin-top:1.5rem">
+  <div class="card" id="s-infrastructure" style="margin-top:1rem">
     <h2 class="settings-section-title">Infrastructure</h2>
     <p class="form-hint" style="margin-bottom:1rem">These values come from your <code>.env</code> file and require a server restart to change.</p>
     <table style="width:100%;border-collapse:collapse">
@@ -639,8 +631,8 @@
     </table>
   </div>
 
-  <!-- ── Server Stats ─────────────────────────────────────── -->
-  <div class="card" id="s-server-stats" style="margin-top:1.5rem">
+  <!-- ── Server Stats ─────────────────────────────────────────── -->
+  <div class="card" id="s-server-stats" style="margin-top:1rem">
     <h2 class="settings-section-title">Server Stats</h2>
     <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap">
       <button type="button" class="btn btn-secondary btn-sm" id="stats-load-btn" onclick="loadStats()">Load Stats</button>
@@ -651,65 +643,15 @@
     </div>
   </div>
 
-  <script>
-  async function loadStats() {
-    var btn    = document.getElementById('stats-load-btn');
-    var status = document.getElementById('stats-load-status');
-    var content = document.getElementById('stats-content');
-    var table  = document.getElementById('stats-table');
-    btn.disabled = true;
-    btn.textContent = 'Loading\u2026';
-    status.textContent = '';
-    try {
-      var resp = await fetch('/admin/stats', { credentials: 'include' });
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      var d = await resp.json();
-
-      var rows = [
-        ['Tickets \u2014 New',     d.tickets.new],
-        ['Tickets \u2014 Open',    d.tickets.open],
-        ['Tickets \u2014 On Hold', d.tickets.on_hold],
-        ['Tickets \u2014 Closed',  d.tickets.closed],
-        ['Tickets \u2014 Total',   d.tickets.total],
-        null,
-        ['Attachments',          d.attachments.count + ' files'],
-        ['Attachment storage',   d.attachments.sizeMb + ' MB'],
-        ['Database size',        d.dbSizeMb + ' MB'],
-        ['Log files size',       d.logSizeMb + ' MB'],
-        ['App directory size',   d.appSizeMb + ' MB (excl. node_modules)'],
-        null,
-        ['Emails sent today',        d.emailsSentToday !== null ? d.emailsSentToday : '\u2014 (no log configured)'],
-        ['Emails sent this month',   d.emailsSentThisMonth !== null ? d.emailsSentThisMonth : '\u2014 (no log configured)'],
-      ];
-
-      var html = '';
-      for (var r of rows) {
-        if (!r) { html += '<tr><td colspan="2" style="padding:.4rem 0"></td></tr>'; continue; }
-        html += '<tr style="border-bottom:1px solid var(--border)">'
-          + '<td style="padding:.35rem .5rem .35rem 0;font-size:.85rem;color:var(--text-muted);white-space:nowrap;width:50%">' + r[0] + '</td>'
-          + '<td style="padding:.35rem 0;font-size:.85rem">' + r[1] + '</td>'
-          + '</tr>';
-      }
-      table.innerHTML = html;
-      content.style.display = '';
-      btn.textContent = 'Refresh';
-    } catch (err) {
-      status.textContent = 'Failed: ' + err.message;
-    } finally {
-      btn.disabled = false;
-      if (!status.textContent) btn.textContent = 'Refresh';
-    }
-  }
-  </script>
-
-  <!-- ── Browser cache ─────────────────────────────────────── -->
-  <div class="card" id="s-browser-cache" style="margin-top:1.5rem">
+  <!-- ── Browser Cache ─────────────────────────────────────────── -->
+  <div class="card" id="s-browser-cache" style="margin-top:1rem;margin-bottom:1.5rem">
     <h2 class="settings-section-title">Browser Cache</h2>
     <p class="form-hint" style="margin-bottom:1.25rem">
       If users report stale UI after an update, they can clear their local service-worker cache and reload.
     </p>
     <button type="button" class="btn btn-secondary" onclick="clearSWCache(this)">Clear cached files &amp; reload</button>
   </div>
+
 </main>
 
 <script>
@@ -718,12 +660,10 @@
   if (!nav) return;
 
   const sectionIds = [
-    's-general','s-security','s-due-reminders','s-email','s-uploads','s-features',
-    's-updates','s-urgent-notify','s-inactivity','s-backups','s-update-status','s-backup-status',
-    's-infrastructure','s-server-stats','s-browser-cache',
+    's-site','s-email','s-notifications','s-security','s-uploads','s-features',
+    's-updates','s-backups','s-infrastructure','s-server-stats','s-browser-cache',
   ];
 
-  // Smooth scroll on link click
   nav.querySelectorAll('.settings-sidenav-link').forEach(link => {
     link.addEventListener('click', e => {
       e.preventDefault();
@@ -732,7 +672,6 @@
     });
   });
 
-  // Highlight active section via IntersectionObserver
   const linkMap = {};
   nav.querySelectorAll('.settings-sidenav-link').forEach(a => {
     const id = a.getAttribute('href').slice(1);
@@ -748,7 +687,6 @@
   }
 
   const observer = new IntersectionObserver(entries => {
-    // Pick the topmost visible section
     let topEntry = null;
     for (const e of entries) {
       if (e.isIntersecting) {
@@ -763,6 +701,16 @@
   sectionIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) observer.observe(el);
+  });
+
+  // Mobile ToC: smooth scroll and close on link click
+  document.querySelectorAll('.settings-mobile-toc-nav a').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      const target = document.querySelector(link.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      link.closest('details').removeAttribute('open');
+    });
   });
 })();
 </script>
@@ -792,6 +740,92 @@ async function clearSWCache(btn) {
     for (const k of keys) await caches.delete(k);
   }
   window.location.reload();
+}
+</script>
+
+<script>
+(function() {
+  var btn    = document.getElementById('backup-now-btn');
+  var status = document.getElementById('backup-now-status');
+  if (!btn) return;
+  btn.addEventListener('click', async function() {
+    btn.disabled = true;
+    btn.textContent = 'Backing up…';
+    status.textContent = '';
+    status.style.color = '';
+    try {
+      var resp = await fetch('/admin/backup/now', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': '<%= csrfToken %>' },
+        credentials: 'include',
+      });
+      var data = await resp.json();
+      if (data.ok) {
+        status.textContent = 'Created: ' + data.filename;
+        status.style.color = 'var(--success, #15803d)';
+      } else {
+        status.textContent = 'Failed: ' + (data.error || 'Unknown error');
+        status.style.color = '#b91c1c';
+      }
+    } catch (err) {
+      status.textContent = 'Failed: ' + err.message;
+      status.style.color = '#b91c1c';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Backup Now';
+    }
+  });
+})();
+</script>
+
+<script>
+async function loadStats() {
+  var btn    = document.getElementById('stats-load-btn');
+  var status = document.getElementById('stats-load-status');
+  var content = document.getElementById('stats-content');
+  var table  = document.getElementById('stats-table');
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  status.textContent = '';
+  try {
+    var resp = await fetch('/admin/stats', { credentials: 'include' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var d = await resp.json();
+
+    var rows = [
+      ['Tickets — New',     d.tickets.new],
+      ['Tickets — Open',    d.tickets.open],
+      ['Tickets — On Hold', d.tickets.on_hold],
+      ['Tickets — Closed',  d.tickets.closed],
+      ['Tickets — Total',   d.tickets.total],
+      null,
+      ['Attachments',          d.attachments.count + ' files'],
+      ['Attachment storage',   d.attachments.sizeMb + ' MB'],
+      ['Database size',        d.dbSizeMb + ' MB'],
+      ['Log files size',       d.logSizeMb + ' MB'],
+      ['App directory size',   d.appSizeMb + ' MB (excl. node_modules)'],
+      null,
+      ['Emails sent today',        d.emailsSentToday !== null ? d.emailsSentToday : '— (no log configured)'],
+      ['Emails sent this month',   d.emailsSentThisMonth !== null ? d.emailsSentThisMonth : '— (no log configured)'],
+    ];
+
+    var html = '';
+    for (var r of rows) {
+      if (!r) { html += '<tr><td colspan="2" style="padding:.4rem 0"></td></tr>'; continue; }
+      html += '<tr style="border-bottom:1px solid var(--border)">'
+        + '<td style="padding:.35rem .5rem .35rem 0;font-size:.85rem;color:var(--text-muted);white-space:nowrap;width:50%">' + r[0] + '</td>'
+        + '<td style="padding:.35rem 0;font-size:.85rem">' + r[1] + '</td>'
+        + '</tr>';
+    }
+    table.innerHTML = html;
+    content.style.display = '';
+    btn.textContent = 'Refresh';
+  } catch (err) {
+    status.textContent = 'Failed: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    if (!status.textContent) btn.textContent = 'Refresh';
+  }
 }
 </script>
 
