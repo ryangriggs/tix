@@ -195,45 +195,34 @@
       <% } %>
 
       <!-- Views group -->
-      <%
-        const _activeView = savedViews.find(v => v.id === activeViewId);
-        function _viewsBtnLabel() {
-          return _activeView ? _activeView.name : 'Load view';
-        }
-      %>
+      <% const _activeView = savedViews.find(v => v.id === activeViewId); %>
       <div class="filter-group" id="views-filter-group">
         <span class="filter-row-label">Views</span>
-        <div class="filter-dropdown" id="views-fdd">
-          <button type="button" id="views-fdd-btn"
-                  class="filter-dropdown-btn <%= _activeView ? 'fdd-active' : '' %>"
-                  onclick="fddToggle('views')">
-            <span id="views-fdd-label"><%= _viewsBtnLabel() %></span>
+        <div class="views-split filter-dropdown <%= _activeView ? 'fdd-active' : '' %>" id="views-fdd">
+          <button type="button" class="views-split-main" onclick="fddToggle('views')" title="Load a saved view">
+            <span id="views-fdd-label"><%= _activeView ? _activeView.name : 'Load view' %></span>
             <span class="filter-dropdown-arrow">▾</span>
           </button>
+          <div class="views-split-divider"></div>
+          <button type="button" class="views-split-new" onclick="viewNew()" title="Save current filters as a new view">+</button>
           <div class="filter-dropdown-panel" id="views-fdd-panel">
             <% if (!savedViews.length) { %>
               <div class="filter-dropdown-item" style="color:var(--text-muted);font-style:italic;cursor:default">No saved views yet</div>
             <% } %>
             <% for (const v of savedViews) { %>
-              <div class="filter-dropdown-item views-item <%= v.id === activeViewId ? 'views-item-active' : '' %>"
-                   onclick="loadView(<%= v.id %>)">
-                <span class="views-item-name"><%= v.name %></span>
-                <% if (v.id === activeViewId) { %><span class="views-check">✓</span><% } %>
+              <div class="filter-dropdown-item views-item">
+                <span class="views-item-name <%= v.id === activeViewId ? 'views-item-active' : '' %>"
+                      onclick="loadView(<%= v.id %>)"><%= v.name %><% if (v.id === activeViewId) { %> <span style="color:var(--accent)">✓</span><% } %></span>
+                <span class="views-item-actions">
+                  <button type="button" class="views-icon-btn" onclick="viewSave(<%= v.id %>, event)" title="Save current filters to this view"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button>
+                  <button type="button" class="views-icon-btn" onclick="viewRename(<%= v.id %>, event)" title="Rename this view"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                  <button type="button" class="views-icon-btn views-icon-btn-del" onclick="viewDelete(<%= v.id %>, event)" title="Delete this view"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+                </span>
               </div>
             <% } %>
+            <div id="views-fdd-status" style="font-size:.75rem;color:var(--text-muted);padding:.2rem .85rem;min-height:1.1em"></div>
           </div>
         </div>
-        <button type="button" class="btn btn-secondary view-action-btn" id="view-save-btn"
-                onclick="viewSave()" title="Overwrite this view with current filters"
-                <%= _activeView ? '' : 'disabled' %>>Save</button>
-        <button type="button" class="btn btn-secondary view-action-btn" id="view-rename-btn"
-                onclick="viewRename()" title="Rename this view"
-                <%= _activeView ? '' : 'disabled' %>>Rename</button>
-        <button type="button" class="btn btn-secondary view-action-btn view-action-btn-del" id="view-delete-btn"
-                onclick="viewDelete()" title="Delete this view"
-                <%= _activeView ? '' : 'disabled' %>>Del</button>
-        <button type="button" class="btn btn-secondary view-action-btn" onclick="viewNew()" title="Save current filters as a new view">+ New</button>
-        <span id="view-status"></span>
       </div>
 
     </div>
@@ -242,30 +231,41 @@
   <!-- Mobile sort bar (hidden on desktop) -->
   <div class="mobile-sort-bar">
     <label for="mobile-sort" style="flex-shrink:0">Sort</label>
-    <select id="mobile-sort" class="form-select form-select-sm" onchange="setSort(this.value)">
-      <option value="updated_at"   <%= filters.sort==='updated_at'   ? 'selected':'' %>>Updated</option>
-      <option value="priority"     <%= filters.sort==='priority'     ? 'selected':'' %>>Priority</option>
-      <option value="status"       <%= filters.sort==='status'       ? 'selected':'' %>>Status</option>
-      <option value="id"           <%= filters.sort==='id'           ? 'selected':'' %>>Ticket #</option>
-      <option value="subject"      <%= filters.sort==='subject'      ? 'selected':'' %>>Subject</option>
-      <option value="organization" <%= filters.sort==='organization' ? 'selected':'' %>>Org</option>
+    <select id="mobile-sort" class="form-select form-select-sm" onchange="setSort(this.value, null)">
+      <option value="updated_at"   <%= _srtCols[0]==='updated_at'   ? 'selected':'' %>>Updated</option>
+      <option value="priority"     <%= _srtCols[0]==='priority'     ? 'selected':'' %>>Priority</option>
+      <option value="status"       <%= _srtCols[0]==='status'       ? 'selected':'' %>>Status</option>
+      <option value="id"           <%= _srtCols[0]==='id'           ? 'selected':'' %>>Ticket #</option>
+      <option value="subject"      <%= _srtCols[0]==='subject'      ? 'selected':'' %>>Subject</option>
+      <option value="organization" <%= _srtCols[0]==='organization' ? 'selected':'' %>>Org</option>
     </select>
-    <button type="button" class="btn btn-sm btn-ghost" onclick="setSort('<%= filters.sort %>')" title="Toggle sort direction"><%= filters.order === 'desc' ? '↓' : '↑' %></button>
+    <button type="button" class="btn btn-sm btn-ghost" onclick="setSort('<%= _srtCols[0] || 'priority' %>', null)" title="Toggle sort direction"><%= (_srtDirs[0] || 'desc') === 'desc' ? '↓' : '↑' %></button>
   </div>
 
   <!-- Column headers -->
+  <%
+    const _srtCols = (filters.sort  || '').split(',').map(s => s.trim()).filter(Boolean);
+    const _srtDirs = (filters.order || '').split(',').map(s => s.trim()).filter(Boolean);
+    const _multi   = _srtCols.length > 1;
+    function _sh(col) {
+      const i = _srtCols.indexOf(col);
+      if (i < 0) return '';
+      const arrow = (_srtDirs[i] || 'desc') === 'desc' ? ' ↓' : ' ↑';
+      return arrow + (_multi ? `<span class="sort-prec">${i + 1}</span>` : '');
+    }
+  %>
   <div class="ticket-list-header">
     <div class="tlh-inner">
       <div class="tc-num" style="display:flex;align-items:center;gap:.25rem">
-        <button type="button" class="tlh-sort-btn <%= filters.sort==='status'   ? 'tlh-active':'' %>" onclick="setSort('status')"   title="Sort by status">S<%= filters.sort==='status'   ? (filters.order==='desc'?' ↓':' ↑'):'' %></button>
+        <button type="button" class="tlh-sort-btn <%= _srtCols.includes('status')   ? 'tlh-active':'' %>" onclick="setSort('status',   event)" title="Sort by status (Ctrl+click to add)">S<%- _sh('status') %></button>
         <span style="color:var(--border)">·</span>
-        <button type="button" class="tlh-sort-btn <%= filters.sort==='priority' ? 'tlh-active':'' %>" onclick="setSort('priority')" title="Sort by priority">P<%= filters.sort==='priority' ? (filters.order==='desc'?' ↓':' ↑'):'' %></button>
+        <button type="button" class="tlh-sort-btn <%= _srtCols.includes('priority') ? 'tlh-active':'' %>" onclick="setSort('priority', event)" title="Sort by priority (Ctrl+click to add)">P<%- _sh('priority') %></button>
         <span style="color:var(--border)">·</span>
-        <button type="button" class="tlh-sort-btn <%= filters.sort==='id'       ? 'tlh-active':'' %>" onclick="setSort('id')"       title="Sort by ticket #">#<%= filters.sort==='id'       ? (filters.order==='desc'?' ↓':' ↑'):'' %></button>
+        <button type="button" class="tlh-sort-btn <%= _srtCols.includes('id')       ? 'tlh-active':'' %>" onclick="setSort('id',       event)" title="Sort by ticket # (Ctrl+click to add)">#<%- _sh('id') %></button>
       </div>
-      <button type="button" class="tc-subject tlh-sort-btn <%= filters.sort==='subject'      ? 'tlh-active':'' %>" onclick="setSort('subject')"     >Subject<%= filters.sort==='subject'      ? (filters.order==='desc'?' ↓':' ↑'):'' %></button>
-      <button type="button" class="tc-org     tlh-sort-btn <%= filters.sort==='organization' ? 'tlh-active':'' %>" onclick="setSort('organization')">Org<%= filters.sort==='organization'    ? (filters.order==='desc'?' ↓':' ↑'):'' %></button>
-      <button type="button" class="tc-updated tlh-sort-btn <%= filters.sort==='updated_at'   ? 'tlh-active':'' %>" onclick="setSort('updated_at')"  >Updated<%= filters.sort==='updated_at'   ? (filters.order==='desc'?' ↓':' ↑'):'' %></button>
+      <button type="button" class="tc-subject tlh-sort-btn <%= _srtCols.includes('subject')      ? 'tlh-active':'' %>" onclick="setSort('subject',      event)" title="Ctrl+click to add to sort">Subject<%- _sh('subject') %></button>
+      <button type="button" class="tc-org     tlh-sort-btn <%= _srtCols.includes('organization') ? 'tlh-active':'' %>" onclick="setSort('organization', event)" title="Ctrl+click to add to sort">Org<%- _sh('organization') %></button>
+      <button type="button" class="tc-updated tlh-sort-btn <%= _srtCols.includes('updated_at')   ? 'tlh-active':'' %>" onclick="setSort('updated_at',   event)" title="Ctrl+click to add to sort">Updated<%- _sh('updated_at') %></button>
       <span class="tc-actor tlh-col">Updated by</span>
     </div>
     <% if (user && user.role === 'admin' && tickets.length > 0) { %>
@@ -570,7 +570,8 @@ function _captureFilters() {
 }
 
 function _viewStatus(msg, isError) {
-  const el = document.getElementById('view-status');
+  const el = document.getElementById('views-fdd-status');
+  if (!el) return;
   el.textContent = msg;
   el.style.color = isError ? 'var(--danger)' : 'var(--text-muted)';
   if (msg) setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 2500);
@@ -587,34 +588,34 @@ function loadView(id) {
   window.location.href = '/tickets?' + params.toString();
 }
 
-async function viewSave() {
-  if (!_activeViewId) return;
+async function viewSave(id, event) {
+  event.stopPropagation();
   const body = new URLSearchParams({ _csrf: _viewCsrf, filters: _captureFilters() });
-  const res  = await fetch('/tickets/views/' + _activeViewId + '/save', { method: 'POST', body });
+  const res  = await fetch('/tickets/views/' + id + '/save', { method: 'POST', body });
   const data = await res.json();
   _viewStatus(data.ok ? 'Saved.' : (data.error || 'Error'), !data.ok);
 }
 
-async function viewRename() {
-  if (!_activeViewId) return;
-  const view = _savedViews.find(v => v.id === _activeViewId);
+async function viewRename(id, event) {
+  event.stopPropagation();
+  const view = _savedViews.find(v => v.id === id);
   const name = prompt('Rename view:', view?.name || '');
   if (!name || !name.trim()) return;
   const body = new URLSearchParams({ _csrf: _viewCsrf, name: name.trim() });
-  const res  = await fetch('/tickets/views/' + _activeViewId + '/rename', { method: 'POST', body });
+  const res  = await fetch('/tickets/views/' + id + '/rename', { method: 'POST', body });
   const data = await res.json();
   if (data.ok) { location.reload(); } else { _viewStatus(data.error || 'Error', true); }
 }
 
-async function viewDelete() {
-  if (!_activeViewId) return;
-  const view = _savedViews.find(v => v.id === _activeViewId);
+async function viewDelete(id, event) {
+  event.stopPropagation();
+  const view = _savedViews.find(v => v.id === id);
   if (!confirm('Delete view "' + (view?.name || '') + '"?')) return;
   const body = new URLSearchParams({ _csrf: _viewCsrf });
-  const res  = await fetch('/tickets/views/' + _activeViewId + '/delete', { method: 'POST', body });
+  const res  = await fetch('/tickets/views/' + id + '/delete', { method: 'POST', body });
   const data = await res.json();
   if (data.ok) {
-    document.getElementById('filter-view').value = '';
+    if (id === _activeViewId) document.getElementById('filter-view').value = '';
     document.getElementById('filter-form').submit();
   } else {
     _viewStatus(data.error || 'Error', true);
@@ -635,13 +636,29 @@ async function viewNew() {
   }
 }
 
-function setSort(col) {
+function setSort(col, event) {
   const form = document.getElementById('filter-form');
-  const sortInput = form.querySelector('[name="sort"]');
+  const sortInput  = form.querySelector('[name="sort"]');
   const orderInput = form.querySelector('[name="order"]');
-  const isCurrent = sortInput.value === col;
-  orderInput.value = isCurrent && orderInput.value === 'desc' ? 'asc' : 'desc';
-  sortInput.value = col;
+  const cols   = sortInput.value  ? sortInput.value.split(',')  : [];
+  const orders = orderInput.value ? orderInput.value.split(',') : [];
+
+  if (event && event.ctrlKey) {
+    const idx = cols.indexOf(col);
+    if (idx >= 0) {
+      orders[idx] = (orders[idx] || 'desc') === 'desc' ? 'asc' : 'desc';
+    } else {
+      cols.push(col);
+      orders.push('desc');
+    }
+    sortInput.value  = cols.join(',');
+    orderInput.value = orders.join(',');
+  } else {
+    const isSolo    = cols.length === 1 && cols[0] === col;
+    const curDir    = orders[0] || 'desc';
+    sortInput.value  = col;
+    orderInput.value = isSolo && curDir === 'desc' ? 'asc' : 'desc';
+  }
   form.submit();
 }
 

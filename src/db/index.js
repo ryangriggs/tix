@@ -659,8 +659,15 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
     submitter:     'submitter_name',
     organization:  'organization_name',
   };
-  const sortCol   = validSorts[sort] || 't.updated_at';
-  const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
+  const sortKeys   = String(sort  || 'updated_at').split(',').map(s => s.trim()).filter(Boolean);
+  const sortDirs   = String(order || 'desc'      ).split(',').map(s => s.trim()).filter(Boolean);
+  const sortParts  = sortKeys.map((k, i) => {
+    const col = validSorts[k];
+    if (!col) return null;
+    const dir = (sortDirs[i] || sortDirs[sortDirs.length - 1] || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+    return `${col} ${dir}`;
+  }).filter(Boolean);
+  if (!sortParts.length) sortParts.push('t.updated_at DESC');
 
   // Track the JOIN clause separately so we can build a clean COUNT query
   // without the complex SELECT columns. This avoids fragile regex transforms.
@@ -738,7 +745,7 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
   }
 
   const whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
-  const orderClause = ` ORDER BY CASE t.status WHEN 'new' THEN 0 ELSE 1 END ASC, ${sortCol} ${sortOrder}`;
+  const orderClause = ` ORDER BY CASE t.status WHEN 'new' THEN 0 ELSE 1 END ASC, ${sortParts.join(', ')}`;
 
   // COUNT query — built directly from join+where, no SELECT columns needed
   const countQuery = `SELECT COUNT(DISTINCT t.id) AS total FROM tickets t${joinClause}${whereClause}`;

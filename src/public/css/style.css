@@ -690,20 +690,47 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 .filter-tab-p-high.active   { background: #ffedd5; border-color: #f97316; color: #9a3412; }
 .filter-tab-p-medium.active { background: #dbeafe; border-color: #3b82f6; color: #1e40af; }
 .filter-tab-p-low.active    { background: #f3f4f6; border-color: #9ca3af; color: #374151; }
-/* Views filter group — saved view action buttons */
-.view-action-btn {
-  padding: .2rem .45rem;
-  font-size: .75rem;
-  border-radius: 4px;
+/* Views — split button (dropdown trigger + inline + button) */
+.views-split {
+  display: flex; align-items: stretch;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); position: relative;
+  transition: border-color .1s, background .1s;
 }
-.view-action-btn:disabled { opacity: .4; cursor: not-allowed; }
-.view-action-btn-del { color: var(--danger); border-color: var(--danger) !important; }
-.view-action-btn-del:hover:not(:disabled) { background: var(--danger); color: #fff; }
-.views-item { cursor: pointer; justify-content: space-between; gap: .75rem; }
-.views-item:hover { background: var(--bg); }
+.views-split.fdd-active { border-color: var(--accent); background: #eff6ff; }
+.views-split-main {
+  display: flex; align-items: center; gap: .3rem;
+  padding: .28rem .5rem .28rem .65rem;
+  border: none; background: transparent;
+  color: var(--text-muted); font-size: .8rem;
+  cursor: pointer; font-family: var(--font); white-space: nowrap; line-height: 1.4;
+}
+.views-split.fdd-active .views-split-main { color: #1e40af; }
+.views-split-main:hover { background: rgba(0,0,0,.04); border-radius: 999px 0 0 999px; }
+.views-split-divider { width: 1px; background: var(--border); margin: .3rem 0; flex-shrink: 0; }
+.views-split.fdd-active .views-split-divider { background: #bfdbfe; }
+.views-split-new {
+  display: flex; align-items: center; padding: .28rem .6rem;
+  border: none; background: transparent; border-radius: 0 999px 999px 0;
+  color: var(--text-muted); font-size: .9rem; font-weight: 700;
+  cursor: pointer; font-family: var(--font); line-height: 1;
+}
+.views-split-new:hover { background: rgba(0,0,0,.04); color: var(--text); }
+.views-split.fdd-active .views-split-new { color: #1e40af; }
+/* Views dropdown rows */
+.views-item { justify-content: space-between; gap: .5rem; }
+.views-item-name { flex: 1; cursor: pointer; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .views-item-active { font-weight: 600; color: var(--accent); }
-.views-item-active .views-check { color: var(--accent); flex-shrink: 0; }
-#view-status { font-size: .75rem; color: var(--text-muted); white-space: nowrap; }
+.views-item-actions { display: flex; gap: .05rem; opacity: 0; flex-shrink: 0; transition: opacity .12s; }
+.views-item:hover .views-item-actions { opacity: 1; }
+.views-icon-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; padding: 0;
+  border: none; background: none; cursor: pointer;
+  border-radius: 3px; color: var(--text-muted);
+}
+.views-icon-btn:hover { background: var(--border); color: var(--text); }
+.views-icon-btn-del:hover { color: var(--danger); }
 
 /* Multi-select filter dropdowns (Org, Owner) */
 .filter-dropdown { position: relative; }
@@ -786,6 +813,7 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 }
 .tlh-sort-btn:hover { color: var(--accent); }
 .tlh-sort-btn.tlh-active { color: var(--text); }
+.sort-prec { font-size: .6rem; vertical-align: super; font-weight: 700; opacity: .7; margin-left: .05rem; }
 
 .tlh-ticket-count {
   width: 3.5rem;
