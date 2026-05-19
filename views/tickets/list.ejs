@@ -237,6 +237,7 @@
     <label for="mobile-sort" style="flex-shrink:0">Sort</label>
     <select id="mobile-sort" class="form-select form-select-sm" onchange="setSort(this.value, null)">
       <option value="updated_at"   <%= _srtCols[0]==='updated_at'   ? 'selected':'' %>>Updated</option>
+      <option value="created_at"   <%= _srtCols[0]==='created_at'   ? 'selected':'' %>>Created</option>
       <option value="priority"     <%= _srtCols[0]==='priority'     ? 'selected':'' %>>Priority</option>
       <option value="status"       <%= _srtCols[0]==='status'       ? 'selected':'' %>>Status</option>
       <option value="id"           <%= _srtCols[0]==='id'           ? 'selected':'' %>>Ticket #</option>
@@ -307,7 +308,7 @@
             <span class="tc-subject"><%= t.subject %></span>
             <span class="tc-org"><%= t.organization_name || '' %></span>
             <span class="tc-updated" data-ts="<%= t.updated_at %>" data-actor="<%= t.last_actor || '' %>"><%= formatDate(t.updated_at) %></span>
-            <span class="tc-actor"<% if (t.last_actor && t.last_actor !== t.last_actor_email) { %> title="<%= t.last_actor_email %>"<% } %>><%= t.last_actor || '' %></span>
+            <span class="tc-created" data-ts="<%= t.created_at %>" title="<%= formatDateFull(t.created_at) %>"><%= formatDate(t.created_at) %></span>
           </a>
           <% if (user && user.role === 'admin') { %>
             <label class="ticket-card-checkbox" title="Select ticket">
