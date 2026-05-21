@@ -21,6 +21,10 @@ const config = {
   loginRateLimitPerIpPerHour:    parseInt(process.env.LOGIN_RATE_LIMIT_IP    || '20', 10),
   loginRateLimitPerEmailPerMin:  parseInt(process.env.LOGIN_RATE_LIMIT_EMAIL || '5',  10),
 
+  // ALTCHA proof-of-work CAPTCHA — required for first-time account creation.
+  // Set ALTCHA_HMAC_KEY to a long random string in production.
+  altchaHmacKey: process.env.ALTCHA_HMAC_KEY || 'dev-altcha-key-change-in-production',
+
   // Mailgun inbound webhook — enable or disable the /inbound/mailgun POST endpoint.
   // Automatically defaults to true when mail_transport is mailgun.
   mailgunWebhookEnabled: false, // set dynamically via applySettings

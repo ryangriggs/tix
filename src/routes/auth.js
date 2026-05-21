@@ -5,6 +5,8 @@ const fs     = require('fs');
 const express = require('express');
 const router  = express.Router();
 
+const { createChallenge, verifySolution } = require('altcha-lib');
+
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 const db = require('../db');
@@ -69,6 +71,20 @@ function logUser(email, status) {
   }
 }
 
+// GET /auth/captcha — generates an ALTCHA proof-of-work challenge (public, no auth)
+router.get('/captcha', async (req, res) => {
+  try {
+    const challenge = await createChallenge({
+      hmacKey:   config.altchaHmacKey,
+      maxNumber: 100000,
+      expires:   new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+    });
+    res.json(challenge);
+  } catch (err) {
+    res.status(500).json({ error: 'Could not generate challenge' });
+  }
+});
+
 // GET /auth/login
 router.get('/login', (req, res) => {
   if (req.cookies.session) return res.redirect('/');
@@ -94,6 +110,21 @@ router.post('/login', async (req, res) => {
     logUser(email, 'FAILED - email rate limited');
     // Return generic message to avoid confirming email existence
     return res.render('auth/login', { title: 'Log in', error: 'Too many login attempts. Please try again in a minute.', email, next });
+  }
+
+  // For unrecognised email addresses, require a solved ALTCHA challenge before
+  // creating the account — prevents automated account enumeration / spam signups.
+  const existingUser = db.getUserByEmail(email);
+  if (!existingUser) {
+    const payload = req.body.altcha;
+    let captchaOk = false;
+    if (payload) {
+      try { captchaOk = await verifySolution(payload, config.altchaHmacKey); } catch (_) {}
+    }
+    if (!captchaOk) {
+      logUser(email, 'FAILED - captcha required for new account');
+      return res.render('auth/login', { title: 'Log in', error: 'Please complete the verification check and try again.', email, next });
+    }
   }
 
   const user = db.findOrCreateUser(email);
