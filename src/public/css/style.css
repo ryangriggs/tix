@@ -844,11 +844,11 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
   background: var(--border);
   transform: translateX(-50%);
   border-radius: 1px;
-  opacity: 0;
-  transition: opacity .15s;
+  opacity: 0.5;
+  transition: opacity .15s, background .15s;
 }
 .col-resizer:hover::after,
-.col-resizer.dragging::after { opacity: 1; }
+.col-resizer.dragging::after { opacity: 1; background: var(--accent); }
 
 .tlh-ticket-count {
   width: 3.5rem;
