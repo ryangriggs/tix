@@ -745,7 +745,7 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
   }
 
   const whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
-  const orderClause = ` ORDER BY CASE t.status WHEN 'new' THEN 0 ELSE 1 END ASC, ${sortParts.join(', ')}`;
+  const orderClause = ` ORDER BY ${sortParts.join(', ')}`;
 
   // COUNT query — built directly from join+where, no SELECT columns needed
   const countQuery = `SELECT COUNT(DISTINCT t.id) AS total FROM tickets t${joinClause}${whereClause}`;

@@ -826,7 +826,7 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 .ticket-list-header .tc-created { position: relative; overflow: visible; }
 .col-resizer {
   position: absolute;
-  right: -5px;
+  right: -5px;  /* default: right-edge handle (num column) */
   top: 0;
   height: 100%;
   width: 10px;
@@ -834,6 +834,7 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
   z-index: 5;
   user-select: none;
 }
+.col-resizer.col-resizer-left { right: auto; left: -5px; }
 .col-resizer::after {
   content: '';
   position: absolute;
@@ -841,12 +842,13 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
   top: 15%;
   height: 70%;
   width: 2px;
-  background: var(--border);
+  background: #475569;
   transform: translateX(-50%);
   border-radius: 1px;
-  opacity: 0.5;
-  transition: opacity .15s, background .15s;
+  opacity: 0;
+  transition: opacity .12s, background .12s;
 }
+.ticket-list-header:hover .col-resizer::after { opacity: 0.45; }
 .col-resizer:hover::after,
 .col-resizer.dragging::after { opacity: 1; background: var(--accent); }
 

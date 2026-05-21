@@ -751,11 +751,13 @@ if (_searchInput && _searchClear) {
 // ---- Resizable columns ----
 (function() {
   const STORAGE_KEY = 'tix-col-widths';
+  // left:true  → handle at left edge of cell (before this column); drag right = column shrinks
+  // left:false → handle at right edge of cell (before next column); drag right = column grows
   const COLS = {
-    num:     { def: 90,  min: 55 },
-    org:     { def: 130, min: 60 },
-    updated: { def: 80,  min: 55 },
-    created: { def: 110, min: 55 },
+    num:     { def: 90,  min: 55, left: false },
+    org:     { def: 130, min: 60, left: true  },
+    updated: { def: 80,  min: 55, left: true  },
+    created: { def: 110, min: 55, left: true  },
   };
 
   // Apply stored widths immediately so the grid matches on first paint
@@ -784,7 +786,7 @@ if (_searchInput && _searchClear) {
     if (!cell) continue;
 
     const handle = document.createElement('div');
-    handle.className = 'col-resizer';
+    handle.className = COLS[col].left ? 'col-resizer col-resizer-left' : 'col-resizer';
     cell.appendChild(handle);
 
     let startX, startW;
@@ -799,7 +801,9 @@ if (_searchInput && _searchClear) {
       document.body.style.userSelect = 'none';
 
       function onMove(e) {
-        const w = Math.max(COLS[col].min, startW + e.clientX - startX);
+        const delta = e.clientX - startX;
+        // Left-edge handle: drag right = column shrinks (inverted); right-edge: drag right = grows
+        const w = Math.max(COLS[col].min, COLS[col].left ? startW - delta : startW + delta);
         document.documentElement.style.setProperty('--tc-col-' + col, w + 'px');
       }
       function onUp() {
