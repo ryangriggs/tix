@@ -747,6 +747,84 @@ if (_searchInput && _searchClear) {
     document.getElementById('filter-form').submit();
   });
 }
+
+// ---- Resizable columns ----
+(function() {
+  const STORAGE_KEY = 'tix-col-widths';
+  const COLS = {
+    num:     { def: 90,  min: 55 },
+    org:     { def: 130, min: 60 },
+    updated: { def: 80,  min: 55 },
+    created: { def: 110, min: 55 },
+  };
+
+  // Apply stored widths immediately so the grid matches on first paint
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    for (const col in COLS) {
+      const w = Math.max(COLS[col].min, saved[col] || COLS[col].def);
+      document.documentElement.style.setProperty('--tc-col-' + col, w + 'px');
+    }
+  } catch(e) {}
+
+  function saveWidths() {
+    const widths = {};
+    for (const col in COLS) {
+      const raw = document.documentElement.style.getPropertyValue('--tc-col-' + col);
+      widths[col] = parseInt(raw) || COLS[col].def;
+    }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(widths)); } catch(e) {}
+  }
+
+  const header = document.querySelector('.ticket-list-header');
+  if (!header) return;
+
+  for (const col in COLS) {
+    const cell = header.querySelector('.tc-' + col);
+    if (!cell) continue;
+
+    const handle = document.createElement('div');
+    handle.className = 'col-resizer';
+    cell.appendChild(handle);
+
+    let startX, startW;
+
+    handle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      startX = e.clientX;
+      startW = cell.getBoundingClientRect().width;
+      handle.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+
+      function onMove(e) {
+        const w = Math.max(COLS[col].min, startW + e.clientX - startX);
+        document.documentElement.style.setProperty('--tc-col-' + col, w + 'px');
+      }
+      function onUp() {
+        handle.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        saveWidths();
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    // Prevent click-without-drag from triggering sort
+    handle.addEventListener('click', e => e.stopPropagation());
+
+    // Double-click to reset this column to its default width
+    handle.addEventListener('dblclick', function(e) {
+      e.stopPropagation();
+      document.documentElement.style.setProperty('--tc-col-' + col, COLS[col].def + 'px');
+      saveWidths();
+    });
+  }
+})();
 </script>
 
 <%- include('../partials/foot') %>

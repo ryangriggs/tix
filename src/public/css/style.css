@@ -22,6 +22,10 @@
   --shadow-md:    0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -1px rgba(0,0,0,.06);
   --font:         -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --header-h:     56px;
+  --tc-col-num:     90px;
+  --tc-col-org:     130px;
+  --tc-col-updated: 80px;
+  --tc-col-created: 110px;
 }
 
 /* ============================================================
@@ -780,7 +784,7 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 
 .tlh-inner {
   display: grid;
-  grid-template-columns: 90px 1fr 130px 80px 110px;
+  grid-template-columns: var(--tc-col-num) minmax(80px, 1fr) var(--tc-col-org) var(--tc-col-updated) var(--tc-col-created);
   grid-template-areas: "num subject org updated created";
   align-items: center;
   gap: 0.625rem;
@@ -814,6 +818,37 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 .tlh-sort-btn:hover { color: var(--accent); }
 .tlh-sort-btn.tlh-active { color: var(--text); }
 .sort-prec { font-size: .6rem; vertical-align: super; font-weight: 700; opacity: .7; margin-left: .05rem; }
+
+/* Resizable column handles (header row only) */
+.ticket-list-header .tc-num,
+.ticket-list-header .tc-org,
+.ticket-list-header .tc-updated,
+.ticket-list-header .tc-created { position: relative; overflow: visible; }
+.col-resizer {
+  position: absolute;
+  right: -5px;
+  top: 0;
+  height: 100%;
+  width: 10px;
+  cursor: col-resize;
+  z-index: 5;
+  user-select: none;
+}
+.col-resizer::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 15%;
+  height: 70%;
+  width: 2px;
+  background: var(--border);
+  transform: translateX(-50%);
+  border-radius: 1px;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.col-resizer:hover::after,
+.col-resizer.dragging::after { opacity: 1; }
 
 .tlh-ticket-count {
   width: 3.5rem;
@@ -928,7 +963,7 @@ select.badge-role { cursor: pointer; border: 1px solid var(--border); padding: 1
 /* Single-row grid inside the card link */
 .ticket-card-link {
   display: grid;
-  grid-template-columns: 90px 1fr 130px 80px 110px;
+  grid-template-columns: var(--tc-col-num) minmax(80px, 1fr) var(--tc-col-org) var(--tc-col-updated) var(--tc-col-created);
   grid-template-areas: "num subject org updated created";
   align-items: center;
   gap: 0.625rem;
@@ -1734,7 +1769,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     grid-template-columns: auto 1fr auto;
     grid-template-areas:
       "num subject updated"
-      "org org actor";
+      "org org created";
     gap: 0.2rem 0.5rem;
     padding: 0.625rem 0.75rem;
   }
