@@ -29,11 +29,16 @@ Settings that stay in .env (restart-required):
 - PORT, SMTP_PORT, DATA_DIR, UPLOADS_DIR, EMAIL_LOG, USER_LOG
 
 Settings in DB (editable in UI):
-- General: app_url, ticket_email, ticket_silent_email, ticket_prefix, mail_from_name, admin_email, site_name, default_assignee_email
-- Security: jwt_secret, secure_session, otp_max_tries, otp_lockout_seconds
-- Mail: mail_transport, mailgun_api_key, mailgun_domain, smtp_relay_host/port/user/pass, gmail_client_id/secret/refresh_token/user
-- Uploads: upload_allowed_extensions, upload_blocked_extensions, email_rate_limit_per_ticket/new_tickets
-- Reminders: reminder_count, reminder_frequency_hours
+- Site & Identity: site_name, app_url, ticket_prefix, ticket_email, ticket_silent_email, mail_from_name, admin_email, default_assignee_email
+- Security: jwt_secret, secure_session, otp_max_tries, otp_lockout_seconds, login_rate_limit_ip, login_rate_limit_email
+- Mail transport: mail_transport, mail_queue_delay_ms, mailgun_api_key, mailgun_domain, smtp_relay_host/port/user/pass, resend_api_key, gmail_client_id/secret/refresh_token/user
+- Inbound email security: mailgun_webhook_enabled, enforce_spf, enforce_dkim
+- Notifications: notify_email_submitter, notify_email_status_change, urgent_notify_user_ids
+- Uploads: upload_max_size_mb, upload_allowed_extensions, upload_blocked_extensions, annotation_extensions, email_rate_limit_per_ticket/new_tickets
+- Reminders: reminder_count, reminder_frequency_hours, inactivity_hours_urgent/high/medium/low
+- Features: enable_billable_hours, enable_location
+- Updates: update_check_enabled, update_repo_url, update_check_interval_hours
+- Backups: backup_frequency_hours, backup_retention_days (requires BACKUP_DIR in .env)
 
 Note: changing ticket_email in UI updates outbound links immediately but NOT the SMTP server's domain filter (that's bound at startup).
 

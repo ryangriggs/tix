@@ -51,6 +51,15 @@ const data = await sidebarPost(url, { key: value });
 
 ## views/tickets/list.ejs
 
+### Ticket list columns
+Grid: `num subject org updated created` (5 columns). CSS class → grid-area:
+- `.tc-num` → num (90px): priority dot + ticket ID
+- `.tc-subject` → subject (1fr)
+- `.tc-org` → org (130px)
+- `.tc-updated` → updated (80px): relative update time, `data-ts` + `data-actor` attrs
+- `.tc-created` → created (110px): relative creation time, `data-ts` attr — replaced the old `.tc-actor` "Updated by" column (2026-05)
+Both date columns are sortable (click or Ctrl+click). Multi-sort via comma-separated `sort`/`order` query params. Mobile sort bar includes `created_at` option.
+
 ### Filter bar
 Hidden inputs: `filter-status`, `filter-priority`, `filter-since`, `sort`, `order`.
 Visible selects: org, owner (admin/tech only). All changes submit `filter-form`.
@@ -165,15 +174,24 @@ Dialog form fields:
 - Delete blocked by server if `isLocationReferenced(id)` → shows alert with error message
 
 ## views/admin/settings.ejs
-Organized sections (all in one form, one Save button):
-1. General (app_url, site_name, ticket_email, ticket_silent_email, ticket_prefix, mail_from_name, admin_email, default_assignee_email)
-2. Security (jwt_secret password input, secure_session checkbox, otp_max_tries, otp_lockout_seconds)
-3. Due-date reminders (reminder_count, reminder_frequency_hours)
-4. Email Transport (mail_transport select + conditional subsections for mailgun/smtp/gmail)
-   - JS hides/shows transport subsections based on select value
-5. Uploads & Rate Limits (extensions, rate limits)
-6. Infrastructure — read-only table from `infra` object (PORT, SMTP_PORT, etc.)
-7. Browser Cache — clear SW cache button
+Reorganized (2026-05) into 7 sections. All config in one `<form>`, one Save button. Floating sidebar on desktop (≥1060px); collapsible `<details>` ToC at top on mobile (<768px).
+
+Section IDs and content:
+- `#s-site` — Site & Identity: site_name, app_url, ticket_prefix, ticket_email(s), mail_from_name, admin_email, default_assignee_email
+- `#s-email` — Email Transport: transport selector + mailgun/smtp/gmail/resend credentials, queue_delay, mailgun webhook, SPF/DKIM enforcement. JS hides/shows `#transport-{type}` subsections.
+- `#s-notifications` — Notifications & Reminders: notify_email_submitter/status_change checkboxes; urgent notify user-picker; due-date reminder count/freq; inactivity reminder hours per priority
+- `#s-security` — Security: jwt_secret, secure_session, otp_max_tries, otp_lockout_seconds, login_rate_limit_ip/email
+- `#s-uploads` — Uploads: upload_max_size_mb, upload_allowed/blocked_extensions, annotation_extensions, email rate limits
+- `#s-features` — Features: enable_billable_hours, enable_location
+- `#s-system` — Group label div (anchor target, not a card)
+- `#s-updates` — Updates (inside form): auto-check checkbox, repo URL, check interval + inline status + Check Now/Install buttons (AJAX, type="button")
+- `#s-backups` — Backups (inside form): frequency, retention + inline status table + Backup Now button (AJAX, type="button")
+- `#s-infrastructure` — Infrastructure: read-only .env values table (outside form)
+- `#s-server-stats` — Server Stats: Load Stats → AJAX table (outside form)
+- `#s-browser-cache` — Browser Cache: clear SW cache button (outside form)
+
+Sidebar: `.settings-sidenav-link` for top 6, `.settings-sidenav-group` label for System, `.settings-sidenav-link.sub` for indented system sub-links.
+Mobile ToC: `.settings-mobile-toc` (hidden on desktop, `display:block` on mobile <768px) wraps `<details>/<summary>` with `.settings-mobile-toc-nav` links; `.toc-group-label` + `.toc-sub` for System sub-items.
 
 ## views/reports/index.ejs
 - Billing Report card: date range → `/reports/billing.csv`
@@ -206,7 +224,12 @@ Images are stripped from the body before this template renders (handled in mail.
 - `.flat-dot`, `.flat-dot-{status}` — status circles in filter tabs
 - `.reports-grid`, `.report-card`, `.report-card-title`, `.report-card-desc`
 - `.modal-dialog`, `.modal-header`, `.modal-body`, `.modal-footer` — native `<dialog>` styling
-- `.settings-section-title`, `.settings-sub-title`, `.settings-transport-section`
+- `.settings-section-title`, `.settings-sub-title`, `.settings-transport-section`, `.settings-hr`
+- `.settings-section-group-label` — uppercase label separating sidebar groups (e.g. "System")
+- `.settings-sidenav-group` — sidebar group header (smaller, uppercase, border-top separator)
+- `.settings-sidenav-link.sub` — indented sub-link (padding-left:1.35rem, font-size:.73rem)
+- `.settings-mobile-toc` — hidden on desktop, block on mobile; wraps details/summary ToC
+- `.settings-mobile-toc-nav` — nav inside the ToC; `.toc-group-label` for section labels, `.toc-sub` for indented links
 - `.billing-total` — sidebar billable hours total
 - `.nav-dropdown`, `.nav-dropdown-menu`, `.nav-dropdown-item`, `.nav-dropdown-toggle`
 - `.timeline-page`, `.timeline-main`, `.timeline-sidebar`, `.timeline-sidebar-header`, `.timeline-sidebar-body`
