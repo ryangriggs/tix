@@ -510,6 +510,7 @@ router.post('/settings', (req, res) => {
     email_rate_limit_new_tickets:   String(rateLimitNew),
     login_rate_limit_ip:            String(Math.max(1, int('login_rate_limit_ip', 20))),
     login_rate_limit_email:         String(Math.max(1, int('login_rate_limit_email', 5))),
+    altcha_enabled:                 req.body.altcha_enabled === '1' ? 'true' : 'false',
     mailgun_webhook_enabled:        req.body.mailgun_webhook_enabled === 'true' ? 'true' : 'false',
     reminder_count:                 String(reminderCount),
     reminder_frequency_hours:       String(reminderFreq),

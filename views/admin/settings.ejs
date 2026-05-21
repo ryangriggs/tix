@@ -406,6 +406,19 @@
         </div>
       </div>
       <p class="form-hint">Limits magic link requests to prevent email bombing. Resets on server restart.</p>
+
+      <hr class="settings-hr">
+      <h3 class="settings-sub-title">CAPTCHA</h3>
+
+      <div class="form-group">
+        <label>ALTCHA verification for new accounts</label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="altcha_enabled" value="1"
+                 <%= (s.altcha_enabled === undefined || s.altcha_enabled !== 'false') ? 'checked' : '' %>>
+          Require ALTCHA proof-of-work verification when an unrecognised email address attempts to sign in for the first time
+        </label>
+        <p class="form-hint">Does not affect existing accounts. ALTCHA runs automatically in the browser with no user interaction required.</p>
+      </div>
     </div>
 
     <!-- ── Uploads ────────────────────────────────────────────── -->

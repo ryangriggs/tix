@@ -25,6 +25,7 @@
           class="form-input"
         >
       </div>
+      <% if (altchaEnabled) { %>
       <altcha-widget
         challengeurl="/auth/captcha"
         workerurl="/js/altcha-worker.js"
@@ -32,9 +33,12 @@
         hidefooter
         style="display:block;margin-bottom:.75rem"
       ></altcha-widget>
+      <% } %>
       <button type="submit" class="btn btn-primary btn-full" id="login-btn">Send login link</button>
     </form>
+    <% if (altchaEnabled) { %>
     <script type="module" src="/js/altcha.min.js"></script>
+    <% } %>
   </div>
 </main>
 

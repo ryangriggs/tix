@@ -85,11 +85,15 @@ router.get('/captcha', async (req, res) => {
   }
 });
 
+function loginRender(res, opts) {
+  res.render('auth/login', { title: 'Log in', altchaEnabled: config.altchaEnabled, ...opts });
+}
+
 // GET /auth/login
 router.get('/login', (req, res) => {
   if (req.cookies.session) return res.redirect('/');
   const next = safeRedirectUrl(req.query.next);
-  res.render('auth/login', { title: 'Log in', error: null, email: '', next });
+  loginRender(res, { error: null, email: '', next });
 });
 
 // POST /auth/login — send magic link + OTP
@@ -98,24 +102,24 @@ router.post('/login', async (req, res) => {
   const next  = safeRedirectUrl(req.body.next);
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.render('auth/login', { title: 'Log in', error: 'Please enter a valid email address.', email, next });
+    return loginRender(res, { error: 'Please enter a valid email address.', email, next });
   }
 
   const limited = checkLoginRateLimit(clientIp(req), email);
   if (limited === 'ip') {
     logUser(email, 'FAILED - IP rate limited');
-    return res.render('auth/login', { title: 'Log in', error: 'Too many login attempts from your network. Please try again later.', email, next });
+    return loginRender(res, { error: 'Too many login attempts from your network. Please try again later.', email, next });
   }
   if (limited === 'email') {
     logUser(email, 'FAILED - email rate limited');
     // Return generic message to avoid confirming email existence
-    return res.render('auth/login', { title: 'Log in', error: 'Too many login attempts. Please try again in a minute.', email, next });
+    return loginRender(res, { error: 'Too many login attempts. Please try again in a minute.', email, next });
   }
 
   // For unrecognised email addresses, require a solved ALTCHA challenge before
   // creating the account — prevents automated account enumeration / spam signups.
   const existingUser = db.getUserByEmail(email);
-  if (!existingUser) {
+  if (!existingUser && config.altchaEnabled) {
     const payload = req.body.altcha;
     let captchaOk = false;
     if (payload) {
@@ -123,15 +127,15 @@ router.post('/login', async (req, res) => {
     }
     if (!captchaOk) {
       logUser(email, 'FAILED - captcha required for new account');
-      return res.render('auth/login', { title: 'Log in', error: 'Please complete the verification check and try again.', email, next });
+      return loginRender(res, { error: 'Please complete the verification check and try again.', email, next });
     }
   }
 
   const user = db.findOrCreateUser(email);
   if (user._isNew) sendAdminNewUserNotification(user, 'First login (magic link request)').catch(console.error);
   if (user.blocked_at) {
-    logUser(email, 'FAILED - account blocked');
-    return res.render('auth/login', { title: 'Log in', error: 'This account has been blocked.', email, next });
+    logUser(email, 'FAILED - account disabled');
+    return loginRender(res, { error: 'This account is disabled.', email, next });
   }
 
   // Cryptographically secure 6-digit OTP
