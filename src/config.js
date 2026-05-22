@@ -21,10 +21,11 @@ const config = {
   loginRateLimitPerIpPerHour:    parseInt(process.env.LOGIN_RATE_LIMIT_IP    || '20', 10),
   loginRateLimitPerEmailPerMin:  parseInt(process.env.LOGIN_RATE_LIMIT_EMAIL || '5',  10),
 
-  // ALTCHA proof-of-work CAPTCHA — required for first-time account creation.
-  // Set ALTCHA_HMAC_KEY to a long random string in production.
-  altchaHmacKey:  process.env.ALTCHA_HMAC_KEY || 'dev-altcha-key-change-in-production',
-  altchaEnabled:  true, // toggled via admin settings UI
+  // Cloudflare Turnstile CAPTCHA — shown to new (unrecognised) email addresses only.
+  // Keys are set via the admin settings page, not environment variables.
+  turnstileEnabled:   false,
+  turnstileSiteKey:   '',
+  turnstileSecretKey: '',
 
   // Mailgun inbound webhook — enable or disable the /inbound/mailgun POST endpoint.
   // Automatically defaults to true when mail_transport is mailgun.
@@ -152,7 +153,9 @@ function applySettings(map) {
 
   if ('login_rate_limit_ip'    in map) config.loginRateLimitPerIpPerHour   = parseInt(map.login_rate_limit_ip,    10) || 20;
   if ('login_rate_limit_email' in map) config.loginRateLimitPerEmailPerMin = parseInt(map.login_rate_limit_email, 10) || 5;
-  if ('altcha_enabled'         in map) config.altchaEnabled = map.altcha_enabled !== 'false';
+  if ('turnstile_enabled'    in map) config.turnstileEnabled   = map.turnstile_enabled === 'true';
+  if ('turnstile_site_key'   in map) config.turnstileSiteKey   = map.turnstile_site_key   || '';
+  if ('turnstile_secret_key' in map) config.turnstileSecretKey = map.turnstile_secret_key || '';
 
   if ('enforce_spf'  in map) config.enforceSPF  = map.enforce_spf  === 'true';
   if ('enforce_dkim' in map) config.enforceDKIM = map.enforce_dkim === 'true';

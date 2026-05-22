@@ -39,6 +39,18 @@
           <option value="low">⚫ Low</option>
         </select>
       </div>
+      <% if (isTechOrAdmin) { %>
+      <div class="form-group">
+        <label for="status">Status</label>
+        <select id="status" name="status" class="form-select">
+          <option value="new" selected>New</option>
+          <option value="open">Open</option>
+          <option value="pending">Pending</option>
+          <option value="on_hold">On hold</option>
+          <option value="closed">Closed</option>
+        </select>
+      </div>
+      <% } %>
       <div class="form-group">
         <label for="due_date">Due date <span class="optional">(optional)</span></label>
         <input type="date" id="due_date" name="due_date" class="form-input">

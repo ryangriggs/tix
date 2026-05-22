@@ -408,16 +408,33 @@
       <p class="form-hint">Limits magic link requests to prevent email bombing. Resets on server restart.</p>
 
       <hr class="settings-hr">
-      <h3 class="settings-sub-title">CAPTCHA</h3>
+      <h3 class="settings-sub-title">CAPTCHA (Cloudflare Turnstile)</h3>
 
       <div class="form-group">
-        <label>ALTCHA verification for new accounts</label>
         <label class="checkbox-label">
-          <input type="checkbox" name="altcha_enabled" value="1"
-                 <%= (s.altcha_enabled === undefined || s.altcha_enabled !== 'false') ? 'checked' : '' %>>
-          Require ALTCHA proof-of-work verification when an unrecognised email address attempts to sign in for the first time
+          <input type="checkbox" name="turnstile_enabled" value="1"
+                 <%= s.turnstile_enabled === 'true' ? 'checked' : '' %>>
+          Require Turnstile verification when an unrecognised email address attempts to sign in for the first time
         </label>
-        <p class="form-hint">Does not affect existing accounts. ALTCHA runs automatically in the browser with no user interaction required.</p>
+        <p class="form-hint">Does not affect existing accounts. New users see an intermediate verification screen before any account is created or email is sent.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="turnstile_site_key">Site Key <span class="optional">(public)</span></label>
+        <input type="text" id="turnstile_site_key" name="turnstile_site_key"
+               value="<%= s.turnstile_site_key || '' %>" class="form-input"
+               placeholder="1x00000000000000000000AA" autocomplete="off">
+      </div>
+
+      <div class="form-group">
+        <label for="turnstile_secret_key">Secret Key</label>
+        <input type="password" id="turnstile_secret_key" name="turnstile_secret_key"
+               value="<%= s.turnstile_secret_key || '' %>" autocomplete="new-password" class="form-input"
+               placeholder="1x0000000000000000000000000000000AA">
+        <p class="form-hint">
+          Get your keys at <a href="https://dash.cloudflare.com/?to=/:account/turnstile" target="_blank" rel="noopener">dash.cloudflare.com → Turnstile</a>.
+          Create a site, choose <strong>Managed</strong> challenge type, and add your domain.
+        </p>
       </div>
     </div>
 

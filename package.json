@@ -1,6 +1,6 @@
 {
   "name": "tix",
-  "version": "1.2.48",
+  "version": "1.2.49",
   "description": "Simple email-based ticketing system",
   "main": "src/tix.js",
   "scripts": {
@@ -11,8 +11,6 @@
     "gmail-test": "node scripts/gmail-test.js"
   },
   "dependencies": {
-    "altcha": "^2.3.0",
-    "altcha-lib": "^1.4.1",
     "archiver": "^7.0.1",
     "cookie-parser": "^1.4.6",
     "dotenv": "^17.3.1",

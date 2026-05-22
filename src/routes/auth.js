@@ -5,8 +5,6 @@ const fs     = require('fs');
 const express = require('express');
 const router  = express.Router();
 
-const { createChallenge, verifySolution } = require('altcha-lib');
-
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 const db = require('../db');
@@ -47,8 +45,6 @@ function checkLoginRateLimit(ip, email) {
 }
 
 function clientIp(req) {
-  // Trust X-Forwarded-For only if behind a known proxy (configurable).
-  // For simplicity, use the first non-private IP or fall back to socket address.
   const forwarded = req.headers['x-forwarded-for'];
   if (forwarded) return forwarded.split(',')[0].trim();
   return req.socket?.remoteAddress || 'unknown';
@@ -71,22 +67,26 @@ function logUser(email, status) {
   }
 }
 
-// GET /auth/captcha — generates an ALTCHA proof-of-work challenge (public, no auth)
-router.get('/captcha', async (req, res) => {
-  try {
-    const challenge = await createChallenge({
-      hmacKey:   config.altchaHmacKey,
-      maxNumber: 100000,
-      expires:   new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
-    });
-    res.json(challenge);
-  } catch (err) {
-    res.status(500).json({ error: 'Could not generate challenge' });
-  }
-});
-
 function loginRender(res, opts) {
-  res.render('auth/login', { title: 'Log in', altchaEnabled: config.altchaEnabled, ...opts });
+  res.render('auth/login', { title: 'Log in', ...opts });
+}
+
+function signupRender(res, opts) {
+  res.render('auth/signup', { title: 'Verify you\'re human', turnstileSiteKey: config.turnstileSiteKey, ...opts });
+}
+
+// Shared: issue OTP + magic link, then redirect to verify page.
+async function sendOtp(res, user, email, next, onError) {
+  const otp = String(crypto.randomInt(100000, 1000000));
+  const { tokenId, rawToken } = db.createAuthToken(user.id, otp);
+  const magicLink = `${config.appUrl}/auth/verify?t=${tokenId}&k=${rawToken}&next=${encodeURIComponent(next)}`;
+  try {
+    await sendMagicLink(email, magicLink, otp);
+    res.redirect(`/auth/verify?t=${tokenId}&sent=1&next=${encodeURIComponent(next)}`);
+  } catch (err) {
+    console.error('[Auth] Failed to send magic link:', err);
+    onError();
+  }
 }
 
 // GET /auth/login
@@ -96,7 +96,11 @@ router.get('/login', (req, res) => {
   loginRender(res, { error: null, email: '', next });
 });
 
-// POST /auth/login — send magic link + OTP
+// POST /auth/login
+// - Existing active user  → send OTP immediately
+// - Existing blocked user → show "account disabled"
+// - Unknown email + Turnstile configured → redirect to /auth/signup captcha page
+// - Unknown email + Turnstile not configured → create account and send OTP directly
 router.post('/login', async (req, res) => {
   const email = (req.body.email || '').trim().toLowerCase();
   const next  = safeRedirectUrl(req.body.next);
@@ -112,46 +116,86 @@ router.post('/login', async (req, res) => {
   }
   if (limited === 'email') {
     logUser(email, 'FAILED - email rate limited');
-    // Return generic message to avoid confirming email existence
     return loginRender(res, { error: 'Too many login attempts. Please try again in a minute.', email, next });
   }
 
-  // For unrecognised email addresses, require a solved ALTCHA challenge before
-  // creating the account — prevents automated account enumeration / spam signups.
   const existingUser = db.getUserByEmail(email);
-  if (!existingUser && config.altchaEnabled) {
-    const payload = req.body.altcha;
-    let captchaOk = false;
-    if (payload) {
-      try { captchaOk = await verifySolution(payload, config.altchaHmacKey); } catch (_) {}
+
+  if (!existingUser) {
+    if (config.turnstileEnabled && config.turnstileSiteKey) {
+      return res.redirect(`/auth/signup?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}`);
     }
-    if (!captchaOk) {
-      logUser(email, 'FAILED - captcha required for new account');
-      return loginRender(res, { error: 'Please complete the verification check and try again.', email, next });
+    // Turnstile not configured — create account and send OTP directly
+    const user = db.findOrCreateUser(email);
+    if (user._isNew) sendAdminNewUserNotification(user, 'First login (magic link request)').catch(console.error);
+    return sendOtp(res, user, email, next, () =>
+      loginRender(res, { error: 'Could not send login email. Please try again.', email, next })
+    );
+  }
+
+  if (existingUser.blocked_at) {
+    logUser(email, 'FAILED - account disabled');
+    return loginRender(res, { error: 'This account is disabled.', email, next });
+  }
+
+  return sendOtp(res, existingUser, email, next, () =>
+    loginRender(res, { error: 'Could not send login email. Please try again.', email, next })
+  );
+});
+
+// GET /auth/signup — Turnstile verification page for new accounts only
+router.get('/signup', (req, res) => {
+  if (!config.turnstileEnabled || !config.turnstileSiteKey) return res.redirect('/auth/login');
+  const email = (req.query.email || '').trim().toLowerCase();
+  const next  = safeRedirectUrl(req.query.next);
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.redirect('/auth/login');
+  if (db.getUserByEmail(email)) return res.redirect('/auth/login');
+  signupRender(res, { error: null, email, next });
+});
+
+// POST /auth/signup — verify Turnstile token, then create account and send OTP
+router.post('/signup', async (req, res) => {
+  const email = (req.body.email || '').trim().toLowerCase();
+  const next  = safeRedirectUrl(req.body.next);
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.redirect('/auth/login');
+  if (db.getUserByEmail(email)) return res.redirect('/auth/login');
+
+  const limited = checkLoginRateLimit(clientIp(req), email);
+  if (limited === 'ip') {
+    return signupRender(res, { error: 'Too many attempts from your network. Please try again later.', email, next });
+  }
+  if (limited === 'email') {
+    return signupRender(res, { error: 'Too many attempts. Please try again in a minute.', email, next });
+  }
+
+  // Verify Turnstile
+  if (config.turnstileEnabled && config.turnstileSecretKey) {
+    const token = req.body['cf-turnstile-response'];
+    let ok = false;
+    if (token) {
+      try {
+        const resp = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret: config.turnstileSecretKey, response: token, remoteip: clientIp(req) }),
+        });
+        const data = await resp.json();
+        ok = data.success === true;
+      } catch (_) {}
+    }
+    if (!ok) {
+      logUser(email, 'FAILED - Turnstile verification failed');
+      return signupRender(res, { error: 'Verification failed. Please try again.', email, next });
     }
   }
 
   const user = db.findOrCreateUser(email);
   if (user._isNew) sendAdminNewUserNotification(user, 'First login (magic link request)').catch(console.error);
-  if (user.blocked_at) {
-    logUser(email, 'FAILED - account disabled');
-    return loginRender(res, { error: 'This account is disabled.', email, next });
-  }
 
-  // Cryptographically secure 6-digit OTP
-  const otp = String(crypto.randomInt(100000, 1000000));
-  const { tokenId, rawToken } = db.createAuthToken(user.id, otp);
-
-  const magicLink = `${config.appUrl}/auth/verify?t=${tokenId}&k=${rawToken}&next=${encodeURIComponent(next)}`;
-
-  try {
-    await sendMagicLink(email, magicLink, otp);
-  } catch (err) {
-    console.error('[Auth] Failed to send magic link:', err);
-    return res.render('auth/login', { title: 'Log in', error: 'Could not send login email. Please try again.', email, next });
-  }
-
-  res.redirect(`/auth/verify?t=${tokenId}&sent=1&next=${encodeURIComponent(next)}`);
+  return sendOtp(res, user, email, next, () =>
+    signupRender(res, { error: 'Could not send login email. Please try again.', email, next })
+  );
 });
 
 // GET /auth/verify

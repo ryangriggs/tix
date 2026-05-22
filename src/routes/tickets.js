@@ -402,15 +402,15 @@ router.post('/views/:id/delete', (req, res) => {
 
 // GET /tickets/new
 router.get('/new', (req, res) => {
-  res.render('tickets/new', { title: 'New Ticket', error: null, uploadMaxSizeMb: config.uploadMaxSizeMb || 25 });
+  res.render('tickets/new', { title: 'New Ticket', error: null, uploadMaxSizeMb: config.uploadMaxSizeMb || 25, isTechOrAdmin: ['admin', 'technician'].includes(req.user.role) });
 });
 
 // POST /tickets — create a ticket
 router.post('/', upload, async (req, res) => {
-  const { subject, body, priority, due_date, organization_name } = req.body;
+  const { subject, body, priority, due_date, organization_name, status } = req.body;
 
   if (!subject || !subject.trim()) {
-    return res.render('tickets/new', { title: 'New Ticket', error: 'Subject is required.' });
+    return res.render('tickets/new', { title: 'New Ticket', error: 'Subject is required.', uploadMaxSizeMb: config.uploadMaxSizeMb || 25, isTechOrAdmin: ['admin', 'technician'].includes(req.user.role) });
   }
 
   const cleanBody = sanitize(body);
@@ -425,7 +425,8 @@ router.post('/', upload, async (req, res) => {
     orgId = req.user.organization_id;
   }
 
-  const ticket = db.createTicket({ subject: subject.trim(), body: cleanBody, priority: priority || 'medium', dueDate, organizationId: orgId });
+  const isTechOrAdmin = ['admin', 'technician'].includes(req.user.role);
+  const ticket = db.createTicket({ subject: subject.trim(), body: cleanBody, priority: priority || 'medium', status: isTechOrAdmin ? (status || 'new') : 'new', dueDate, organizationId: orgId });
   db.addParty(ticket.id, req.user.id, 'submitter');
   if (ticket.priority === 'urgent')
     notifyUrgent(ticket, req.user.email).catch(err => console.error('[Tickets] Urgent notify error:', err));

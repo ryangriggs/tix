@@ -534,12 +534,14 @@ function verifyOTPByTokenId(tokenId, otp) {
 // Tickets
 // ============================================================
 
-function createTicket({ subject, body, priority = 'medium', dueDate = null, organizationId = null }) {
+const VALID_TICKET_STATUSES = new Set(['new', 'pending', 'open', 'on_hold', 'closed']);
+function createTicket({ subject, body, priority = 'medium', status = 'new', dueDate = null, organizationId = null }) {
+  const safeStatus = VALID_TICKET_STATUSES.has(status) ? status : 'new';
   const replyToken = uuidv4().replace(/-/g, '');
   const result = prepare(`
     INSERT INTO tickets (subject, body, status, priority, due_date, reply_token, organization_id)
-    VALUES (?, ?, 'new', ?, ?, ?, ?)
-  `).run(subject, body, priority, dueDate, replyToken, organizationId || null);
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(subject, body, safeStatus, priority, dueDate, replyToken, organizationId || null);
   return prepare('SELECT * FROM tickets WHERE id = ?').get(result.lastInsertRowid);
 }
 

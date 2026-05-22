@@ -1,0 +1,21 @@
+<%- include('../partials/head', { title: 'Verify you\'re human' }) %>
+<main class="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo"><%= siteName %></div>
+    <h1 class="auth-title">One more step</h1>
+    <p class="auth-subtitle">Please complete the verification below to create your account.</p>
+
+    <% if (error) { %>
+      <div class="alert alert-error"><%= error %></div>
+    <% } %>
+
+    <form method="POST" action="/auth/signup" class="auth-form">
+      <input type="hidden" name="email" value="<%= email %>">
+      <input type="hidden" name="next" value="<%= next %>">
+      <div class="cf-turnstile" data-sitekey="<%= turnstileSiteKey %>" data-theme="light" style="margin-bottom:.75rem"></div>
+      <button type="submit" class="btn btn-primary btn-full">Continue</button>
+    </form>
+  </div>
+</main>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<%- include('../partials/foot') %>
