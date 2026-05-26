@@ -431,6 +431,7 @@ router.get('/settings', async (req, res) => {
         lastBackupAt: db.getSetting('last_backup_at') || null,
         backupDir:   config.backupDir || '',
         dirExists:   !!(config.backupDir && fs.existsSync(config.backupDir)),
+        diskStats:   getDiskStats(config.dataDir || process.cwd()),
       };
     })(),
     message:     req.query.message || null,
@@ -648,6 +649,17 @@ function dirSizeBytes(dirPath) {
 
 function toMb(bytes) { return Math.round(bytes / 1024 / 1024 * 10) / 10; }
 
+function getDiskStats(checkPath) {
+  try {
+    const p    = fs.existsSync(checkPath) ? checkPath : process.cwd();
+    const stat = fs.statfsSync(p);
+    const totalBytes = stat.blocks * stat.bsize;
+    const usedBytes  = (stat.blocks - stat.bfree) * stat.bsize;
+    const pct        = totalBytes > 0 ? Math.round(usedBytes / totalBytes * 100) : 0;
+    return { usedMb: toMb(usedBytes), totalMb: toMb(totalBytes), pct };
+  } catch (_) { return null; }
+}
+
 // GET /admin/stats — on-demand server statistics
 router.get('/stats', (req, res) => {
   // Ticket counts
@@ -707,6 +719,7 @@ router.get('/stats', (req, res) => {
     appSizeMb,
     emailsSentToday,
     emailsSentThisMonth,
+    diskStats: getDiskStats(config.dataDir || process.cwd()),
   });
 });
 

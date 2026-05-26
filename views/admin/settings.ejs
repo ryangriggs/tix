@@ -623,6 +623,14 @@
             <%= backupStatus.lastBackupAt ? formatDateFull(parseInt(backupStatus.lastBackupAt)) : 'Never' %>
           </td>
         </tr>
+        <% if (backupStatus.diskStats) { %>
+        <tr>
+          <td style="color:var(--text-muted);font-size:.875rem;padding:.3rem .5rem;white-space:nowrap">Disk space used</td>
+          <td style="font-size:.875rem;padding:.3rem .5rem">
+            <%= backupStatus.diskStats.usedMb %> MB of <%= backupStatus.diskStats.totalMb %> MB (<%= backupStatus.diskStats.pct %>%)
+          </td>
+        </tr>
+        <% } %>
       </table>
 
       <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
@@ -1046,6 +1054,7 @@ async function loadStats() {
       ['Database size',        d.dbSizeMb + ' MB'],
       ['Log files size',       d.logSizeMb + ' MB'],
       ['App directory size',   d.appSizeMb + ' MB (excl. node_modules)'],
+      ['Disk space used',      d.diskStats ? d.diskStats.usedMb + ' MB of ' + d.diskStats.totalMb + ' MB (' + d.diskStats.pct + '%)' : '—'],
       null,
       ['Emails sent today',        d.emailsSentToday !== null ? d.emailsSentToday : '— (no log configured)'],
       ['Emails sent this month',   d.emailsSentThisMonth !== null ? d.emailsSentThisMonth : '— (no log configured)'],
