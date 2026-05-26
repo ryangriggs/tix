@@ -381,6 +381,8 @@ function getUsersSorted(sort, order) {
     role:              "u.role",
     organization_name: "COALESCE(o.name, '') COLLATE NOCASE",
     created_at:        "u.created_at",
+    ticket_count:      "(SELECT COUNT(DISTINCT tp2.ticket_id) FROM ticket_parties tp2 WHERE tp2.user_id = u.id)",
+    status:            "CASE WHEN u.blocked_at IS NULL THEN 0 ELSE 1 END",
   };
   const primary = cols[sort] || cols.organization_name;
   const secondary = sort === 'organization_name'
