@@ -48,6 +48,7 @@
         <th><button class="th-sort-btn <%= sort==='role'  ?'tlh-active':'' %>" onclick="setUserSort('role')">Role<%= sort==='role'  ? (order==='asc'?' ↑':' ↓'):'' %></button></th>
         <th><button class="th-sort-btn <%= sort==='organization_name' ?'tlh-active':'' %>" onclick="setUserSort('organization_name')">Organization<%= sort==='organization_name' ? (order==='asc'?' ↑':' ↓'):'' %></button></th>
         <th><button class="th-sort-btn <%= sort==='created_at' ?'tlh-active':'' %>" onclick="setUserSort('created_at')">Created<%= sort==='created_at' ? (order==='asc'?' ↑':' ↓'):'' %></button></th>
+        <th>Tickets</th>
         <th>Status</th>
         <th>Actions</th>
       </tr>
@@ -60,6 +61,7 @@
           <td><span class="badge badge-role"><%= u.role %></span></td>
           <td><%= u.organization_name || '—' %></td>
           <td><span data-ts="<%= u.created_at %>"><%= formatDate(u.created_at) %></span></td>
+          <td><%= u.ticket_count || 0 %></td>
           <td><%= u.blocked_at ? 'Blocked' : 'Active' %></td>
           <td class="actions-cell">
             <button type="button" class="btn btn-sm btn-secondary"
@@ -103,6 +105,7 @@
         <% if (u.name) { %><div class="user-card-email"><%= u.email %></div><% } %>
         <div class="user-card-meta">
           <span><%= u.organization_name || '—' %></span>
+          <span><%= u.ticket_count || 0 %> ticket<%= u.ticket_count === 1 ? '' : 's' %></span>
           <% if (u.blocked_at) { %><span style="color:#dc2626">Blocked</span><% } %>
         </div>
       </div>

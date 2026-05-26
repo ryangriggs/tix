@@ -387,7 +387,9 @@ function getUsersSorted(sort, order) {
     ? "COALESCE(u.name, u.email) COLLATE NOCASE ASC"
     : "COALESCE(o.name, '') COLLATE NOCASE ASC, COALESCE(u.name, u.email) COLLATE NOCASE ASC";
   return prepare(
-    `SELECT u.*, o.name AS organization_name FROM users u
+    `SELECT u.*, o.name AS organization_name,
+       (SELECT COUNT(DISTINCT tp.ticket_id) FROM ticket_parties tp WHERE tp.user_id = u.id) AS ticket_count
+     FROM users u
      LEFT JOIN organizations o ON o.id = u.organization_id
      ORDER BY ${primary} ${dir}, ${secondary}`
   ).all();
