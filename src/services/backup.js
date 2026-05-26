@@ -66,6 +66,20 @@ function getRecentBackups(n = 5) {
     .map(f => f.name);
 }
 
+// Returns all backup files with metadata, sorted newest first
+function getAllBackups() {
+  const dir = config.backupDir;
+  if (!dir || !fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir)
+    .filter(f => /^backup-[\d-]+\.zip$/.test(f))
+    .map(f => {
+      const fp   = path.join(dir, f);
+      const stat = fs.statSync(fp);
+      return { name: f, size: stat.size, mtime: stat.mtimeMs };
+    })
+    .sort((a, b) => b.mtime - a.mtime);
+}
+
 function getBackupDirSizeMb() {
   const dir = config.backupDir;
   if (!dir || !fs.existsSync(dir)) return 0;
@@ -76,4 +90,4 @@ function getBackupDirSizeMb() {
   return Math.round(total / 1024 / 1024 * 10) / 10;
 }
 
-module.exports = { createBackup, purgeOldBackups, getRecentBackups, getBackupDirSizeMb };
+module.exports = { createBackup, purgeOldBackups, getRecentBackups, getAllBackups, getBackupDirSizeMb };

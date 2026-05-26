@@ -427,7 +427,7 @@ router.get('/settings', async (req, res) => {
       return {
         dbSizeMb,
         dirSizeMb:   backup.getBackupDirSizeMb(),
-        recentFiles: backup.getRecentBackups(5),
+        allFiles:    backup.getAllBackups(),
         lastBackupAt: db.getSetting('last_backup_at') || null,
         backupDir:   config.backupDir || '',
         dirExists:   !!(config.backupDir && fs.existsSync(config.backupDir)),
@@ -579,6 +579,22 @@ router.get('/backup/download/:filename', (req, res) => {
   const filePath = path.join(config.backupDir, filename);
   if (!fs.existsSync(filePath)) return res.status(404).send('File not found');
   res.download(filePath, filename);
+});
+
+// POST /admin/backup/delete — body: { filenames: ['backup-....zip', ...] }
+router.post('/backup/delete', (req, res) => {
+  const filenames = Array.isArray(req.body && req.body.filenames) ? req.body.filenames : [];
+  if (!filenames.length) return res.status(400).json({ error: 'No filenames provided' });
+  if (!config.backupDir) return res.status(404).json({ error: 'Backup directory not configured' });
+  const errors = [];
+  for (const f of filenames) {
+    if (!/^backup-[\d-]+\.zip$/.test(f)) { errors.push(`Invalid: ${f}`); continue; }
+    const fp = path.join(config.backupDir, f);
+    try { fs.unlinkSync(fp); audit.log(req, `deleted backup: ${f}`); }
+    catch (err) { errors.push(`${f}: ${err.message}`); }
+  }
+  if (errors.length) return res.status(207).json({ ok: false, errors });
+  res.json({ ok: true });
 });
 
 // ── Update endpoints ─────────────────────────────────────────

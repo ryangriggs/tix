@@ -625,21 +625,57 @@
         </tr>
       </table>
 
-      <% if (backupStatus.recentFiles.length) { %>
-      <div style="margin-bottom:1rem">
-        <div style="font-size:.875rem;font-weight:500;margin-bottom:.4rem">Recent backups</div>
-        <% for (const f of backupStatus.recentFiles) { %>
-          <div style="font-size:.85rem;margin:.2rem 0">
-            <a href="/admin/backup/download/<%= encodeURIComponent(f) %>"><%= f %></a>
-          </div>
-        <% } %>
-      </div>
-      <% } %>
-
-      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
         <button id="backup-now-btn" type="button" class="btn btn-secondary btn-sm">Backup Now</button>
         <span id="backup-now-status" style="font-size:.875rem"></span>
       </div>
+
+      <% if (backupStatus.dirExists) { %>
+      <details id="backup-file-details">
+        <summary style="cursor:pointer;font-size:.875rem;font-weight:500;user-select:none;padding:.25rem 0">
+          Backup files (<%= backupStatus.allFiles.length %>)
+        </summary>
+        <div style="margin-top:.75rem">
+
+          <%# Bulk action bar — shown via JS when rows are selected %>
+          <div id="backup-bulk-bar" style="display:none;align-items:center;gap:.75rem;flex-wrap:wrap;margin-bottom:.6rem;padding:.45rem .6rem;background:var(--bg-alt,#f3f4f6);border-radius:.375rem;font-size:.85rem">
+            <span id="backup-sel-info" style="font-weight:500"></span>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="backupDownloadSelected()">Download selected</button>
+            <button type="button" class="btn btn-sm btn-danger"    onclick="backupDeleteSelected()">Delete selected</button>
+          </div>
+
+          <% if (backupStatus.allFiles.length === 0) { %>
+            <p style="font-size:.875rem;color:var(--text-muted)">No backup files found.</p>
+          <% } else { %>
+          <div style="overflow-x:auto">
+          <table id="backup-table" class="data-table" style="font-size:.85rem;min-width:500px">
+            <thead>
+              <tr>
+                <th style="width:2rem;text-align:center">
+                  <input type="checkbox" id="backup-select-all" title="Select all" onchange="backupSelectAll(this.checked)">
+                </th>
+                <th><button class="th-sort-btn" id="bsort-name" onclick="backupSortBy('name')">Filename</button></th>
+                <th><button class="th-sort-btn" id="bsort-mtime" onclick="backupSortBy('mtime')">Date ↓</button></th>
+                <th style="text-align:right"><button class="th-sort-btn" id="bsort-size" onclick="backupSortBy('size')">Size</button></th>
+                <th style="width:1px;white-space:nowrap">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="backup-tbody"></tbody>
+          </table>
+          </div>
+          <% } %>
+
+        </div>
+      </details>
+      <% } %>
+
+      <%# Embed backup file data for JS rendering %>
+      <script>
+      var _backupFiles = <%- JSON.stringify(backupStatus.allFiles) %>;
+      var _backupCsrf  = '<%= csrfToken %>';
+      var _backupSort  = { col: 'mtime', dir: 'desc' };
+      var _backupLastChecked = null;
+      </script>
     </div>
 
     <div class="form-actions">
@@ -793,18 +829,194 @@ async function clearSWCache(btn) {
       if (data.ok) {
         status.textContent = 'Created: ' + data.filename;
         status.style.color = 'var(--success, #15803d)';
+        setTimeout(function() { window.location.reload(); }, 800);
       } else {
         status.textContent = 'Failed: ' + (data.error || 'Unknown error');
         status.style.color = '#b91c1c';
+        btn.disabled = false;
+        btn.textContent = 'Backup Now';
       }
     } catch (err) {
       status.textContent = 'Failed: ' + err.message;
       status.style.color = '#b91c1c';
-    } finally {
       btn.disabled = false;
       btn.textContent = 'Backup Now';
     }
   });
+})();
+</script>
+
+<script>
+// ── Backup file list management ──────────────────────────────
+(function() {
+  var tbody = document.getElementById('backup-tbody');
+  if (!tbody || !_backupFiles) return;
+
+  function fmtSize(bytes) {
+    if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + ' GB';
+    if (bytes >= 1048576)    return (bytes / 1048576).toFixed(1) + ' MB';
+    if (bytes >= 1024)       return (bytes / 1024).toFixed(1) + ' KB';
+    return bytes + ' B';
+  }
+
+  function fmtDate(ms) {
+    return new Date(ms).toLocaleString();
+  }
+
+  function getSortedFiles() {
+    var files = _backupFiles.slice();
+    var col = _backupSort.col, dir = _backupSort.dir;
+    files.sort(function(a, b) {
+      var av = a[col], bv = b[col];
+      if (typeof av === 'string') av = av.toLowerCase();
+      if (typeof bv === 'string') bv = bv.toLowerCase();
+      return dir === 'asc' ? (av > bv ? 1 : av < bv ? -1 : 0) : (av < bv ? 1 : av > bv ? -1 : 0);
+    });
+    return files;
+  }
+
+  function renderTable() {
+    var files = getSortedFiles();
+    var html = '';
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i];
+      var enc = encodeURIComponent(f.name);
+      var esc = f.name.replace(/"/g, '&quot;');
+      html += '<tr data-name="' + esc + '" data-size="' + f.size + '">' +
+        '<td style="text-align:center"><input type="checkbox" class="backup-cb" data-name="' + esc + '" onchange="backupCbChange(event,this)"></td>' +
+        '<td style="word-break:break-all">' + f.name + '</td>' +
+        '<td style="white-space:nowrap">' + fmtDate(f.mtime) + '</td>' +
+        '<td style="text-align:right;white-space:nowrap">' + fmtSize(f.size) + '</td>' +
+        '<td style="white-space:nowrap">' +
+          '<a href="/admin/backup/download/' + enc + '" class="btn btn-sm btn-secondary" style="margin-right:.25rem" download>Download</a>' +
+          '<button type="button" class="btn btn-sm btn-danger" onclick="backupDeleteOne(\'' + esc + '\')">Delete</button>' +
+        '</td>' +
+      '</tr>';
+    }
+    tbody.innerHTML = html;
+    _backupLastChecked = null;
+    updateSortHeaders();
+    updateBulkBar();
+  }
+
+  function updateSortHeaders() {
+    ['name','mtime','size'].forEach(function(col) {
+      var btn = document.getElementById('bsort-' + col);
+      if (!btn) return;
+      var label = col === 'name' ? 'Filename' : col === 'mtime' ? 'Date' : 'Size';
+      if (_backupSort.col === col) {
+        btn.textContent = label + (_backupSort.dir === 'asc' ? ' ↑' : ' ↓');
+        btn.classList.add('tlh-active');
+      } else {
+        btn.textContent = label;
+        btn.classList.remove('tlh-active');
+      }
+    });
+  }
+
+  window.backupSortBy = function(col) {
+    if (_backupSort.col === col) {
+      _backupSort.dir = _backupSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      _backupSort.col = col;
+      _backupSort.dir = col === 'mtime' ? 'desc' : 'asc';
+    }
+    renderTable();
+  };
+
+  window.backupCbChange = function(evt, cb) {
+    if (evt.shiftKey && _backupLastChecked) {
+      var cbs = Array.from(document.querySelectorAll('.backup-cb'));
+      var a = cbs.indexOf(_backupLastChecked), b = cbs.indexOf(cb);
+      var lo = Math.min(a, b), hi = Math.max(a, b);
+      for (var i = lo; i <= hi; i++) cbs[i].checked = cb.checked;
+    }
+    _backupLastChecked = cb;
+    updateBulkBar();
+  };
+
+  window.backupSelectAll = function(checked) {
+    document.querySelectorAll('.backup-cb').forEach(function(cb) { cb.checked = checked; });
+    _backupLastChecked = null;
+    updateBulkBar();
+  };
+
+  function getSelected() {
+    return Array.from(document.querySelectorAll('.backup-cb:checked')).map(function(cb) { return cb.dataset.name; });
+  }
+
+  function getTotalSize(names) {
+    var nameSet = new Set(names);
+    return _backupFiles.filter(function(f) { return nameSet.has(f.name); })
+      .reduce(function(s, f) { return s + f.size; }, 0);
+  }
+
+  function updateBulkBar() {
+    var sel = getSelected();
+    var bar = document.getElementById('backup-bulk-bar');
+    var info = document.getElementById('backup-sel-info');
+    var allCb = document.getElementById('backup-select-all');
+    var allCbs = document.querySelectorAll('.backup-cb');
+    if (bar) bar.style.display = sel.length ? 'flex' : 'none';
+    if (info) info.textContent = sel.length + ' file' + (sel.length === 1 ? '' : 's') + ' selected — ' + fmtSize(getTotalSize(sel));
+    if (allCb) {
+      allCb.checked = allCbs.length > 0 && sel.length === allCbs.length;
+      allCb.indeterminate = sel.length > 0 && sel.length < allCbs.length;
+    }
+  }
+
+  window.backupDeleteOne = async function(name) {
+    if (!confirm('Delete ' + name + '?\nThis cannot be undone.')) return;
+    await doDelete([name]);
+  };
+
+  window.backupDeleteSelected = async function() {
+    var sel = getSelected();
+    if (!sel.length) return;
+    if (!confirm('Delete ' + sel.length + ' backup file' + (sel.length === 1 ? '' : 's') + '?\nThis cannot be undone.')) return;
+    await doDelete(sel);
+  };
+
+  async function doDelete(filenames) {
+    try {
+      var resp = await fetch('/admin/backup/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _backupCsrf },
+        credentials: 'include',
+        body: JSON.stringify({ filenames: filenames }),
+      });
+      var data = await resp.json();
+      if (data.ok) {
+        var nameSet = new Set(filenames);
+        _backupFiles = _backupFiles.filter(function(f) { return !nameSet.has(f.name); });
+        var details = document.getElementById('backup-file-details');
+        var summary = details && details.querySelector('summary');
+        if (summary) summary.textContent = 'Backup files (' + _backupFiles.length + ')';
+        renderTable();
+      } else {
+        alert('Some files could not be deleted:\n' + (data.errors || []).join('\n'));
+        window.location.reload();
+      }
+    } catch (err) {
+      alert('Delete failed: ' + err.message);
+    }
+  }
+
+  window.backupDownloadSelected = function() {
+    var sel = getSelected();
+    sel.forEach(function(name, i) {
+      setTimeout(function() {
+        var a = document.createElement('a');
+        a.href = '/admin/backup/download/' + encodeURIComponent(name);
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }, i * 300);
+    });
+  };
+
+  renderTable();
 })();
 </script>
 
