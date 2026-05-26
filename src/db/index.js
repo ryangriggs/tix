@@ -1317,6 +1317,45 @@ function deleteSavedView(id, userId) {
   prepare('DELETE FROM saved_views WHERE id = ? AND user_id = ?').run(id, userId);
 }
 
+// ============================================================
+// Email usage counters — lazy reset at midnight / 1st of month
+// ============================================================
+function _localDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function _localMonthStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function getEmailUsageCounts() {
+  const now      = new Date();
+  const today    = _localDateStr(now);
+  const thisMonth = _localMonthStr(now);
+
+  let daily   = parseInt(getSetting('email_daily_count')   || '0', 10);
+  let monthly = parseInt(getSetting('email_monthly_count') || '0', 10);
+
+  if ((getSetting('email_daily_reset_date') || '') !== today) {
+    daily = 0;
+    setSetting('email_daily_count',      '0');
+    setSetting('email_daily_reset_date', today);
+  }
+  if ((getSetting('email_monthly_reset_month') || '') !== thisMonth) {
+    monthly = 0;
+    setSetting('email_monthly_count',       '0');
+    setSetting('email_monthly_reset_month', thisMonth);
+  }
+
+  return { dailyCount: daily, monthlyCount: monthly };
+}
+
+function incrementEmailCountBy(n = 1) {
+  if (n < 1) return;
+  const { dailyCount, monthlyCount } = getEmailUsageCounts();
+  setSetting('email_daily_count',   String(dailyCount   + n));
+  setSetting('email_monthly_count', String(monthlyCount + n));
+}
+
 module.exports = {
   initDb,
   // Users
@@ -1358,4 +1397,6 @@ module.exports = {
   getTechnicianOrganizations, addTechnicianOrganization, removeTechnicianOrganization,
   // Saved views
   getSavedViews, getSavedViewById, createSavedView, updateSavedViewFilters, renameSavedView, deleteSavedView,
+  // Email usage
+  getEmailUsageCounts, incrementEmailCountBy,
 };

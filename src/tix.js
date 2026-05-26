@@ -11,7 +11,7 @@ const config = require('./config');
 const { requireAuth, requireAdmin, optionalAuth, verifyCsrf } = require('./middleware/auth');
 const { startSMTPServer } = require('./smtp');
 const { initDb, getTicketsForReminders, setTicketRemindersSent, getSetting, setSetting, seedSetting, getAllSettings,
-        getOpenTicketsForInactivityCheck, setInactivityReminderSent } = require('./db');
+        getOpenTicketsForInactivityCheck, setInactivityReminderSent, getEmailUsageCounts } = require('./db');
 const { sendDueReminder, sendInactivityReminder } = require('./services/mail');
 
 const updater = require('./services/updater');
@@ -101,6 +101,26 @@ app.use((req, res, next) => {
     res.locals.showBackupFailedBanner = false;
     res.locals.backupFailedAt = '';
   }
+
+  // Email quota warning — computed for all requests, gated by admin role in nav template
+  res.locals.showEmailQuotaWarning = false;
+  res.locals.emailQuotaWarningMsg  = '';
+  try {
+    const dQ = parseInt(getSetting('email_quota_daily')   || '0', 10);
+    const mQ = parseInt(getSetting('email_quota_monthly') || '0', 10);
+    if (dQ > 0 || mQ > 0) {
+      const { dailyCount, monthlyCount } = getEmailUsageCounts();
+      const dWarn = dQ > 0 && dailyCount   >= dQ * 0.9;
+      const mWarn = mQ > 0 && monthlyCount >= mQ * 0.9;
+      if (dWarn || mWarn) {
+        res.locals.showEmailQuotaWarning = true;
+        res.locals.emailQuotaWarningMsg  = dWarn && mWarn
+          ? 'Daily and monthly email quotas are at or above 90%.'
+          : dWarn ? 'Daily email quota is at or above 90%.'
+                  : 'Monthly email quota is at or above 90%.';
+      }
+    }
+  } catch (_) {}
 
   res.locals.formatDate = function (ts) {
     if (!ts) return '—';
@@ -233,6 +253,8 @@ async function start() {
     inactivity_hours_high:          '0',
     inactivity_hours_medium:        '0',
     inactivity_hours_low:           '0',
+    email_quota_daily:              '0',
+    email_quota_monthly:            '0',
   };
   for (const [key, val] of Object.entries(seedDefaults)) {
     if (val !== null && val !== undefined) seedSetting(key, val);

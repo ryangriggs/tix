@@ -251,6 +251,59 @@
           Reject emails with an invalid DKIM signature (<code>fail</code> only — unsigned emails still pass)
         </label>
       </div>
+
+      <hr class="settings-hr">
+      <h3 class="settings-sub-title">Send Quotas</h3>
+      <p class="form-hint" style="margin-bottom:.75rem">
+        Set to 0 for unlimited. Daily count resets at midnight; monthly count resets on the 1st.
+        &nbsp;<a href="/admin/logs?tab=email">Email Log &rarr;</a>
+      </p>
+      <div class="form-row" style="gap:1.5rem;flex-wrap:wrap;margin-bottom:.75rem">
+        <div class="form-group" style="flex:0 0 auto;margin-bottom:0">
+          <label class="form-label">Daily quota (0&nbsp;=&nbsp;unlimited)</label>
+          <input type="number" name="email_quota_daily" min="0" class="form-input form-input-sm" style="width:9rem"
+                 value="<%= s.email_quota_daily || '0' %>">
+        </div>
+        <div class="form-group" style="flex:0 0 auto;margin-bottom:0">
+          <label class="form-label">Monthly quota (0&nbsp;=&nbsp;unlimited)</label>
+          <input type="number" name="email_quota_monthly" min="0" class="form-input form-input-sm" style="width:9rem"
+                 value="<%= s.email_quota_monthly || '0' %>">
+        </div>
+      </div>
+      <%
+        let _dQ = parseInt(s.email_quota_daily   || '0', 10);
+        let _mQ = parseInt(s.email_quota_monthly || '0', 10);
+        let _dC = emailUsage.dailyCount;
+        let _mC = emailUsage.monthlyCount;
+        let _dP = _dQ > 0 ? Math.min(100, Math.round(_dC / _dQ * 100)) : 0;
+        let _mP = _mQ > 0 ? Math.min(100, Math.round(_mC / _mQ * 100)) : 0;
+      %>
+      <% if (_dQ > 0 || _mQ > 0) { %>
+      <div style="margin-bottom:.5rem;max-width:28rem">
+        <% if (_dQ > 0) { %>
+        <div style="margin-bottom:.75rem">
+          <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.3rem;color:var(--text-muted)">
+            <span>Daily: <strong style="color:var(--text)"><%= _dC %> / <%= _dQ %></strong></span>
+            <span><%= _dP %>%</span>
+          </div>
+          <div style="height:.45rem;border-radius:.25rem;background:var(--border);overflow:hidden">
+            <div style="height:100%;width:<%= _dP %>%;background:<%= _dP >= 90 ? '#dc2626' : _dP >= 75 ? '#f59e0b' : '#22c55e' %>;border-radius:.25rem"></div>
+          </div>
+        </div>
+        <% } %>
+        <% if (_mQ > 0) { %>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.3rem;color:var(--text-muted)">
+            <span>Monthly: <strong style="color:var(--text)"><%= _mC %> / <%= _mQ %></strong></span>
+            <span><%= _mP %>%</span>
+          </div>
+          <div style="height:.45rem;border-radius:.25rem;background:var(--border);overflow:hidden">
+            <div style="height:100%;width:<%= _mP %>%;background:<%= _mP >= 90 ? '#dc2626' : _mP >= 75 ? '#f59e0b' : '#22c55e' %>;border-radius:.25rem"></div>
+          </div>
+        </div>
+        <% } %>
+      </div>
+      <% } %>
     </div>
 
     <!-- ── Notifications & Reminders ────────────────────────── -->
@@ -1056,8 +1109,8 @@ async function loadStats() {
       ['App directory size',   d.appSizeMb + ' MB (excl. node_modules)'],
       ['Disk space used',      d.diskStats ? d.diskStats.usedMb + ' MB of ' + d.diskStats.totalMb + ' MB (' + d.diskStats.pct + '%)' : '—'],
       null,
-      ['Emails sent today',        d.emailsSentToday !== null ? d.emailsSentToday : '— (no log configured)'],
-      ['Emails sent this month',   d.emailsSentThisMonth !== null ? d.emailsSentThisMonth : '— (no log configured)'],
+      ['Emails sent today',      d.emailsSentToday],
+      ['Emails sent this month', d.emailsSentThisMonth],
     ];
 
     var html = '';

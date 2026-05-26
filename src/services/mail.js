@@ -243,6 +243,7 @@ async function _doSend({ to, subject, html, text, messageId, inReplyTo, referenc
       });
     }
     logEmail(to, subject);
+    db.incrementEmailCountBy(1);
   } catch (err) {
     logEmail(to, subject, err.message || String(err));
     throw err;
@@ -309,6 +310,7 @@ async function sendTicketNotification({ to, ticketSubject, body, ticketId, comme
     try {
       await transport.sendMailBatch(batch);
       for (const email of recipients) logEmail(email, subject);
+      db.incrementEmailCountBy(recipients.length);
     } catch (err) {
       for (const email of recipients) logEmail(email, subject, err.message || String(err));
       throw err;

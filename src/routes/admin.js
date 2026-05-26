@@ -436,6 +436,7 @@ router.get('/settings', async (req, res) => {
     })(),
     message:     req.query.message || null,
     updateState: updater.getState(),
+    emailUsage:  (() => { try { return db.getEmailUsageCounts(); } catch (_) { return { dailyCount: 0, monthlyCount: 0 }; } })(),
   });
 });
 
@@ -530,6 +531,8 @@ router.post('/settings', (req, res) => {
     inactivity_hours_high:          String(Math.max(0, flt('inactivity_hours_high',   0))),
     inactivity_hours_medium:        String(Math.max(0, flt('inactivity_hours_medium', 0))),
     inactivity_hours_low:           String(Math.max(0, flt('inactivity_hours_low',    0))),
+    email_quota_daily:              String(Math.max(0, int('email_quota_daily',   0))),
+    email_quota_monthly:            String(Math.max(0, int('email_quota_monthly', 0))),
     urgent_notify_user_ids:         [].concat(req.body.urgent_notify_user_ids || [])
                                       .map(id => parseInt(id, 10)).filter(id => id > 0).join(','),
   };
@@ -690,26 +693,7 @@ router.get('/stats', (req, res) => {
   // App directory size (excluding node_modules and .git)
   const appSizeMb = toMb(dirSizeBytes(process.cwd()));
 
-  // Email counts from log (timestamps are UTC ISO)
-  let emailsSentToday = null;
-  let emailsSentThisMonth = null;
-  if (config.emailLog) {
-    try {
-      const now = new Date();
-      const todayStr = now.toISOString().slice(0, 10);   // YYYY-MM-DD UTC
-      const monthStr = now.toISOString().slice(0, 7);    // YYYY-MM UTC
-      let today = 0, month = 0;
-      const lines = fs.readFileSync(config.emailLog, 'utf8').split('\n');
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        const ts = line.split(' | ')[0] || '';
-        if (line.includes(' | [ERROR] ')) continue;  // skip errors
-        if (ts.startsWith(monthStr)) { month++; if (ts.startsWith(todayStr)) today++; }
-      }
-      emailsSentToday = today;
-      emailsSentThisMonth = month;
-    } catch (_) {}
-  }
+  const { dailyCount: emailsSentToday, monthlyCount: emailsSentThisMonth } = db.getEmailUsageCounts();
 
   res.json({
     tickets,

@@ -1,3 +1,11 @@
+<% if (user && user.role === 'admin' && showEmailQuotaWarning) { %>
+<div class="impersonation-banner" id="email-quota-banner" style="background:#fef3c7;color:#92400e;border-bottom:1px solid #fde68a">
+  <span><%= emailQuotaWarningMsg %></span>
+  <a href="/admin/settings#s-email" style="color:#92400e;font-weight:600;margin-left:.75rem;text-decoration:underline">View Settings</a>
+  <button type="button" style="background:none;border:none;cursor:pointer;color:#92400e;font-size:.8rem;margin-left:.75rem;text-decoration:underline"
+          onclick="document.getElementById('email-quota-banner').style.display='none'">hide</button>
+</div>
+<% } %>
 <% if (showBackupDirMissingBanner) { %>
 <div class="impersonation-banner" style="background:#fee2e2;color:#991b1b;border-bottom:1px solid #fca5a5">
   Backup directory does not exist. Automatic backups are not being made.
