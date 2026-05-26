@@ -63,7 +63,7 @@
           <td><span class="badge badge-role"><%= u.role %></span></td>
           <td><%= u.organization_name || '—' %></td>
           <td><span data-ts="<%= u.created_at %>"><%= formatDate(u.created_at) %></span></td>
-          <td><%= u.ticket_count || 0 %></td>
+          <td><% if (u.ticket_count) { %><a href="/tickets?party=<%= u.id %>&status=&priority=&since=&org=&owner="><%= u.ticket_count %></a><% } else { %>0<% } %></td>
           <td><%= u.blocked_at ? 'Blocked' : 'Active' %></td>
           <td class="actions-cell">
             <button type="button" class="btn btn-sm btn-secondary"
@@ -107,7 +107,7 @@
         <% if (u.name) { %><div class="user-card-email"><%= u.email %></div><% } %>
         <div class="user-card-meta">
           <span><%= u.organization_name || '—' %></span>
-          <span><%= u.ticket_count || 0 %> ticket<%= u.ticket_count === 1 ? '' : 's' %></span>
+          <% if (u.ticket_count) { %><a href="/tickets?party=<%= u.id %>&status=&priority=&since=&org=&owner="><%= u.ticket_count %> ticket<%= u.ticket_count === 1 ? '' : 's' %></a><% } else { %><span>0 tickets</span><% } %>
           <% if (u.blocked_at) { %><span style="color:#dc2626">Blocked</span><% } %>
         </div>
       </div>

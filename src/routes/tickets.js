@@ -224,6 +224,11 @@ router.get('/', (req, res) => {
 
   const { status, priority, sort, order, q, since, org, date_from, date_to, owner, view: viewParam, page: pageParam, per_page: perPageParam } = req.query;
 
+  // Admin-only: filter by any ticket_parties membership (all roles), used from admin users page
+  const partyUserId = req.user.role === 'admin' && req.query.party
+    ? (parseInt(req.query.party, 10) || null)
+    : null;
+
   // Strip ticket prefix from search term; if remainder is a plain integer treat as ID lookup
   const prefix = config.ticketPrefix;
   let search = q || '';
@@ -310,6 +315,7 @@ router.get('/', (req, res) => {
     dateTo,
     orgFilters,
     ownerFilters,
+    partyUserId,
     limit:           perPage > 0 ? perPage : 0,
     offset:          perPage > 0 ? (currentPage - 1) * perPage : 0,
   });

@@ -652,7 +652,7 @@ function ticketAccessCondition({ userId, userRole, userOrgId, userIsSuperuser, u
 function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgIds = [],
                       status, priority, sort = 'updated_at', order = 'desc', search = '',
                       dateFrom = null, dateTo = null, orgFilters = [], idSearch = null,
-                      ownerFilters = [], limit = 0, offset = 0 }) {
+                      ownerFilters = [], partyUserId = null, limit = 0, offset = 0 }) {
   const validSorts = {
     created_at:    't.created_at',
     updated_at:    't.updated_at',
@@ -733,6 +733,10 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
       }
     }
     if (orClauses.length) conditions.push(`(${orClauses.join(' OR ')})`);
+  }
+  if (partyUserId) {
+    conditions.push('EXISTS (SELECT 1 FROM ticket_parties tp_p WHERE tp_p.ticket_id = t.id AND tp_p.user_id = ?)');
+    params.push(partyUserId);
   }
   if (search && !idSearch) {
     // Build an FTS4 MATCH query: each whitespace-delimited token becomes a prefix search.
