@@ -21,7 +21,7 @@ function maskSecret(val) {
 
 // GET /admin/users
 router.get('/users', (req, res) => {
-  const validSorts = ['name', 'email', 'role', 'organization_name', 'created_at'];
+  const validSorts = ['name', 'email', 'role', 'organization_name', 'created_at', 'ticket_count', 'status'];
   const sort  = validSorts.includes(req.query.sort) ? req.query.sort : 'organization_name';
   const order = req.query.order === 'desc' ? 'desc' : 'asc';
 
