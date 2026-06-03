@@ -58,6 +58,11 @@
             <button type="button" class="btn btn-primary" onclick="runBillingReport()">Run</button>
           </div>
         </div>
+        <p class="form-hint" style="margin-top:.5rem">
+          Date range uses company timezone: <strong><%= siteTimezoneAbbr %></strong> (<code><%= siteTimezone %></code>).
+          All staff running this report with the same dates will receive identical data.
+          <a href="/admin/settings#s-site">Change in Settings</a>.
+        </p>
         <p class="form-hint" id="billing-error" style="color:var(--danger,#dc2626);display:none"></p>
       </div>
       <% } %>

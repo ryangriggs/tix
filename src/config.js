@@ -50,6 +50,7 @@ const config = {
   ticketEmail:        process.env.TICKET_EMAIL        || 'tickets@example.com',
   ticketSilentEmail:  process.env.TICKET_SILENT_EMAIL || '',
   ticketPrefix:       process.env.TICKET_PREFIX       || '',
+  timezone:           process.env.TIMEZONE            || 'UTC',
   mailFromName:  process.env.MAIL_FROM_NAME  || 'Ticketing',
   defaultAssigneeEmail: process.env.DEFAULT_ASSIGNEE_EMAIL || null,
   adminEmail: process.env.ADMIN_EMAIL || null,
@@ -112,6 +113,7 @@ function applySettings(map) {
   if ('ticket_email'           in map) config.ticketEmail           = map.ticket_email           || config.ticketEmail;
   if ('ticket_silent_email'    in map) config.ticketSilentEmail     = map.ticket_silent_email    || '';
   if ('ticket_prefix'          in map) config.ticketPrefix          = map.ticket_prefix          || '';
+  if ('timezone'               in map) config.timezone               = map.timezone               || 'UTC';
   if ('mail_from_name'         in map) config.mailFromName          = map.mail_from_name         || config.mailFromName;
   if ('admin_email'            in map) config.adminEmail            = map.admin_email            || null;
   if ('site_name'              in map) config.siteName              = map.site_name              || config.siteName;

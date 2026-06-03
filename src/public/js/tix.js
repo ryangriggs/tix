@@ -29,14 +29,27 @@ function fmtTs(ts, fmt) {
   return d.toLocaleDateString();
 }
 
+function _browserTzAbbr() {
+  try {
+    return new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
+      .formatToParts(new Date()).find(p => p.type === 'timeZoneName')?.value || '';
+  } catch (_) { return ''; }
+}
+
 function localiseTimestamps(root) {
+  const tzAbbr = _browserTzAbbr();
   (root || document).querySelectorAll('[data-ts]').forEach(el => {
     const ts = parseInt(el.dataset.ts, 10);
     if (!ts) return;
     el.textContent = fmtTs(ts, el.dataset.fmt);
-    // For ticket-list rows: update the hover title with full date + optional actor
+    // Build full date string with timezone abbreviation for hover titles
+    const fullDate = fmtTs(ts, 'full') + (tzAbbr ? ' ' + tzAbbr : '');
     if ('actor' in el.dataset) {
-      el.title = fmtTs(ts, 'full') + (el.dataset.actor ? ` · by ${el.dataset.actor}` : '');
+      // Ticket-list updated column: show date + who last acted
+      el.title = fullDate + (el.dataset.actor ? ` · by ${el.dataset.actor}` : '');
+    } else if (el.hasAttribute('title')) {
+      // Any other date element that already has a title (e.g. created column): replace with local tz
+      el.title = fullDate;
     }
   });
 }

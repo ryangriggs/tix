@@ -75,6 +75,13 @@
         <p class="form-hint">Prepended to ticket numbers in subject lines, e.g. <code>TKT-42</code>. Leave blank for plain numbers.</p>
       </div>
 
+      <div class="form-group">
+        <label for="timezone">Company timezone</label>
+        <input type="text" id="timezone" name="timezone"
+               value="<%= s.timezone || 'UTC' %>" placeholder="UTC" class="form-input" style="width:18rem">
+        <p class="form-hint">IANA timezone used for report date ranges and date-of-work grouping. Examples: <code>America/New_York</code>, <code>America/Chicago</code>, <code>America/Los_Angeles</code>, <code>UTC</code>.</p>
+      </div>
+
       <hr class="settings-hr">
       <h3 class="settings-sub-title">Email Addresses</h3>
 

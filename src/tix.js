@@ -150,6 +150,7 @@ app.use((req, res, next) => {
   };
 
   res.locals.formatTicketId = id => `${config.ticketPrefix}${id}`;
+  res.locals.siteTimezone = config.timezone;
 
   next();
 });
@@ -208,6 +209,7 @@ async function start() {
     ticket_email:                   config.ticketEmail,
     ticket_silent_email:            config.ticketSilentEmail,
     ticket_prefix:                  config.ticketPrefix,
+    timezone:                       config.timezone,
     mail_from_name:                 config.mailFromName,
     admin_email:                    config.adminEmail,
     site_name:                      config.siteName,

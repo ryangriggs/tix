@@ -474,6 +474,10 @@ router.post('/settings', (req, res) => {
   if (uploadMaxSizeMb < 1) return res.redirect('/admin/settings?message=Upload+size+must+be+at+least+1+MB');
   const smtpRelayPort     = int('smtp_relay_port', 587);
 
+  const timezone = trim('timezone') || 'UTC';
+  try { new Intl.DateTimeFormat('en-US', { timeZone: timezone }); }
+  catch (_) { return res.redirect('/admin/settings?message=Invalid+timezone+name'); }
+
   const mailTransport = trim('mail_transport');
   if (mailTransport && !['mailgun', 'smtp', 'gmail', 'resend'].includes(mailTransport))
     return res.redirect('/admin/settings?message=Invalid+mail+transport');
@@ -483,6 +487,7 @@ router.post('/settings', (req, res) => {
     ticket_email:                   ticketEmail,
     ticket_silent_email:            trim('ticket_silent_email').toLowerCase(),
     ticket_prefix:                  trim('ticket_prefix'),
+    timezone:                       timezone,
     mail_from_name:                 trim('mail_from_name'),
     admin_email:                    adminEmail,
     site_name:                      trim('site_name'),
