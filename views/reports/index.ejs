@@ -15,7 +15,7 @@
       <div class="report-card">
         <div class="report-card-title">Billing Report</div>
         <p class="report-card-desc">Generate a report of billable hours logged in the specified date range, grouped by ticket. Based on reply date — hours added in a later period appear in that period's report.</p>
-        <div class="form-row" style="gap:.75rem;flex-wrap:wrap">
+        <div class="form-row" style="gap:.75rem;flex-wrap:wrap;align-items:flex-end">
           <div class="form-group" style="flex:0 0 auto;margin-bottom:0">
             <label for="billing-from">Start Date</label>
             <input type="date" id="billing-from" class="form-input form-input-sm">
@@ -24,7 +24,37 @@
             <label for="billing-to">End Date</label>
             <input type="date" id="billing-to" class="form-input form-input-sm">
           </div>
-          <div class="form-group" style="flex:0 0 auto;margin-bottom:0;padding-top:1.5rem">
+          <% if (organizations && organizations.length) { %>
+          <div class="form-group" style="flex:0 0 auto;margin-bottom:0">
+            <label>Organization</label>
+            <div class="filter-dropdown" id="billing-org-fdd" style="display:inline-block">
+              <button type="button" id="billing-org-fdd-btn"
+                      class="filter-dropdown-btn"
+                      onclick="billingOrgToggle(event)">
+                <span id="billing-org-fdd-label">Any org</span>
+                <span class="filter-dropdown-arrow">▾</span>
+              </button>
+              <div class="filter-dropdown-panel" id="billing-org-fdd-panel">
+                <label class="filter-dropdown-item">
+                  <input type="checkbox" id="billing-org-cb-all" checked
+                         onchange="billingOrgChange('all', this)"> Any org
+                </label>
+                <label class="filter-dropdown-item">
+                  <input type="checkbox" class="billing-org-spec-cb" data-val="unassigned"
+                         onchange="billingOrgChange('unassigned', this)"> Not assigned
+                </label>
+                <% if (organizations.length) { %><hr class="filter-dropdown-sep"><% } %>
+                <% for (const o of organizations) { %>
+                  <label class="filter-dropdown-item">
+                    <input type="checkbox" class="billing-org-spec-cb" data-val="<%= o.id %>"
+                           onchange="billingOrgChange(<%= o.id %>, this)"> <%= o.name %>
+                  </label>
+                <% } %>
+              </div>
+            </div>
+          </div>
+          <% } %>
+          <div class="form-group" style="flex:0 0 auto;margin-bottom:0">
             <button type="button" class="btn btn-primary" onclick="runBillingReport()">Run</button>
           </div>
         </div>
@@ -64,24 +94,76 @@
 </main>
 
 <script>
+(function() {
+  // ---- Org dropdown for billing report ----
+  var _billingOrgs = <%- JSON.stringify((organizations || []).map(o => ({ id: o.id, name: o.name }))).replace(/</g, '\\u003C') %>;
+
+  function _billingOrgLabel() {
+    var checked = [].slice.call(document.querySelectorAll('.billing-org-spec-cb:checked')).map(function(cb) { return cb.dataset.val; });
+    if (!checked.length) return 'Any org';
+    var parts = [];
+    if (checked.indexOf('unassigned') >= 0) parts.push('Not assigned');
+    checked.filter(function(v) { return v !== 'unassigned'; }).forEach(function(id) {
+      var o = _billingOrgs.find(function(x) { return String(x.id) === id; });
+      if (o) parts.push(o.name);
+    });
+    if (!parts.length) return 'Any org';
+    return parts.length === 1 ? parts[0] : parts[0] + ' +' + (parts.length - 1);
+  }
+
+  window.billingOrgToggle = function(e) {
+    var panel = document.getElementById('billing-org-fdd-panel');
+    if (!panel) return;
+    panel.classList.toggle('fdd-open');
+    e.stopPropagation();
+  };
+
+  window.billingOrgChange = function(val, el) {
+    if (val === 'all') {
+      document.querySelectorAll('.billing-org-spec-cb').forEach(function(cb) { cb.checked = false; });
+    } else {
+      document.getElementById('billing-org-cb-all').checked = false;
+    }
+    var lbl = document.getElementById('billing-org-fdd-label');
+    if (lbl) lbl.textContent = _billingOrgLabel();
+    var btn = document.getElementById('billing-org-fdd-btn');
+    var checked = [].slice.call(document.querySelectorAll('.billing-org-spec-cb:checked'));
+    if (btn) btn.classList.toggle('fdd-active', checked.length > 0);
+  };
+
+  document.addEventListener('click', function(e) {
+    var panel = document.getElementById('billing-org-fdd-panel');
+    if (panel && !e.target.closest('#billing-org-fdd')) panel.classList.remove('fdd-open');
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var panel = document.getElementById('billing-org-fdd-panel');
+      if (panel) panel.classList.remove('fdd-open');
+    }
+  });
+})();
+
 function runBillingReport() {
-  const from = document.getElementById('billing-from').value;
-  const to   = document.getElementById('billing-to').value;
-  const err  = document.getElementById('billing-error');
+  var from = document.getElementById('billing-from').value;
+  var to   = document.getElementById('billing-to').value;
+  var err  = document.getElementById('billing-error');
   err.style.display = 'none';
   if (!from || !to) { err.textContent = 'Please select both a start and end date.'; err.style.display = ''; return; }
   if (from > to)    { err.textContent = 'Start date must be on or before the end date.'; err.style.display = ''; return; }
-  window.location = `/reports/billing.csv?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  var checked = [].slice.call(document.querySelectorAll('.billing-org-spec-cb:checked')).map(function(cb) { return cb.dataset.val; });
+  var url = '/reports/billing.csv?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
+  if (checked.length) url += '&org=' + encodeURIComponent(checked.join(','));
+  window.location = url;
 }
 
 function runTravelReport() {
-  const from = document.getElementById('travel-from').value;
-  const to   = document.getElementById('travel-to').value;
-  const err  = document.getElementById('travel-error');
+  var from = document.getElementById('travel-from').value;
+  var to   = document.getElementById('travel-to').value;
+  var err  = document.getElementById('travel-error');
   err.style.display = 'none';
   if (!from || !to) { err.textContent = 'Please select both a start and end date.'; err.style.display = ''; return; }
   if (from > to)    { err.textContent = 'Start date must be on or before the end date.'; err.style.display = ''; return; }
-  window.location = `/reports/travel.csv?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  window.location = '/reports/travel.csv?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
 }
 </script>
 

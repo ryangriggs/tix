@@ -6,30 +6,40 @@ const { requireAdmin } = require('../middleware/auth');
 const db = require('../db');
 const config = require('../config');
 const audit = require('../services/audit');
-const { ticketPrefix } = config;
 
 // GET /reports
 router.get('/', (req, res) => {
+  const organizations = (req.user && req.user.role === 'admin') ? db.getAllOrganizations() : [];
   res.render('reports/index', {
     title: 'Reports',
     enableBillableHours: config.enableBillableHours,
     enableLocation:      config.enableLocation,
+    organizations,
   });
 });
 
 // GET /reports/billing.csv — admin only
 router.get('/billing.csv', requireAdmin, (req, res) => {
   if (!config.enableBillableHours) return res.status(404).send('Billing report is disabled.');
-  const { from, to } = req.query;
+  const { from, to, org } = req.query;
   if (!from || !to) return res.status(400).send('from and to query parameters are required');
 
   const fromTs = Math.floor(new Date(from + 'T00:00:00').getTime() / 1000);
   const toTs   = Math.floor(new Date(to   + 'T23:59:59').getTime() / 1000);
   if (isNaN(fromTs) || isNaN(toTs)) return res.status(400).send('Invalid date format');
 
-  const rows = db.getBillingReport(fromTs, toTs);
-  console.log(`[Reports] Billing: from=${from}(${fromTs}) to=${to}(${toTs}), rows=${rows.length}`);
-  audit.log(req, `ran Billing report (${from} to ${to})`);
+  let orgFilter = null;
+  if (org) {
+    orgFilter = org.split(',').map(v => v.trim()).filter(Boolean);
+    for (const v of orgFilter) {
+      if (v !== 'unassigned' && !/^\d+$/.test(v)) return res.status(400).send('Invalid org filter');
+    }
+  }
+
+  const rows = db.getBillingReport(fromTs, toTs, orgFilter);
+  const orgDesc = orgFilter ? ` orgs=[${orgFilter.join(',')}]` : '';
+  console.log(`[Reports] Billing: from=${from}(${fromTs}) to=${to}(${toTs})${orgDesc}, rows=${rows.length}`);
+  audit.log(req, `ran Billing report (${from} to ${to}${orgDesc})`);
 
   const escape = v => `"${String(v || '').replace(/"/g, '""')}"`;
 
@@ -50,7 +60,7 @@ router.get('/billing.csv', requireAdmin, (req, res) => {
     escape(e.organization_name || ''),
     escape(e.subject),
     e.hours,
-    escape(`${ticketPrefix}${e.id}`),
+    escape(`${config.ticketPrefix}${e.id}`),
     escape(e.dateStr),
   ].join(','));
 

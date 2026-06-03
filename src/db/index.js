@@ -1237,7 +1237,22 @@ function getAttachmentCount() {
   return prepare('SELECT COUNT(*) AS count FROM attachments').get().count || 0;
 }
 
-function getBillingReport(fromTs, toTs) {
+function getBillingReport(fromTs, toTs, orgFilter = null) {
+  const params = [fromTs, toTs];
+  let whereExtra = '';
+  if (orgFilter && orgFilter.length > 0) {
+    const ids = orgFilter.filter(v => v !== 'unassigned').map(Number).filter(n => n > 0);
+    const unassigned = orgFilter.includes('unassigned');
+    if (ids.length && unassigned) {
+      whereExtra = `AND (t.organization_id IS NULL OR t.organization_id IN (${ids.map(() => '?').join(',')}))`;
+      params.push(...ids);
+    } else if (ids.length) {
+      whereExtra = `AND t.organization_id IN (${ids.map(() => '?').join(',')})`;
+      params.push(...ids);
+    } else if (unassigned) {
+      whereExtra = `AND t.organization_id IS NULL`;
+    }
+  }
   return prepare(`
     SELECT t.id, t.subject, t.status,
            o.name AS organization_name,
@@ -1248,8 +1263,9 @@ function getBillingReport(fromTs, toTs) {
     JOIN comments c ON c.ticket_id = t.id
     WHERE c.created_at >= ? AND c.created_at <= ?
       AND c.billable_hours > 0
+      ${whereExtra}
     ORDER BY t.id ASC, c.created_at ASC
-  `).all(fromTs, toTs);
+  `).all(...params);
 }
 
 function getTicketsForReminders() {
