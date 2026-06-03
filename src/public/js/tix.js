@@ -41,14 +41,22 @@ function localiseTimestamps(root) {
   (root || document).querySelectorAll('[data-ts]').forEach(el => {
     const ts = parseInt(el.dataset.ts, 10);
     if (!ts) return;
+    // Setting textContent removes all child nodes (including any previously appended tz span)
     el.textContent = fmtTs(ts, el.dataset.fmt);
-    // Build full date string with timezone abbreviation for hover titles
+    // For full timestamps (created, comments, attachments): append visible tz abbreviation
+    if (el.dataset.fmt === 'full' && tzAbbr) {
+      const tzEl = document.createElement('span');
+      tzEl.textContent = ' ' + tzAbbr;
+      tzEl.style.cssText = 'color:var(--text-muted,#6b7280);font-size:.85em;margin-left:.15em';
+      el.appendChild(tzEl);
+    }
+    // Update hover title with full date + timezone
     const fullDate = fmtTs(ts, 'full') + (tzAbbr ? ' ' + tzAbbr : '');
     if ('actor' in el.dataset) {
-      // Ticket-list updated column: show date + who last acted
+      // Ticket-list updated column: date + who last acted
       el.title = fullDate + (el.dataset.actor ? ` · by ${el.dataset.actor}` : '');
     } else if (el.hasAttribute('title')) {
-      // Any other date element that already has a title (e.g. created column): replace with local tz
+      // Ticket-list created column and any other pre-titled date elements
       el.title = fullDate;
     }
   });
