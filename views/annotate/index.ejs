@@ -366,7 +366,7 @@ function setStatus(msg, isError) {
 // ── Close with dirty check ─────────────────────────────────
 function confirmClose() {
   if (isDirty && !confirm('You have unsaved changes. Close without saving?')) return;
-  window.close();
+  window.location = '/tickets/' + TICKET_ID;
 }
 
 window.addEventListener('beforeunload', e => {
@@ -757,7 +757,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   try {
     await saveAllAnnotations();
     isDirty = false;
-    window.close();
+    window.location = '/tickets/' + TICKET_ID;
   } catch (err) {
     setStatus('Save failed: ' + err.message, true);
     btn.disabled = false; btn.textContent = 'Save and close';

@@ -165,7 +165,8 @@ app.use('/timeline',  requireAuth, verifyCsrf, require('./routes/timeline'));
 app.use('/dashboard', requireAuth, require('./routes/dashboard'));
 app.use('/admin', requireAuth, requireAdmin, verifyCsrf, require('./routes/admin'));
 app.use('/api', requireAuth, require('./routes/api'));
-app.use('/reports', requireAuth, require('./routes/reports'));
+app.use('/reports',       requireAuth, require('./routes/reports'));
+app.use('/organizations', requireAuth, verifyCsrf, require('./routes/orgnotes'));
 app.use('/inbound',     require('./routes/inbound'));
 app.use('/unsubscribe', require('./routes/unsubscribe'));
 

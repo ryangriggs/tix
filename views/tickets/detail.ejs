@@ -160,19 +160,19 @@
                 const _aExt = (a.original_name || '').split('.').pop().toLowerCase();
                 const _aAnnotatable = annotationExts.has(_aExt);
                 const _aRenameId = 'rename-' + a.stored_name.replace(/[^a-z0-9]/gi, '_');
+                const _aViewHref = (_aAnnotatable && canManageAtt)
+                  ? `/tickets/${ticket.id}/attachments/${a.stored_name}/annotate`
+                  : `/tickets/attachments/${a.stored_name}`;
               %>
               <li>
-                <a href="/tickets/attachments/<%= a.stored_name %>" class="attachment-link" target="_blank">📎 <span id="<%= _aRenameId %>-label"><%= a.original_name %></span></a>
+                <a href="<%= _aViewHref %>" class="attachment-link">📎 <span id="<%= _aRenameId %>-label"><%= a.original_name %></span></a>
                 <span class="meta-item" style="margin-left:.25rem">(<%= (a.size/1024).toFixed(1) %> KB)</span>
                 <span class="meta-item" style="margin-left:.25rem" data-ts="<%= a.created_at %>" data-fmt="full"><%= formatDateFull(a.created_at) %></span>
                 <% if (a.uploader_name) { %><span class="meta-item"> — <%= a.uploader_name %></span><% } %>
                 <span class="attach-btn-wrap" style="display:inline-block;margin-left:.35rem;vertical-align:middle">
                   <button type="button" class="btn-icon" onclick="toggleAttachActionsMenu(this)" title="Actions">&middot;&middot;&middot;</button>
                   <div class="attach-menu attach-actions-menu" style="right:0;left:auto">
-                    <a href="/tickets/attachments/<%= a.stored_name %>" target="_blank" class="attach-menu-item">View</a>
-                    <% if (_aAnnotatable && canManageAtt) { %>
-                    <a href="/tickets/<%= ticket.id %>/attachments/<%= a.stored_name %>/annotate" target="_blank" class="attach-menu-item">Annotate</a>
-                    <% } %>
+                    <a href="<%= _aViewHref %>" class="attach-menu-item">View</a>
                     <% if (canManageAtt) { %>
                     <button type="button" class="attach-menu-item" onclick="startAttachRename(this, '<%= a.stored_name %>')">Rename</button>
                     <button type="button" class="attach-menu-item attach-menu-item-danger" onclick="deleteAttach('<%= a.stored_name %>')">Delete</button>
@@ -352,6 +352,12 @@
         <% } else { %>
           <span><%= ticket.organization_name || '—' %></span>
         <% } %>
+        <div id="org-notes-wrap" style="margin-top:.4rem;<%= ticket.organization_id ? '' : 'display:none' %>">
+          <a id="org-notes-btn" href="/organizations/<%= ticket.organization_id || 0 %>/notes"
+             target="_blank" class="btn btn-sm btn-ghost" style="padding-left:.4rem;padding-right:.4rem">
+            Org Notes
+          </a>
+        </div>
       </div>
 
       <!-- Billable Hours total (admin only) -->
@@ -1165,6 +1171,17 @@ document.addEventListener('DOMContentLoaded', () => {
           const hasOrg = !!data.orgId;
           locInput.disabled = !hasOrg || '<%= ticket.status %>' === 'closed';
           locInput.placeholder = hasOrg ? 'Type or select a location…' : 'No organization assigned';
+        }
+        // Sync org notes button
+        const notesWrap = document.getElementById('org-notes-wrap');
+        const notesBtn  = document.getElementById('org-notes-btn');
+        if (notesWrap && notesBtn) {
+          if (data.orgId) {
+            notesBtn.href = '/organizations/' + data.orgId + '/notes';
+            notesWrap.style.display = '';
+          } else {
+            notesWrap.style.display = 'none';
+          }
         }
       } catch (err) { alert('Could not update organization: ' + err.message); }
     });

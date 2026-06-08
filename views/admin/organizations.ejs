@@ -23,6 +23,8 @@
           <tr>
             <td><%= o.name %></td>
             <td style="white-space:nowrap;display:flex;gap:.4rem">
+              <a href="/organizations/<%= o.id %>/notes" target="_blank"
+                 class="btn btn-sm btn-secondary">Notes</a>
               <button class="btn btn-sm btn-secondary"
                       onclick="openOrgDialog(<%= o.id %>, <%= JSON.stringify(o.name) %>)">Edit</button>
               <form method="POST" action="/admin/organizations/<%= o.id %>/delete" style="display:inline"

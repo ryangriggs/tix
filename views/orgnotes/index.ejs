@@ -1,0 +1,378 @@
+<%- include('../partials/head', { title: title }) %>
+<link href="/css/quill.snow.css" rel="stylesheet">
+<%- include('../partials/nav') %>
+
+<style>
+.org-note-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: .85rem;
+  background: var(--surface);
+}
+.org-note-header {
+  display: flex;
+  align-items: flex-start;
+  gap: .6rem;
+  margin-bottom: .6rem;
+  flex-wrap: wrap;
+}
+.org-note-meta {
+  flex: 1;
+  font-size: .8rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.org-note-actions { display: flex; gap: .35rem; margin-left: auto; flex-shrink: 0; }
+.vis-badge {
+  display: inline-block;
+  font-size: .7rem;
+  font-weight: 600;
+  padding: .15rem .5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.vis-admin    { background: #fee2e2; color: #991b1b; }
+.vis-tech     { background: #fef3c7; color: #92400e; }
+.vis-supervisor { background: #dbeafe; color: #1e40af; }
+.vis-user     { background: #dcfce7; color: #166534; }
+.org-note-body { margin-top: .25rem; }
+.org-note-body.ql-snow.ql-editor { padding: 0; border: none; font-size: .9rem; }
+.sort-btn.sort-active { background: var(--primary); color: #fff; border-color: var(--primary); }
+#add-note-area { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.25rem; background: var(--surface); }
+.note-edit-area { border-top: 1px solid var(--border); margin-top: .75rem; padding-top: .75rem; }
+.quill-note-editor { background: var(--bg, #fff); }
+.quill-note-editor .ql-toolbar { border-radius: var(--radius) var(--radius) 0 0; }
+.quill-note-editor .ql-container { border-radius: 0 0 var(--radius) var(--radius); min-height: 120px; }
+</style>
+
+<main class="container">
+  <div class="page-toolbar" style="margin-bottom:1rem">
+    <h1 class="page-title" style="font-size:1.2rem"><%= org.name %> — Notes</h1>
+    <button onclick="window.close()" class="btn btn-ghost btn-sm">Close</button>
+  </div>
+
+  <% const canWrite = userNoteLevel >= 2; %>
+
+  <% if (canWrite) { %>
+  <button class="btn btn-primary btn-sm" id="show-add-btn" onclick="showAddNote()" style="margin-bottom:1rem">+ Add Note</button>
+
+  <div id="add-note-area" style="display:none">
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:.6rem;flex-wrap:wrap">
+      <strong style="font-size:.9rem">New Note</strong>
+      <label style="font-size:.85rem;display:flex;align-items:center;gap:.4rem;margin-left:auto">
+        Visibility:
+        <select id="add-vis" class="form-input form-input-sm">
+          <% for (const [vis, lvl] of Object.entries(VIS_LEVEL).sort((a,b) => b[1]-a[1])) { %>
+            <% if (lvl <= userNoteLevel) { %>
+              <option value="<%= vis %>" <%= vis === 'tech' ? 'selected' : '' %>><%= VIS_LABELS[vis] %></option>
+            <% } %>
+          <% } %>
+        </select>
+      </label>
+    </div>
+    <div id="add-editor-wrap" class="quill-note-editor"></div>
+    <div style="display:flex;gap:.5rem;margin-top:.6rem">
+      <button class="btn btn-primary btn-sm" onclick="submitNote()">Add Note</button>
+      <button class="btn btn-ghost btn-sm"   onclick="cancelAddNote()">Cancel</button>
+    </div>
+    <p id="add-error" class="form-hint" style="color:var(--danger);display:none;margin-top:.4rem"></p>
+  </div>
+  <% } %>
+
+  <% if (notes.length) { %>
+  <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.85rem;flex-wrap:wrap">
+    <span style="font-size:.8rem;color:var(--text-muted)">Sort:</span>
+    <button class="btn btn-sm btn-ghost sort-btn sort-active" data-sort="newest"  onclick="sortNotes('newest')">Newest</button>
+    <button class="btn btn-sm btn-ghost sort-btn"              data-sort="oldest"  onclick="sortNotes('oldest')">Oldest</button>
+    <button class="btn btn-sm btn-ghost sort-btn"              data-sort="updated" onclick="sortNotes('updated')">Last Updated</button>
+    <button class="btn btn-sm btn-ghost sort-btn"              data-sort="creator" onclick="sortNotes('creator')">Creator</button>
+  </div>
+  <% } %>
+
+  <div id="notes-list">
+    <% for (const n of notes) { %>
+    <%
+      const canEdit = userNoteLevel >= VIS_LEVEL[n.visibility];
+      const wasUpdated = n.updated_at !== n.created_at;
+    %>
+    <div class="org-note-card" id="note-<%= n.id %>"
+         data-created="<%= n.created_at %>"
+         data-updated="<%= n.updated_at %>"
+         data-creator="<%= (n.creator_display || '').toLowerCase() %>">
+
+      <div class="org-note-header">
+        <span class="vis-badge vis-<%= n.visibility %>"><%= VIS_LABELS[n.visibility] %></span>
+        <span class="org-note-meta">
+          Created <span data-ts="<%= n.created_at %>" data-fmt="full" title=""><%= new Date(n.created_at * 1000).toLocaleString() %></span>
+          by <strong><%= n.creator_display %></strong>
+          <% if (wasUpdated) { %>
+            &middot; Updated <span data-ts="<%= n.updated_at %>" data-fmt="full" title=""><%= new Date(n.updated_at * 1000).toLocaleString() %></span>
+            by <strong><%= n.updater_display %></strong>
+          <% } %>
+        </span>
+        <% if (canEdit) { %>
+        <div class="org-note-actions">
+          <button class="btn btn-sm btn-ghost" onclick="startEdit(<%= n.id %>)">Edit</button>
+          <button class="btn btn-sm btn-ghost" style="color:var(--danger)" onclick="deleteNote(<%= n.id %>)">Delete</button>
+        </div>
+        <% } %>
+      </div>
+
+      <div id="note-body-<%= n.id %>" class="org-note-body ql-snow ql-editor"><%- n.body %></div>
+
+      <div id="note-edit-<%= n.id %>" class="note-edit-area" style="display:none">
+        <div style="display:flex;align-items:center;gap:1rem;margin-bottom:.6rem;flex-wrap:wrap">
+          <label style="font-size:.85rem;display:flex;align-items:center;gap:.4rem">
+            Visibility:
+            <select id="note-vis-<%= n.id %>" class="form-input form-input-sm">
+              <% for (const [vis, lvl] of Object.entries(VIS_LEVEL).sort((a,b) => b[1]-a[1])) { %>
+                <% if (lvl <= userNoteLevel) { %>
+                  <option value="<%= vis %>" <%= n.visibility === vis ? 'selected' : '' %>><%= VIS_LABELS[vis] %></option>
+                <% } %>
+              <% } %>
+            </select>
+          </label>
+        </div>
+        <div id="note-editor-wrap-<%= n.id %>" class="quill-note-editor"></div>
+        <div style="display:flex;gap:.5rem;margin-top:.6rem">
+          <button class="btn btn-primary btn-sm" onclick="saveEdit(<%= n.id %>)">Save</button>
+          <button class="btn btn-ghost btn-sm"   onclick="cancelEdit(<%= n.id %>)">Cancel</button>
+        </div>
+        <p id="note-error-<%= n.id %>" class="form-hint" style="color:var(--danger);display:none;margin-top:.4rem"></p>
+      </div>
+    </div>
+    <% } %>
+  </div>
+
+  <% if (!notes.length) { %>
+    <p style="color:var(--text-muted);font-size:.9rem">No notes yet<% if (userNoteLevel < 2) { %> visible to your account<% } %>.</p>
+  <% } %>
+</main>
+
+<script src="/js/quill.min.js"></script>
+<script>
+'use strict';
+
+const ORG_ID    = <%= org.id %>;
+const CSRF      = '<%= csrfToken %>';
+const USER_LVL  = <%= userNoteLevel %>;
+const VIS_LEVEL = <%- JSON.stringify(VIS_LEVEL) %>;
+const VIS_LABELS = <%- JSON.stringify(VIS_LABELS) %>;
+const BASE_URL  = '/organizations/' + ORG_ID + '/notes';
+
+// ── Quill instances ────────────────────────────────────────────
+const _quills = {}; // noteId → Quill instance (for edit)
+let _addQuill = null;
+let _activeEditId = null;
+
+const TOOLBAR = [
+  [{ header: [1, 2, 3, false] }],
+  ['bold', 'italic', 'underline', 'strike'],
+  [{ list: 'ordered' }, { list: 'bullet' }],
+  ['link'],
+  ['clean'],
+];
+
+function makeQuill(containerId) {
+  return new Quill('#' + containerId, {
+    theme: 'snow',
+    modules: { toolbar: TOOLBAR },
+  });
+}
+
+// ── Add note ───────────────────────────────────────────────────
+function showAddNote() {
+  document.getElementById('show-add-btn').style.display = 'none';
+  const area = document.getElementById('add-note-area');
+  area.style.display = '';
+  if (!_addQuill) {
+    _addQuill = new Quill('#add-editor-wrap', { theme: 'snow', modules: { toolbar: TOOLBAR } });
+  }
+  _addQuill.focus();
+}
+
+function cancelAddNote() {
+  document.getElementById('add-note-area').style.display = 'none';
+  document.getElementById('show-add-btn').style.display = '';
+  document.getElementById('add-error').style.display = 'none';
+  if (_addQuill) _addQuill.setContents([]);
+}
+
+async function submitNote() {
+  const errEl = document.getElementById('add-error');
+  errEl.style.display = 'none';
+  const body = _addQuill ? _addQuill.root.innerHTML.trim() : '';
+  if (!body || body === '<p><br></p>') { errEl.textContent = 'Note cannot be empty.'; errEl.style.display = ''; return; }
+  const visibility = document.getElementById('add-vis').value;
+  try {
+    const resp = await apiFetch(BASE_URL, { body, visibility });
+    prependNoteCard(resp.note);
+    cancelAddNote();
+  } catch (e) { errEl.textContent = e.message; errEl.style.display = ''; }
+}
+
+// ── Edit note ──────────────────────────────────────────────────
+function startEdit(noteId) {
+  if (_activeEditId && _activeEditId !== noteId) cancelEdit(_activeEditId);
+  _activeEditId = noteId;
+
+  document.getElementById('note-body-' + noteId).style.display = 'none';
+  const editArea = document.getElementById('note-edit-' + noteId);
+  editArea.style.display = '';
+
+  if (!_quills[noteId]) {
+    _quills[noteId] = new Quill('#note-editor-wrap-' + noteId, { theme: 'snow', modules: { toolbar: TOOLBAR } });
+  }
+  const bodyHtml = document.getElementById('note-body-' + noteId).innerHTML;
+  _quills[noteId].clipboard.dangerouslyPasteHTML(bodyHtml);
+  _quills[noteId].focus();
+}
+
+function cancelEdit(noteId) {
+  document.getElementById('note-body-' + noteId).style.display = '';
+  document.getElementById('note-edit-' + noteId).style.display = 'none';
+  document.getElementById('note-error-' + noteId).style.display = 'none';
+  if (_activeEditId === noteId) _activeEditId = null;
+}
+
+async function saveEdit(noteId) {
+  const errEl = document.getElementById('note-error-' + noteId);
+  errEl.style.display = 'none';
+  const body = _quills[noteId] ? _quills[noteId].root.innerHTML.trim() : '';
+  if (!body || body === '<p><br></p>') { errEl.textContent = 'Note cannot be empty.'; errEl.style.display = ''; return; }
+  const visibility = document.getElementById('note-vis-' + noteId).value;
+  try {
+    const resp = await apiFetch(BASE_URL + '/' + noteId + '/update', { body, visibility });
+    updateNoteCard(noteId, resp.note);
+    cancelEdit(noteId);
+  } catch (e) { errEl.textContent = e.message; errEl.style.display = ''; }
+}
+
+// ── Delete note ────────────────────────────────────────────────
+async function deleteNote(noteId) {
+  if (!confirm('Delete this note? This cannot be undone.')) return;
+  try {
+    await apiFetch(BASE_URL + '/' + noteId + '/delete', {});
+    document.getElementById('note-' + noteId)?.remove();
+    if (!document.querySelectorAll('.org-note-card').length) {
+      document.getElementById('notes-list').insertAdjacentHTML('afterend',
+        '<p id="empty-msg" style="color:var(--text-muted);font-size:.9rem">No notes yet.</p>');
+    }
+  } catch (e) { alert('Could not delete note: ' + e.message); }
+}
+
+// ── DOM helpers ────────────────────────────────────────────────
+function fmtTs(ts) {
+  return new Date(ts * 1000).toLocaleString();
+}
+
+function visBadgeHtml(vis) {
+  return `<span class="vis-badge vis-${vis}">${escHtml(VIS_LABELS[vis] || vis)}</span>`;
+}
+
+function noteCardHtml(n, canEdit) {
+  const wasUpdated = n.updated_at !== n.created_at;
+  const visOpts = Object.entries(VIS_LEVEL)
+    .sort((a, b) => b[1] - a[1])
+    .filter(([, lvl]) => lvl <= USER_LVL)
+    .map(([vis]) => `<option value="${vis}" ${n.visibility === vis ? 'selected' : ''}>${escHtml(VIS_LABELS[vis])}</option>`)
+    .join('');
+
+  return `
+    <div class="org-note-header">
+      ${visBadgeHtml(n.visibility)}
+      <span class="org-note-meta">
+        Created <span data-ts="${n.created_at}" data-fmt="full" title="">${escHtml(fmtTs(n.created_at))}</span>
+        by <strong>${escHtml(n.creator_display)}</strong>
+        ${wasUpdated ? `&middot; Updated <span data-ts="${n.updated_at}" data-fmt="full" title="">${escHtml(fmtTs(n.updated_at))}</span> by <strong>${escHtml(n.updater_display)}</strong>` : ''}
+      </span>
+      ${canEdit ? `<div class="org-note-actions">
+        <button class="btn btn-sm btn-ghost" onclick="startEdit(${n.id})">Edit</button>
+        <button class="btn btn-sm btn-ghost" style="color:var(--danger)" onclick="deleteNote(${n.id})">Delete</button>
+      </div>` : ''}
+    </div>
+    <div id="note-body-${n.id}" class="org-note-body ql-snow ql-editor">${n.body}</div>
+    <div id="note-edit-${n.id}" class="note-edit-area" style="display:none">
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:.6rem;flex-wrap:wrap">
+        <label style="font-size:.85rem;display:flex;align-items:center;gap:.4rem">
+          Visibility: <select id="note-vis-${n.id}" class="form-input form-input-sm">${visOpts}</select>
+        </label>
+      </div>
+      <div id="note-editor-wrap-${n.id}" class="quill-note-editor"></div>
+      <div style="display:flex;gap:.5rem;margin-top:.6rem">
+        <button class="btn btn-primary btn-sm" onclick="saveEdit(${n.id})">Save</button>
+        <button class="btn btn-ghost btn-sm"   onclick="cancelEdit(${n.id})">Cancel</button>
+      </div>
+      <p id="note-error-${n.id}" class="form-hint" style="color:var(--danger);display:none;margin-top:.4rem"></p>
+    </div>`;
+}
+
+function prependNoteCard(n) {
+  const canEdit = USER_LVL >= (VIS_LEVEL[n.visibility] || 0);
+  const div = document.createElement('div');
+  div.className = 'org-note-card';
+  div.id = 'note-' + n.id;
+  div.dataset.created = n.created_at;
+  div.dataset.updated = n.updated_at;
+  div.dataset.creator = (n.creator_display || '').toLowerCase();
+  div.innerHTML = noteCardHtml(n, canEdit);
+  const list = document.getElementById('notes-list');
+  list.insertBefore(div, list.firstChild);
+  document.getElementById('empty-msg')?.remove();
+  if (typeof localiseTimestamps === 'function') localiseTimestamps(div);
+}
+
+function updateNoteCard(noteId, n) {
+  const card = document.getElementById('note-' + noteId);
+  if (!card) return;
+  card.dataset.updated = n.updated_at;
+  const canEdit = USER_LVL >= (VIS_LEVEL[n.visibility] || 0);
+  card.innerHTML = noteCardHtml(n, canEdit);
+  delete _quills[noteId];
+  if (typeof localiseTimestamps === 'function') localiseTimestamps(card);
+}
+
+// ── Sort ───────────────────────────────────────────────────────
+function sortNotes(key) {
+  const list  = document.getElementById('notes-list');
+  const cards = [...list.querySelectorAll('.org-note-card')];
+  cards.sort((a, b) => {
+    switch (key) {
+      case 'newest':  return b.dataset.created - a.dataset.created;
+      case 'oldest':  return a.dataset.created - b.dataset.created;
+      case 'updated': return b.dataset.updated - a.dataset.updated;
+      case 'creator': return (a.dataset.creator || '').localeCompare(b.dataset.creator || '');
+      default: return 0;
+    }
+  });
+  cards.forEach(c => list.appendChild(c));
+  document.querySelectorAll('.sort-btn').forEach(b =>
+    b.classList.toggle('sort-active', b.dataset.sort === key));
+}
+
+// ── API helper ─────────────────────────────────────────────────
+async function apiFetch(url, data) {
+  const resp = await fetch(url, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
+    body:    JSON.stringify(data),
+    credentials: 'include',
+  });
+  const json = await resp.json();
+  if (!resp.ok) throw new Error(json.error || 'Server error');
+  return json;
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Run localiseTimestamps on initial load
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof localiseTimestamps === 'function') localiseTimestamps();
+});
+</script>
+
+<%- include('../partials/foot') %>

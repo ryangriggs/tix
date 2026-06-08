@@ -167,6 +167,18 @@ const SCHEMA = `
     UNIQUE(organization_id, name COLLATE NOCASE)
   );
 
+  CREATE TABLE IF NOT EXISTS organization_notes (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    body            TEXT    NOT NULL,
+    visibility      TEXT    NOT NULL DEFAULT 'tech',
+    created_at      INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at      INTEGER NOT NULL DEFAULT (unixepoch()),
+    created_by      INTEGER NOT NULL REFERENCES users(id),
+    updated_by      INTEGER NOT NULL REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_org_notes_org ON organization_notes(organization_id);
+
   CREATE TABLE IF NOT EXISTS saved_views (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -302,6 +314,16 @@ async function initDb() {
   // Back-fill reply tokens for any existing tickets that pre-date this migration
   _db.exec(`UPDATE tickets SET reply_token = lower(hex(randomblob(16))) WHERE reply_token IS NULL`);
   _db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_reply_token ON tickets(reply_token)');
+  try { _db.exec(`CREATE TABLE IF NOT EXISTS organization_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    body TEXT NOT NULL, visibility TEXT NOT NULL DEFAULT 'tech',
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    updated_by INTEGER NOT NULL REFERENCES users(id)
+  )`); } catch (_) {}
+  try { _db.exec('CREATE INDEX IF NOT EXISTS idx_org_notes_org ON organization_notes(organization_id)'); } catch (_) {}
 
   // One-time FTS population for existing data (new installs have nothing to populate)
   const ftsMigrated = prepare('SELECT value FROM settings WHERE key = ?').get('fts_migrated');
@@ -1065,6 +1087,57 @@ function getOrganizationById(id) {
   return prepare('SELECT * FROM organizations WHERE id = ?').get(id);
 }
 
+// Org Notes — visibility hierarchy: admin(4) > tech(3) > supervisor(2) > user(1)
+const _NOTE_VIS = ['user', 'supervisor', 'tech', 'admin']; // index+1 = level
+
+function getOrgNotes(orgId, level) {
+  const allowed = _NOTE_VIS.slice(0, Math.max(0, level));
+  if (!allowed.length) return [];
+  const ph = allowed.map(() => '?').join(',');
+  return prepare(`
+    SELECT n.*,
+           COALESCE(c.name, c.email) AS creator_display,
+           COALESCE(u.name, u.email) AS updater_display
+    FROM organization_notes n
+    JOIN users c ON c.id = n.created_by
+    JOIN users u ON u.id = n.updated_by
+    WHERE n.organization_id = ? AND n.visibility IN (${ph})
+    ORDER BY n.created_at DESC
+  `).all(orgId, ...allowed);
+}
+
+function getOrgNoteById(noteId) {
+  return prepare('SELECT * FROM organization_notes WHERE id = ?').get(noteId);
+}
+
+function getOrgNoteByIdWithUsers(noteId) {
+  return prepare(`
+    SELECT n.*,
+           COALESCE(c.name, c.email) AS creator_display,
+           COALESCE(u.name, u.email) AS updater_display
+    FROM organization_notes n
+    JOIN users c ON c.id = n.created_by
+    JOIN users u ON u.id = n.updated_by
+    WHERE n.id = ?
+  `).get(noteId);
+}
+
+function addOrgNote(orgId, body, visibility, userId) {
+  return prepare(
+    'INSERT INTO organization_notes (organization_id, body, visibility, created_by, updated_by) VALUES (?, ?, ?, ?, ?)'
+  ).run(orgId, body, visibility, userId, userId);
+}
+
+function updateOrgNote(noteId, body, visibility, userId) {
+  return prepare(
+    'UPDATE organization_notes SET body=?, visibility=?, updated_at=unixepoch(), updated_by=? WHERE id=?'
+  ).run(body, visibility, userId, noteId);
+}
+
+function deleteOrgNote(noteId) {
+  return prepare('DELETE FROM organization_notes WHERE id=?').run(noteId);
+}
+
 function setOrgUrgentNotifyUserIds(orgId, ids) {
   prepare('UPDATE organizations SET urgent_notify_user_ids = ? WHERE id = ?').run(ids || null, orgId);
 }
@@ -1406,6 +1479,9 @@ module.exports = {
   findOrCreateOrganization, getAllOrganizations, getOrganizationsByIds, searchOrganizations,
   renameOrganization, deleteOrganization, getOrganizationById,
   setOrgUrgentNotifyUserIds, getUrgentNotifyEmails,
+  // Org Notes
+  getOrgNotes, getOrgNoteById, getOrgNoteByIdWithUsers,
+  addOrgNote, updateOrgNote, deleteOrgNote,
   // Locations
   getLocationsByOrg, getLocationById, createLocation, findOrCreateLocation,
   updateLocation, isLocationReferenced, deleteLocation, getTravelReport,
