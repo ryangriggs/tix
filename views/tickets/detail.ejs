@@ -5,6 +5,15 @@
 <link href="/css/quill.snow.css" rel="stylesheet">
 <script src="/js/quill.min.js"></script>
 
+<style>
+/* Inline images that are stored attachments are clickable to open in the annotate viewer */
+.rich-content img[src^="/tickets/attachments/"] {
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.rich-content img[src^="/tickets/attachments/"]:hover { opacity: .82; }
+</style>
+
 <main class="container" id="ticket-detail"
   data-ticket-id="<%= ticket.id %>">
 
@@ -1453,6 +1462,19 @@ function reorderAfterPin(commentEl, isPinned) {
   const hasPinned = section.querySelectorAll('.comment[data-pinned="1"]').length > 0;
   document.getElementById('pinned-divider').style.display = hasPinned ? '' : 'none';
 }
+</script>
+
+<script>
+// Open inline attachment images in the annotate viewer on click.
+// Uses event delegation so it works after comment/body innerHTML updates.
+document.addEventListener('click', function(e) {
+  if (e.target.tagName !== 'IMG') return;
+  if (!e.target.closest('.rich-content')) return;
+  const src = e.target.getAttribute('src') || '';
+  const m = src.match(/^\/tickets\/attachments\/([^/?#]+)$/);
+  if (!m) return;
+  window.open('/tickets/<%= ticket.id %>/attachments/' + encodeURIComponent(m[1]) + '/annotate', '_blank');
+});
 </script>
 
 <%- include('../partials/foot') %>
