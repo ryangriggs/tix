@@ -104,10 +104,15 @@ const ALLOWED_TAGS = [
 function sanitize(html) {
   return sanitizeHtml(html || '', {
     allowedTags: ALLOWED_TAGS,
-    allowedAttributes: { a: ['href', 'target'], img: ['src', 'alt'], li: ['class'] },
+    allowedAttributes: { a: ['href', 'target', 'rel'], img: ['src', 'alt'], li: ['class'] },
     allowedClasses: { li: [/^ql-indent-[1-8]$/] },
-    allowedSchemes: ['http', 'https', 'mailto', 'data'],
+    allowedSchemes: ['http', 'https', 'mailto'],
+    allowedSchemesByTag: { img: ['http', 'https', 'data'] },
     transformTags: {
+      // Force safe link attributes to prevent tabnapping and data: href phishing
+      a(tagName, attribs) {
+        return { tagName, attribs: { ...attribs, target: '_blank', rel: 'noopener noreferrer' } };
+      },
       // Strip data: URIs that are not safe raster image types (SVG can contain scripts)
       img(tagName, attribs) {
         const src = attribs.src || '';
@@ -830,8 +835,8 @@ router.post('/:id/comments/:commentId/edit', (req, res) => {
   const isOwner = comment.user_id === req.user.id;
   if (!isAdmin && !isOwner) return res.status(403).json({ error: 'Forbidden.' });
 
-  const body = (req.body.body || '').trim();
-  if (!body) return res.status(400).json({ error: 'Comment body cannot be empty.' });
+  const body = sanitize(req.body.body || '');
+  if (!body.trim()) return res.status(400).json({ error: 'Comment body cannot be empty.' });
 
   db.updateComment(commentId, body);
   audit.log(req, 'edited comment', ticket.id);
@@ -901,8 +906,8 @@ router.post('/:id/body', (req, res) => {
   const access = getTicketAccess(ticket, req.user);
   if (access !== 'admin' && access !== 'owner') return res.status(403).json({ error: 'Forbidden' });
 
-  const body = (req.body.body || '').trim();
-  if (!body) return res.status(400).json({ error: 'Body cannot be empty.' });
+  const body = sanitize(req.body.body || '');
+  if (!body.trim()) return res.status(400).json({ error: 'Body cannot be empty.' });
 
   db.updateTicket(ticket.id, { body });
   audit.log(req, 'edited ticket body', ticket.id);

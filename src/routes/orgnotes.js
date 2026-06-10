@@ -15,10 +15,28 @@ function userNoteLevel(user) {
   return 1;
 }
 
+// Returns true only if this user should be able to see any notes for this org.
+// Always 404 (not 403) on failure — avoids confirming that an org ID exists.
+function canAccessOrg(user, orgId) {
+  if (user.role === 'admin') return true;
+  // techOrgIds covers both technicians and group superusers assigned to this org
+  if (Array.isArray(user.techOrgIds) && user.techOrgIds.includes(orgId)) return true;
+  // Regular user whose account is assigned to this org
+  if (user.organization_id === orgId) return true;
+  return false;
+}
+
+function parseId(str) {
+  const n = parseInt(str, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 // GET /organizations/:id/notes
 router.get('/:id/notes', (req, res) => {
-  const org = db.getOrganizationById(parseInt(req.params.id, 10));
-  if (!org) return res.status(404).render('error', { title: '404', message: 'Organization not found.' });
+  const orgId = parseId(req.params.id);
+  const org   = orgId ? db.getOrganizationById(orgId) : null;
+  if (!org || !canAccessOrg(req.user, org.id))
+    return res.status(404).render('error', { title: '404', message: 'Not found.' });
 
   const level = userNoteLevel(req.user);
   const notes = db.getOrgNotes(org.id, level);
@@ -35,8 +53,10 @@ router.get('/:id/notes', (req, res) => {
 
 // POST /organizations/:id/notes — create
 router.post('/:id/notes', (req, res) => {
-  const org = db.getOrganizationById(parseInt(req.params.id, 10));
-  if (!org) return res.status(404).json({ error: 'Organization not found' });
+  const orgId = parseId(req.params.id);
+  const org   = orgId ? db.getOrganizationById(orgId) : null;
+  if (!org || !canAccessOrg(req.user, org.id))
+    return res.status(404).json({ error: 'Not found' });
 
   const level = userNoteLevel(req.user);
   if (level < 2) return res.status(403).json({ error: 'Forbidden' });
@@ -44,7 +64,7 @@ router.post('/:id/notes', (req, res) => {
   const body       = (req.body.body || '').trim();
   const visibility = req.body.visibility;
 
-  if (!body)               return res.status(400).json({ error: 'Note body is required' });
+  if (!body)                  return res.status(400).json({ error: 'Note body is required' });
   if (!VIS_LEVEL[visibility]) return res.status(400).json({ error: 'Invalid visibility' });
   if (VIS_LEVEL[visibility] > level)
     return res.status(403).json({ error: 'Cannot set visibility above your access level' });
@@ -58,43 +78,59 @@ router.post('/:id/notes', (req, res) => {
 
 // POST /organizations/:id/notes/:noteId/update
 router.post('/:id/notes/:noteId/update', (req, res) => {
-  const orgId  = parseInt(req.params.id, 10);
-  const note   = db.getOrgNoteById(parseInt(req.params.noteId, 10));
+  const orgId  = parseId(req.params.id);
+  const noteId = parseId(req.params.noteId);
+  if (!orgId || !noteId) return res.status(404).json({ error: 'Not found' });
+
+  const org  = db.getOrganizationById(orgId);
+  if (!org || !canAccessOrg(req.user, org.id))
+    return res.status(404).json({ error: 'Not found' });
+
+  const note = db.getOrgNoteById(noteId);
   if (!note || note.organization_id !== orgId)
     return res.status(404).json({ error: 'Note not found' });
 
   const level = userNoteLevel(req.user);
-  if (level < VIS_LEVEL[note.visibility])
+  // Require supervisor+ AND sufficient level for this note's visibility
+  if (level < 2 || level < VIS_LEVEL[note.visibility])
     return res.status(403).json({ error: 'Forbidden' });
 
   const body       = (req.body.body || '').trim();
   const visibility = req.body.visibility || note.visibility;
 
-  if (!body)               return res.status(400).json({ error: 'Note body is required' });
+  if (!body)                  return res.status(400).json({ error: 'Note body is required' });
   if (!VIS_LEVEL[visibility]) return res.status(400).json({ error: 'Invalid visibility' });
   if (VIS_LEVEL[visibility] > level)
     return res.status(403).json({ error: 'Cannot set visibility above your access level' });
 
   db.updateOrgNote(note.id, body, visibility, req.user.id);
   const updated = db.getOrgNoteByIdWithUsers(note.id);
-  audit.log(req, `updated org note ${note.id} (org id ${orgId})`);
+  audit.log(req, `updated org note ${note.id} (org "${org.name}")`);
 
   res.json({ ok: true, note: updated });
 });
 
 // POST /organizations/:id/notes/:noteId/delete
 router.post('/:id/notes/:noteId/delete', (req, res) => {
-  const orgId = parseInt(req.params.id, 10);
-  const note  = db.getOrgNoteById(parseInt(req.params.noteId, 10));
+  const orgId  = parseId(req.params.id);
+  const noteId = parseId(req.params.noteId);
+  if (!orgId || !noteId) return res.status(404).json({ error: 'Not found' });
+
+  const org = db.getOrganizationById(orgId);
+  if (!org || !canAccessOrg(req.user, org.id))
+    return res.status(404).json({ error: 'Not found' });
+
+  const note = db.getOrgNoteById(noteId);
   if (!note || note.organization_id !== orgId)
     return res.status(404).json({ error: 'Note not found' });
 
   const level = userNoteLevel(req.user);
-  if (level < VIS_LEVEL[note.visibility])
+  // Require supervisor+ AND sufficient level for this note's visibility
+  if (level < 2 || level < VIS_LEVEL[note.visibility])
     return res.status(403).json({ error: 'Forbidden' });
 
   db.deleteOrgNote(note.id);
-  audit.log(req, `deleted org note ${note.id} (org id ${orgId})`);
+  audit.log(req, `deleted org note ${note.id} (org "${org.name}")`);
 
   res.json({ ok: true });
 });

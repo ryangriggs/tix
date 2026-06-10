@@ -299,6 +299,10 @@ function parseAddressString(str) {
   });
 }
 
+function escHtml(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // ============================================================
 // In-memory sliding-window rate limiter
 // ============================================================
@@ -493,8 +497,8 @@ async function handleReply(ticketId, fromEmail, parsed, requireParty = false) {
     db.recordEmailMessage(ticketId, msgId, 'out');
 
     const notifyBody = wasReopened
-      ? `<p><strong>${fromEmail}</strong> replied and reopened this ticket:</p>${body}`
-      : `<p><strong>${fromEmail}</strong> replied:</p>${body}`;
+      ? `<p><strong>${escHtml(fromEmail)}</strong> replied and reopened this ticket:</p>${body}`
+      : `<p><strong>${escHtml(fromEmail)}</strong> replied:</p>${body}`;
 
     await sendTicketNotification({
       to: notifyEmails,
@@ -574,7 +578,7 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
   }
 
   if (blockedCcEmails.length) {
-    const noteBody = `User ${senderUser.name || senderUser.email} attempted to CC the ticket to other user(s) ${blockedCcEmails.join(', ')} but does not have permission to add collaborators to the ticket. Contact administrator for approval.`;
+    const noteBody = `<p>User ${escHtml(senderUser.name || senderUser.email)} attempted to CC the ticket to other user(s) ${escHtml(blockedCcEmails.join(', '))} but does not have permission to add collaborators to the ticket. Contact administrator for approval.</p>`;
     db.addComment(ticket.id, senderUser.id, noteBody, false, null, null, 'technician');
     console.log(`[Inbound] Blocked CC attempt from ${fromEmail} to: ${blockedCcEmails.join(', ')}`);
   }
@@ -591,7 +595,7 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
         originalSenderEmail = origEmail;
         console.log(`[Inbound] Forwarded email — added original sender ${origEmail} as collaborator`);
       } else {
-        const noteBody = `User ${senderUser.name || senderUser.email} attempted to CC the ticket to other user(s) ${origEmail} but does not have permission to add collaborators to the ticket. Contact administrator for approval.`;
+        const noteBody = `<p>User ${escHtml(senderUser.name || senderUser.email)} attempted to CC the ticket to other user(s) ${escHtml(origEmail)} but does not have permission to add collaborators to the ticket. Contact administrator for approval.</p>`;
         db.addComment(ticket.id, senderUser.id, noteBody, false, null, null, 'technician');
         console.log(`[Inbound] Blocked forwarded-sender CC from ${fromEmail}: ${origEmail}`);
       }
@@ -635,7 +639,7 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
       ticketSubject: ticket.subject,
       body: `
         <p>Your ticket has been received and assigned ID <strong>#${config.ticketPrefix}${ticket.id}</strong>.</p>
-        <p>Ticket Subject: <strong>${ticket.subject}</strong></p>
+        <p>Ticket Subject: <strong>${escHtml(ticket.subject)}</strong></p>
         `,
       ticketId: ticket.id,
       messageId: outMsgId,
@@ -650,8 +654,8 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
       ticketSubject: ticket.subject,
       body: `
         <p>A ticket has been created on your behalf with ID <strong>#${config.ticketPrefix}${ticket.id}</strong>.</p>
-        <p>Ticket Subject: <strong>${ticket.subject}</strong></p>
-        <p>Created by: <strong>${fromEmail}</strong><p>
+        <p>Ticket Subject: <strong>${escHtml(ticket.subject)}</strong></p>
+        <p>Created by: <strong>${escHtml(fromEmail)}</strong></p>
         <p>${body}</p>
         `,
       ticketId: ticket.id,
@@ -665,7 +669,7 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
     await sendTicketNotification({
       to: defaultEmail,
       ticketSubject: ticket.subject,
-      body: `<p>New ticket <strong>#${config.ticketPrefix}${ticket.id}</strong> from ${fromEmail}:</p>${body}`,
+      body: `<p>New ticket <strong>#${config.ticketPrefix}${ticket.id}</strong> from ${escHtml(fromEmail)}:</p>${body}`,
       ticketId: ticket.id,
       messageId: `<ticket-${ticket.id}-notify-${Date.now()}@${domain}>`,
       replyToken: ticket.reply_token,
@@ -685,7 +689,7 @@ async function handleNewTicket(fromEmail, parsed, { silent = false } = {}) {
       ticketSubject: ticket.subject,
       body: `
         <p>You have been added to ticket <strong>#${config.ticketPrefix}${ticket.id}</strong>.</p>
-        <p>Ticket Subject: <strong>${ticket.subject}</strong></p>
+        <p>Ticket Subject: <strong>${escHtml(ticket.subject)}</strong></p>
         <p>${body}</p>
         `,
       ticketId: ticket.id,
