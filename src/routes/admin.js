@@ -536,6 +536,9 @@ router.post('/settings', (req, res) => {
     inactivity_hours_high:          String(Math.max(0, flt('inactivity_hours_high',   0))),
     inactivity_hours_medium:        String(Math.max(0, flt('inactivity_hours_medium', 0))),
     inactivity_hours_low:           String(Math.max(0, flt('inactivity_hours_low',    0))),
+    pending_reminder_interval_days: String(Math.max(0.5, flt('pending_reminder_interval_days', 1))),
+    pending_reminder_message:       trim('pending_reminder_message'),
+    pending_auto_close_message:     trim('pending_auto_close_message'),
     email_quota_daily:              String(Math.max(0, int('email_quota_daily',   0))),
     email_quota_monthly:            String(Math.max(0, int('email_quota_monthly', 0))),
     urgent_notify_user_ids:         [].concat(req.body.urgent_notify_user_ids || [])

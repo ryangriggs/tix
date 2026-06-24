@@ -124,7 +124,7 @@
           <p id="draft-status" class="form-hint" style="margin:.25rem 0 0;min-height:1.2em;transition:opacity .5s"></p>
           <div class="form-actions" style="flex-wrap:wrap;gap:.5rem">
             <% if (canManage) { %>
-              <select name="status_change" class="form-select form-select-sm" style="width:auto">
+              <select name="status_change" id="comment-status-change" class="form-select form-select-sm" style="width:auto">
                 <option value=""        <%= ticket.status!=='closed'  ? 'selected':'' %>>Keep status</option>
                 <option value="new"     <%= ticket.status==='new'     ? 'disabled':'' %>>New</option>
                 <option value="pending" <%= ticket.status==='pending' ? 'disabled':'' %>>Pending</option>
@@ -134,6 +134,21 @@
                 <option value="closed"  <%= ticket.status==='closed'  ? 'disabled':'' %>>Closed</option>
                 <% } %>
               </select>
+              <% if (isTechOrAdmin) { %>
+              <select name="pending_days" id="comment-pending-days" class="form-select form-select-sm"
+                      style="width:auto;display:none" title="Response deadline">
+                <option value="1">1 day</option>
+                <option value="2" selected>2 days</option>
+                <option value="3">3 days</option>
+                <option value="4">4 days</option>
+                <option value="5">5 days</option>
+                <option value="6">6 days</option>
+                <option value="7">1 week</option>
+                <option value="14">2 weeks</option>
+                <option value="21">3 weeks</option>
+                <option value="30">1 month</option>
+              </select>
+              <% } %>
             <% } %>
             <input type="hidden" name="visibility" id="post-visibility" value="user">
             <input type="hidden" name="draft_id" id="draft-id-input" value="">
@@ -306,6 +321,26 @@
                 data-status="<%= sv %>"><%= sl %></button>
             <% } %>
           </div>
+          <!-- Pending deadline picker — shown when Pending is clicked -->
+          <div id="pending-deadline-picker" style="display:none;margin-top:.5rem">
+            <div class="sidebar-label" style="font-size:.8rem;margin-bottom:.25rem">Response deadline</div>
+            <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+              <select id="pending-days-select" class="form-select form-select-sm" style="width:auto">
+                <option value="1">1 day</option>
+                <option value="2" selected>2 days</option>
+                <option value="3">3 days</option>
+                <option value="4">4 days</option>
+                <option value="5">5 days</option>
+                <option value="6">6 days</option>
+                <option value="7">1 week</option>
+                <option value="14">2 weeks</option>
+                <option value="21">3 weeks</option>
+                <option value="30">1 month</option>
+              </select>
+              <button type="button" class="btn btn-sm btn-primary" id="pending-confirm-btn">Set Pending</button>
+              <button type="button" class="btn btn-sm btn-secondary" id="pending-cancel-btn">Cancel</button>
+            </div>
+          </div>
         </div>
 
         <!-- Priority -->
@@ -328,6 +363,23 @@
             <button type="submit" class="btn btn-sm btn-secondary">Set</button>
           </form>
         </div>
+
+        <!-- Pending until (admin/tech editable) -->
+        <div class="sidebar-section" id="pending-until-section" style="<%= ticket.status === 'pending' ? '' : 'display:none' %>">
+          <div class="sidebar-label">Awaiting response until</div>
+          <% if (isTechOrAdmin) { %>
+            <form id="pending-until-form" class="inline-form">
+              <input type="date" id="pending-until-input" name="pending_until_date"
+                     value="<%= ticket.pending_until ? new Date(ticket.pending_until * 1000).toISOString().slice(0,10) : '' %>"
+                     class="form-input form-input-sm">
+              <button type="submit" class="btn btn-sm btn-secondary">Set</button>
+            </form>
+          <% } else { %>
+            <span id="pending-until-text" data-ts="<%= ticket.pending_until || '' %>" data-fmt="date">
+              <%= ticket.pending_until ? formatDateOnly(ticket.pending_until) : '—' %>
+            </span>
+          <% } %>
+        </div>
       <% } else { %>
         <div class="sidebar-section">
           <div class="sidebar-label">Status</div>
@@ -341,6 +393,14 @@
           <div class="sidebar-section">
             <div class="sidebar-label">Due date</div>
             <span class="<%= ticket.due_date < (Date.now()/1000) ? 'overdue' : '' %>" data-ts="<%= ticket.due_date || '' %>" data-fmt="date"><%= formatDateOnly(ticket.due_date) %></span>
+          </div>
+        <% } %>
+        <% if (ticket.status === 'pending') { %>
+          <div class="sidebar-section" id="pending-until-section">
+            <div class="sidebar-label">Awaiting response until</div>
+            <span id="pending-until-text" data-ts="<%= ticket.pending_until || '' %>" data-fmt="date">
+              <%= ticket.pending_until ? formatDateOnly(ticket.pending_until) : '—' %>
+            </span>
           </div>
         <% } %>
       <% } %>
@@ -1105,20 +1165,86 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => { btn.textContent = orig; }, 1200);
   }
 
+  // Show/hide pending_days dropdown in comment form when Pending is selected
+  const _commentStatusSel = document.getElementById('comment-status-change');
+  const _commentPendingDays = document.getElementById('comment-pending-days');
+  if (_commentStatusSel && _commentPendingDays) {
+    _commentStatusSel.addEventListener('change', () => {
+      _commentPendingDays.style.display = _commentStatusSel.value === 'pending' ? '' : 'none';
+    });
+  }
+
   // --- Status pills ---
   const _currentStatus = '<%= ticket.status %>';
+
+  function _applyStatusChange(sv, pendingUntil) {
+    document.querySelectorAll('#status-pills .pill-btn').forEach(b => b.classList.remove('pill-active'));
+    const newBtn = document.querySelector(`#status-pills [data-status="${sv}"]`);
+    if (newBtn) newBtn.classList.add('pill-active');
+    const badge = document.getElementById('badge-status');
+    if (badge) { badge.className = `badge badge-status-${sv}`; badge.textContent = sv.replace(/_/g, ' '); }
+
+    const pendingSection = document.getElementById('pending-until-section');
+    if (pendingSection) pendingSection.style.display = sv === 'pending' ? '' : 'none';
+
+    if (sv === 'pending' && pendingUntil) {
+      const inp = document.getElementById('pending-until-input');
+      if (inp) inp.value = new Date(pendingUntil * 1000).toISOString().slice(0, 10);
+      const txt = document.getElementById('pending-until-text');
+      if (txt) { txt.dataset.ts = pendingUntil; txt.textContent = fmtTs(pendingUntil, 'date'); }
+    }
+  }
+
   document.querySelectorAll('#status-pills .pill-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const sv = btn.dataset.status;
+
+      if (sv === 'pending') {
+        const picker = document.getElementById('pending-deadline-picker');
+        if (picker) { picker.style.display = ''; return; }
+      }
+
       try {
         await sidebarPost(`/tickets/${TICKET_ID}/status`, { status: sv }, btn);
-        document.querySelectorAll('#status-pills .pill-btn').forEach(b => b.classList.remove('pill-active'));
-        btn.classList.add('pill-active');
-        const badge = document.getElementById('badge-status');
-        if (badge) { badge.className = `badge badge-status-${sv}`; badge.textContent = sv.replace(/_/g, ' '); }
+        _applyStatusChange(sv, null);
       } catch (err) { alert('Could not update status: ' + err.message); }
     });
   });
+
+  // Pending deadline confirm
+  document.getElementById('pending-confirm-btn')?.addEventListener('click', async () => {
+    const days    = document.getElementById('pending-days-select').value;
+    const btn     = document.getElementById('pending-confirm-btn');
+    const picker  = document.getElementById('pending-deadline-picker');
+    try {
+      const data = await sidebarPost(`/tickets/${TICKET_ID}/status`, { status: 'pending', pending_days: days }, btn);
+      picker.style.display = 'none';
+      _applyStatusChange('pending', data.pendingUntil || null);
+    } catch (err) { alert('Could not update status: ' + err.message); }
+  });
+
+  document.getElementById('pending-cancel-btn')?.addEventListener('click', () => {
+    document.getElementById('pending-deadline-picker').style.display = 'none';
+  });
+
+  // Pending-until date form (admin/tech edit)
+  const pendingUntilForm = document.getElementById('pending-until-form');
+  if (pendingUntilForm) {
+    pendingUntilForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const inp    = pendingUntilForm.querySelector('[name="pending_until_date"]');
+      const setBtn = pendingUntilForm.querySelector('[type="submit"]');
+      try {
+        const data = await sidebarPost(`/tickets/${TICKET_ID}/pending-until`, { pending_until_date: inp.value }, setBtn);
+        if (data.pendingUntil) {
+          inp.value = new Date(data.pendingUntil * 1000).toISOString().slice(0, 10);
+          const txt = document.getElementById('pending-until-text');
+          if (txt) { txt.dataset.ts = data.pendingUntil; txt.textContent = fmtTs(data.pendingUntil, 'date'); }
+        }
+        flashBtn(setBtn, true);
+      } catch (err) { alert('Could not update pending deadline: ' + err.message); }
+    });
+  }
 
   // --- Priority pills ---
   document.querySelectorAll('#priority-pills .pill-btn').forEach(btn => {

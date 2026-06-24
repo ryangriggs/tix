@@ -640,8 +640,10 @@ router.post('/bulk', (req, res) => {
     const validStatuses = ['new', 'pending', 'open', 'on_hold', 'closed'];
     if (validStatuses.includes(bulkStatus)) {
       db.bulkUpdateStatus(ids, bulkStatus);
+      if (bulkStatus !== 'pending') {
+        for (const id of ids) db.clearPendingFields(id);
+      }
       audit.log(req, `bulk changed status to ${bulkStatus} on ${ids.length} ticket(s): ${ids.join(', ')}`);
-
     }
   } else if (action === 'priority') {
     const validPriorities = ['low', 'medium', 'high', 'urgent'];
@@ -765,11 +767,24 @@ router.post('/:id/comments', upload, async (req, res) => {
     if (draft) db.deleteComment(publishedDraftId);
   }
 
+  const _now = Math.floor(Date.now() / 1000);
   if (willChangeStatus) {
     const closeFields = { status: statusChange };
-    if (statusChange === 'closed') closeFields.close_date = Math.floor(Date.now() / 1000);
+    if (statusChange === 'closed') closeFields.close_date = _now;
     if (ticket.status === 'closed' && statusChange !== 'closed') closeFields.close_date = null;
     db.updateTicket(ticket.id, closeFields);
+    if (statusChange === 'pending') {
+      const days = Math.max(0.5, parseFloat(req.body.pending_days) || 2);
+      db.setPendingFields(ticket.id, _now + Math.round(days * 86400), _now);
+    } else if (ticket.status === 'pending') {
+      db.clearPendingFields(ticket.id);
+    }
+  }
+
+  // Non-staff web comment on a pending ticket reopens it (they have no status dropdown)
+  if (!willChangeStatus && ticket.status === 'pending' && req.user.role === 'user') {
+    db.updateTicket(ticket.id, { status: 'open' });
+    db.clearPendingFields(ticket.id);
   }
 
   if (shouldNotify) {
@@ -778,7 +793,7 @@ router.post('/:id/comments', upload, async (req, res) => {
         ticket,
         req.user.email,
         `<p>Ticket #: <strong>${config.ticketPrefix}${ticket.id}</strong></p>
-        <p>Status: <strong>${willChangeStatus ? statusChange : ticket.status}</strong></p>
+        <p>Status: <strong>${willChangeStatus ? statusChange : (ticket.status === 'pending' && req.user.role === 'user') ? 'open' : ticket.status}</strong></p>
         <p>Subject: <strong>${ticket.subject}</strong></p>
         <p><strong>${req.user.email}</strong> commented:</p>
         ${body}`,
@@ -791,9 +806,11 @@ router.post('/:id/comments', upload, async (req, res) => {
     }
   }
 
-  audit.log(req, willChangeStatus ? `added comment, changed status to ${statusChange}` : 'added comment', ticket.id);
-  if (willChangeStatus) {
-  }
+  const _autoReopened = !willChangeStatus && ticket.status === 'pending' && req.user.role === 'user';
+  audit.log(req, willChangeStatus
+    ? `added comment, changed status to ${statusChange}`
+    : _autoReopened ? 'added comment, ticket reopened from pending'
+    : 'added comment', ticket.id);
 
   res.redirect(`/tickets/${ticket.id}#comment-${comment.id}`);
 });
@@ -949,10 +966,20 @@ router.post('/:id/status', async (req, res) => {
   if (isClosing   && !canCloseTicket(req.user))  return res.status(403).json({ error: 'Only admins and technicians can close tickets.' });
   if (isReopening && !canReopenTicket(req.user)) return res.status(403).json({ error: 'Only admins can reopen closed tickets.' });
 
+  const now = Math.floor(Date.now() / 1000);
   const statusFields = { status };
-  if (isClosing)   statusFields.close_date = Math.floor(Date.now() / 1000);
+  if (isClosing)   statusFields.close_date = now;
   if (isReopening) statusFields.close_date = null;
   db.updateTicket(ticket.id, statusFields);
+
+  // Manage pending fields
+  if (status === 'pending') {
+    const days = Math.max(0.5, parseFloat(req.body.pending_days) || 2);
+    const pendingUntil = now + Math.round(days * 86400);
+    db.setPendingFields(ticket.id, pendingUntil, now);
+  } else if (ticket.status === 'pending') {
+    db.clearPendingFields(ticket.id);
+  }
 
   const comment = db.addComment(ticket.id, req.user.id, `<em>Status changed to <strong>${status}</strong></em>`);
 
@@ -966,7 +993,14 @@ router.post('/:id/status', async (req, res) => {
 
   audit.log(req, `changed status to ${status}`, ticket.id);
 
-  if (req.accepts('json')) return res.json({ ok: true, status });
+  if (req.accepts('json')) {
+    const resp = { ok: true, status };
+    if (status === 'pending') {
+      const updated = db.getTicketById(ticket.id);
+      resp.pendingUntil = updated.pending_until || null;
+    }
+    return res.json(resp);
+  }
   res.redirect(`/tickets/${ticket.id}`);
 });
 
@@ -1005,6 +1039,24 @@ router.post('/:id/due-date', (req, res) => {
     return res.json({ ok: true, dueDate, formatted });
   }
   res.redirect(`/tickets/${ticket.id}`);
+});
+
+// POST /tickets/:id/pending-until — update pending deadline (admin/tech only)
+router.post('/:id/pending-until', (req, res) => {
+  const ticket = db.getTicketById(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Not found' });
+  if (!['admin', 'technician'].includes(req.user.role)) return res.status(403).json({ error: 'Forbidden' });
+  if (ticket.status !== 'pending') return res.status(400).json({ error: 'Ticket is not pending' });
+
+  const dateVal = req.body.pending_until_date;
+  if (!dateVal) return res.status(400).json({ error: 'Date required' });
+  const pendingUntil = Math.floor(new Date(dateVal + 'T23:59:59').getTime() / 1000);
+  if (!pendingUntil || pendingUntil <= 0) return res.status(400).json({ error: 'Invalid date' });
+
+  db.setPendingFields(ticket.id, pendingUntil, ticket.pending_reminded_at || Math.floor(Date.now() / 1000));
+  audit.log(req, `updated pending deadline to ${dateVal}`, ticket.id);
+
+  res.json({ ok: true, pendingUntil, formatted: new Date(pendingUntil * 1000).toLocaleDateString() });
 });
 
 // POST /tickets/:id/organization — set or clear ticket org (canManage)

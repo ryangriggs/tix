@@ -306,6 +306,8 @@ async function initDb() {
   try { _db.exec('ALTER TABLE comments ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   try { _db.exec('ALTER TABLE users ADD COLUMN can_add_participants INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   try { _db.exec('ALTER TABLE organizations ADD COLUMN urgent_notify_user_ids TEXT'); } catch (_) {}
+  try { _db.exec('ALTER TABLE tickets ADD COLUMN pending_until       INTEGER'); } catch (_) {}
+  try { _db.exec('ALTER TABLE tickets ADD COLUMN pending_reminded_at INTEGER'); } catch (_) {}
   _db.exec('CREATE INDEX IF NOT EXISTS idx_comments_location ON comments(location_id)');
   // Back-fill close_date for tickets closed before this column existed
   _db.exec(`UPDATE tickets SET close_date = updated_at WHERE status = 'closed' AND close_date IS NULL`);
@@ -1202,6 +1204,35 @@ function deleteLocation(id) {
   prepare('DELETE FROM locations WHERE id = ?').run(id);
 }
 
+// ============================================================
+// Pending-ticket reminder / auto-close
+// ============================================================
+
+function getPendingTicketsForAction() {
+  return prepare(`
+    SELECT t.id, t.subject, t.reply_token, t.pending_until, t.pending_reminded_at,
+           u.email AS customer_email
+    FROM tickets t
+    LEFT JOIN ticket_parties tp ON tp.ticket_id = t.id
+    LEFT JOIN users u ON u.id = tp.user_id AND u.role = 'user' AND u.blocked_at IS NULL
+    WHERE t.status = 'pending' AND t.pending_until IS NOT NULL
+    ORDER BY t.id ASC
+  `).all();
+}
+
+function setPendingFields(ticketId, pendingUntil, pendingRemindedAt) {
+  prepare('UPDATE tickets SET pending_until = ?, pending_reminded_at = ? WHERE id = ?')
+    .run(pendingUntil, pendingRemindedAt, ticketId);
+}
+
+function clearPendingFields(ticketId) {
+  prepare('UPDATE tickets SET pending_until = NULL, pending_reminded_at = NULL WHERE id = ?').run(ticketId);
+}
+
+function setPendingRemindedAt(ticketId) {
+  prepare('UPDATE tickets SET pending_reminded_at = unixepoch() WHERE id = ?').run(ticketId);
+}
+
 function getTravelReport(fromTs, toTs) {
   return prepare(`
     SELECT o.name AS organization_name,
@@ -1471,6 +1502,7 @@ module.exports = {
   // Reminders
   getTicketsDueSoon, getTicketsForReminders, setTicketRemindersSent,
   getOpenTicketsForInactivityCheck, setInactivityReminderSent,
+  getPendingTicketsForAction, setPendingFields, clearPendingFields, setPendingRemindedAt,
   getTicketByReplyToken, disableAllPartyNotifications, disablePartyNotifications, togglePartyNotifications,
   // Reports
   getBillingReport, getTicketCountsByStatus, getDashboardStats, getAttachmentCount,

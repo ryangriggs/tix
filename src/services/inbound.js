@@ -480,11 +480,16 @@ async function handleReply(ticketId, fromEmail, parsed, requireParty = false) {
   const comment = db.addComment(ticketId, user.id, body, true);
   commitAttachments(prepared, ticketId, comment.id);
 
-  // Auto-reopen closed tickets when a reply arrives
+  // Auto-reopen closed or pending tickets when a reply arrives
   const wasReopened = ticket.status === 'closed';
+  const wasPending  = ticket.status === 'pending';
   if (wasReopened) {
     db.updateTicket(ticketId, { status: 'open', close_date: null });
     console.log(`[Inbound] Ticket #${ticketId} reopened by reply from ${fromEmail}`);
+  } else if (wasPending) {
+    db.updateTicket(ticketId, { status: 'open' });
+    db.clearPendingFields(ticketId);
+    console.log(`[Inbound] Ticket #${ticketId} moved from pending to open by reply from ${fromEmail}`);
   }
 
   // Email all other parties
@@ -498,7 +503,9 @@ async function handleReply(ticketId, fromEmail, parsed, requireParty = false) {
 
     const notifyBody = wasReopened
       ? `<p><strong>${escHtml(fromEmail)}</strong> replied and reopened this ticket:</p>${body}`
-      : `<p><strong>${escHtml(fromEmail)}</strong> replied:</p>${body}`;
+      : wasPending
+        ? `<p><strong>${escHtml(fromEmail)}</strong> replied and the ticket is now open:</p>${body}`
+        : `<p><strong>${escHtml(fromEmail)}</strong> replied:</p>${body}`;
 
     await sendTicketNotification({
       to: notifyEmails,

@@ -361,6 +361,27 @@ async function sendInactivityReminder(email, ticket, hours) {
   });
 }
 
+function _makeReplyTo(ticket) {
+  if (!ticket.reply_token) return undefined;
+  const mailDomain = config.ticketEmail.includes('@') ? config.ticketEmail.split('@')[1] : 'tix.local';
+  const localPart  = config.ticketEmail.split('@')[0];
+  return `${config.mailFromName} <${localPart}+${ticket.reply_token}@${mailDomain}>`;
+}
+
+async function sendPendingReminder(toEmail, ticket, message) {
+  if (!db.filterNotificationRecipients([toEmail]).length) return;
+  const html = await renderEmail('pending-reminder', { ticket, message });
+  const text = message.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim() +
+    `\n\nTicket: ${config.appUrl}/tickets/${ticket.id}`;
+  send({
+    to:      toEmail,
+    subject: `Response needed [Ticket #${config.ticketPrefix}${ticket.id}]`,
+    html,
+    text,
+    replyTo: _makeReplyTo(ticket),
+  });
+}
+
 function resetMailTransport() { _transport = null; }
 
 async function sendAdminNewUserNotification(user, source) {
@@ -387,4 +408,4 @@ async function sendAdminNewUserNotification(user, source) {
   send({ to: adminEmail, subject: `New user: ${user.email}`, html, text });
 }
 
-module.exports = { send, sendMagicLink, sendTicketNotification, sendDueReminder, sendInactivityReminder, sendAdminNewUserNotification, resetMailTransport, makeUnsubToken, parseUnsubToken, logEmail };
+module.exports = { send, sendMagicLink, sendTicketNotification, sendDueReminder, sendInactivityReminder, sendPendingReminder, sendAdminNewUserNotification, resetMailTransport, makeUnsubToken, parseUnsubToken, logEmail };

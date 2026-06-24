@@ -378,6 +378,33 @@
       </p>
 
       <hr class="settings-hr">
+      <h3 class="settings-sub-title">Pending Ticket Reminders &amp; Auto-Close</h3>
+      <p class="form-hint" style="margin-bottom:1rem">
+        When a ticket is set to <strong>Pending</strong> (awaiting customer response), a deadline is chosen.
+        A reminder is sent to customer parties on the ticket at the interval below.
+        If no response is received by the deadline, the ticket is closed automatically.
+      </p>
+      <div class="form-group">
+        <label for="pending_reminder_interval_days">Reminder interval (days)</label>
+        <input type="number" id="pending_reminder_interval_days" name="pending_reminder_interval_days"
+               min="0.5" step="0.5" class="form-input" style="width:8rem"
+               value="<%= s.pending_reminder_interval_days || '1' %>">
+        <p class="form-hint">How often to remind the customer while the ticket remains pending. Minimum 0.5 days.</p>
+      </div>
+      <div class="form-group">
+        <label for="pending_reminder_message">Reminder email body (HTML)</label>
+        <textarea id="pending_reminder_message" name="pending_reminder_message" rows="4"
+                  class="form-input" style="font-family:monospace;font-size:.85rem"><%= s.pending_reminder_message || '' %></textarea>
+        <p class="form-hint">Sent to customer parties on the ticket as a reminder. HTML is supported.</p>
+      </div>
+      <div class="form-group">
+        <label for="pending_auto_close_message">Auto-close message (HTML)</label>
+        <textarea id="pending_auto_close_message" name="pending_auto_close_message" rows="4"
+                  class="form-input" style="font-family:monospace;font-size:.85rem"><%= s.pending_auto_close_message || '' %></textarea>
+        <p class="form-hint">Added as a comment and emailed to all parties when the ticket is auto-closed. HTML is supported.</p>
+      </div>
+
+      <hr class="settings-hr">
       <h3 class="settings-sub-title">Inactivity Reminders</h3>
       <p class="form-hint" style="margin-bottom:1rem">
         Send a reminder email to ticket owners when an open ticket has had no activity for the specified time.

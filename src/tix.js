@@ -11,8 +11,10 @@ const config = require('./config');
 const { requireAuth, requireAdmin, optionalAuth, verifyCsrf } = require('./middleware/auth');
 const { startSMTPServer } = require('./smtp');
 const { initDb, getTicketsForReminders, setTicketRemindersSent, getSetting, setSetting, seedSetting, getAllSettings,
-        getOpenTicketsForInactivityCheck, setInactivityReminderSent, getEmailUsageCounts } = require('./db');
-const { sendDueReminder, sendInactivityReminder } = require('./services/mail');
+        getOpenTicketsForInactivityCheck, setInactivityReminderSent, getEmailUsageCounts,
+        getPendingTicketsForAction, setPendingRemindedAt, clearPendingFields,
+        updateTicket, addComment, getParties, recordEmailMessage, filterNotificationRecipients } = require('./db');
+const { sendDueReminder, sendInactivityReminder, sendPendingReminder, sendTicketNotification } = require('./services/mail');
 
 const updater = require('./services/updater');
 const backup  = require('./services/backup');
@@ -242,6 +244,9 @@ async function start() {
     mailgun_webhook_enabled:        config.mailTransport === 'mailgun' ? 'true' : 'false',
     reminder_count:                 '1',
     reminder_frequency_hours:       '24',
+    pending_reminder_interval_days: '1',
+    pending_reminder_message:       '<p>This is a reminder that your support ticket is awaiting your response. Please reply to this email or log into the system to update your ticket.</p>',
+    pending_auto_close_message:     '<p>Your ticket has been closed due to inactivity. To reopen it, simply reply to this email or log into the ticket system and post a comment on this ticket.</p>',
     notify_email_submitter:         'true',
     notify_email_status_change:     'true',
     annotation_extensions:          'pdf,jpg,jpeg,gif,png,svg',
@@ -379,6 +384,69 @@ async function start() {
       }
     } catch (err) {
       console.error('[Inactivity Reminders] Error:', err);
+    }
+  }, 10 * 60 * 1000);
+
+  // Pending ticket reminders and auto-close — check every 10 minutes
+  setInterval(async () => {
+    try {
+      const intervalDays = parseFloat(getSetting('pending_reminder_interval_days') || '1');
+      const reminderMsg  = getSetting('pending_reminder_message')   || '';
+      const closeMsg     = getSetting('pending_auto_close_message') || '';
+      if (!(intervalDays > 0)) return;
+
+      const now  = Math.floor(Date.now() / 1000);
+      const rows = getPendingTicketsForAction();
+
+      // Group rows by ticket id, collecting customer emails per ticket
+      const ticketMap = new Map();
+      for (const row of rows) {
+        if (!ticketMap.has(row.id)) ticketMap.set(row.id, { ...row, customerEmails: [] });
+        if (row.customer_email) ticketMap.get(row.id).customerEmails.push(row.customer_email);
+      }
+
+      for (const t of ticketMap.values()) {
+        if (now >= t.pending_until) {
+          // Auto-close: add comment, close ticket, notify everyone
+          const closeMsgHtml = closeMsg || '<p>Ticket closed due to no customer response.</p>';
+          const closeComment = addComment(t.id, null, closeMsgHtml, false, null, null, 'user');
+          updateTicket(t.id, { status: 'closed', close_date: now });
+          clearPendingFields(t.id);
+
+          const parties     = getParties(t.id);
+          const toEmails    = filterNotificationRecipients(parties.map(p => p.email));
+          if (toEmails.length) {
+            const domain = config.ticketEmail.split('@')[1] || 'tix.local';
+            const msgId  = `<ticket-${t.id}-c${closeComment.id}-${Date.now()}@${domain}>`;
+            recordEmailMessage(t.id, msgId, 'out');
+            await sendTicketNotification({
+              to:            toEmails,
+              ticketSubject: t.subject,
+              body:          closeMsgHtml,
+              ticketId:      t.id,
+              commentId:     closeComment.id,
+              messageId:     msgId,
+              inReplyTo:     `<ticket-${t.id}@${domain}>`,
+              replyToken:    t.reply_token,
+            });
+          }
+          console.log(`[Pending] Auto-closed ticket #${t.id}`);
+
+        } else if (t.customerEmails.length > 0) {
+          const intervalSecs = Math.round(intervalDays * 86400);
+          const nextReminder = (t.pending_reminded_at || 0) + intervalSecs;
+          if (now >= nextReminder) {
+            const msg = reminderMsg || '<p>Your ticket is awaiting your response.</p>';
+            for (const email of t.customerEmails) {
+              await sendPendingReminder(email, t, msg).catch(console.error);
+            }
+            setPendingRemindedAt(t.id);
+            console.log(`[Pending] Sent reminder for ticket #${t.id}`);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Pending] Error:', err);
     }
   }, 10 * 60 * 1000);
 
