@@ -392,6 +392,13 @@
         <p class="form-hint">How often to remind the customer while the ticket remains pending. Minimum 0.5 days.</p>
       </div>
       <div class="form-group">
+        <label for="pending_reminder_send_time">Send reminders at (UTC)</label>
+        <input type="time" id="pending_reminder_send_time" name="pending_reminder_send_time"
+               class="form-input" style="width:10rem"
+               value="<%= s.pending_reminder_send_time || '09:00' %>">
+        <p class="form-hint">Time of day (UTC) when reminder emails are sent.</p>
+      </div>
+      <div class="form-group">
         <label for="pending_reminder_message">Reminder email body (HTML)</label>
         <textarea id="pending_reminder_message" name="pending_reminder_message" rows="4"
                   class="form-input" style="font-family:monospace;font-size:.85rem"><%= s.pending_reminder_message || '' %></textarea>

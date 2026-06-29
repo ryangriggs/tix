@@ -245,6 +245,7 @@ async function start() {
     reminder_count:                 '1',
     reminder_frequency_hours:       '24',
     pending_reminder_interval_days: '1',
+    pending_reminder_send_time:     '09:00',
     pending_reminder_message:       '<p>This is a reminder that your support ticket is awaiting your response. Please reply to this email or log into the system to update your ticket.</p>',
     pending_auto_close_message:     '<p>Your ticket has been closed due to inactivity. To reopen it, simply reply to this email or log into the ticket system and post a comment on this ticket.</p>',
     notify_email_submitter:         'true',
@@ -433,12 +434,21 @@ async function start() {
           console.log(`[Pending] Auto-closed ticket #${t.id}`);
 
         } else if (t.customerEmails.length > 0) {
+          const sendTime     = (getSetting('pending_reminder_send_time') || '09:00').trim();
+          const [sendHour, sendMin] = sendTime.split(':').map(Number);
           const intervalSecs = Math.round(intervalDays * 86400);
-          const nextReminder = (t.pending_reminded_at || 0) + intervalSecs;
-          if (now >= nextReminder) {
+          const lastAt       = t.pending_reminded_at || 0;
+          // Next reminder fires at the configured UTC time on the day intervalDays after lastAt
+          const nextDay = new Date((lastAt + intervalSecs) * 1000);
+          nextDay.setUTCHours(sendHour || 9, sendMin || 0, 0, 0);
+          const nextReminderTs = Math.floor(nextDay.getTime() / 1000);
+          if (now >= nextReminderTs) {
+            const domain   = config.ticketEmail.split('@')[1] || 'tix.local';
+            const remMsgId = `<ticket-${t.id}-reminder-${Date.now()}@${domain}>`;
+            recordEmailMessage(t.id, remMsgId, 'out');
             const msg = reminderMsg || '<p>Your ticket is awaiting your response.</p>';
             for (const email of t.customerEmails) {
-              await sendPendingReminder(email, t, msg).catch(console.error);
+              await sendPendingReminder(email, t, msg, remMsgId).catch(console.error);
             }
             setPendingRemindedAt(t.id);
             console.log(`[Pending] Sent reminder for ticket #${t.id}`);

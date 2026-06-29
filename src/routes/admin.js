@@ -537,6 +537,7 @@ router.post('/settings', (req, res) => {
     inactivity_hours_medium:        String(Math.max(0, flt('inactivity_hours_medium', 0))),
     inactivity_hours_low:           String(Math.max(0, flt('inactivity_hours_low',    0))),
     pending_reminder_interval_days: String(Math.max(0.5, flt('pending_reminder_interval_days', 1))),
+    pending_reminder_send_time:     /^\d{2}:\d{2}$/.test((req.body.pending_reminder_send_time || '').trim()) ? req.body.pending_reminder_send_time.trim() : '09:00',
     pending_reminder_message:       trim('pending_reminder_message'),
     pending_auto_close_message:     trim('pending_auto_close_message'),
     email_quota_daily:              String(Math.max(0, int('email_quota_daily',   0))),

@@ -368,17 +368,18 @@ function _makeReplyTo(ticket) {
   return `${config.mailFromName} <${localPart}+${ticket.reply_token}@${mailDomain}>`;
 }
 
-async function sendPendingReminder(toEmail, ticket, message) {
+async function sendPendingReminder(toEmail, ticket, message, messageId) {
   if (!db.filterNotificationRecipients([toEmail]).length) return;
   const html = await renderEmail('pending-reminder', { ticket, message });
   const text = message.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim() +
     `\n\nTicket: ${config.appUrl}/tickets/${ticket.id}`;
   send({
-    to:      toEmail,
-    subject: `Response needed [Ticket #${config.ticketPrefix}${ticket.id}]`,
+    to:        toEmail,
+    subject:   `Response needed [Ticket #${config.ticketPrefix}${ticket.id}]`,
     html,
     text,
-    replyTo: _makeReplyTo(ticket),
+    replyTo:   _makeReplyTo(ticket),
+    messageId,
   });
 }
 
