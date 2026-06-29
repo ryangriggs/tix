@@ -40,6 +40,11 @@
         <button type="button" class="search-clear" id="search-clear" title="Clear search"
           style="<%= filters.q ? '' : 'display:none' %>">×</button>
       </div>
+      <label style="display:flex;align-items:center;gap:.3rem;font-size:.875rem;white-space:nowrap;cursor:pointer">
+        <input type="checkbox" id="include-comments-cb" name="include_comments" value="1"
+               <%= filters.include_comments === '1' ? 'checked' : '' %>>
+        Include comments
+      </label>
       <button type="button" class="btn btn-secondary btn-sm" onclick="this.form.submit()">🔎 Search</button>
       <button type="button" class="btn btn-sm btn-ghost" onclick="resetFilters()" title="Reset all filters to defaults">↺ Reset</button>
     </div>
@@ -470,6 +475,7 @@ function resetFilters() {
   document.getElementById('filter-since').value = '';
   document.getElementById('search-input').value = '';
   document.getElementById('search-clear').style.display = 'none';
+  document.getElementById('include-comments-cb').checked = false;
   document.getElementById('filter-org').value = '';
   document.getElementById('filter-owner').value = 'me';
   document.getElementById('filter-view').value = '';
@@ -550,16 +556,17 @@ const _viewCsrf     = '<%= csrfToken %>';
 function _captureFilters() {
   const form = document.getElementById('filter-form');
   return JSON.stringify({
-    status:    document.getElementById('filter-status').value,
-    priority:  document.getElementById('filter-priority').value,
-    sort:      form.querySelector('[name="sort"]').value,
-    order:     form.querySelector('[name="order"]').value,
-    since:     document.getElementById('filter-since').value,
-    date_from: form.querySelector('[name="date_from"]')?.value || '',
-    date_to:   form.querySelector('[name="date_to"]')?.value   || '',
-    org:       document.getElementById('filter-org').value,
-    owner:     document.getElementById('filter-owner').value,
-    q:         document.getElementById('search-input').value,
+    status:           document.getElementById('filter-status').value,
+    priority:         document.getElementById('filter-priority').value,
+    sort:             form.querySelector('[name="sort"]').value,
+    order:            form.querySelector('[name="order"]').value,
+    since:            document.getElementById('filter-since').value,
+    date_from:        form.querySelector('[name="date_from"]')?.value || '',
+    date_to:          form.querySelector('[name="date_to"]')?.value   || '',
+    org:              document.getElementById('filter-org').value,
+    owner:            document.getElementById('filter-owner').value,
+    q:                document.getElementById('search-input').value,
+    include_comments: document.getElementById('include-comments-cb').checked ? '1' : '',
   });
 }
 
@@ -576,7 +583,7 @@ function loadView(id) {
   if (!view) return;
   const f = JSON.parse(view.filters);
   const params = new URLSearchParams();
-  const keys = ['status','priority','sort','order','since','date_from','date_to','org','owner','q'];
+  const keys = ['status','priority','sort','order','since','date_from','date_to','org','owner','q','include_comments'];
   keys.forEach(k => { if (f[k] != null && f[k] !== '') params.set(k, f[k]); });
   params.set('view', id);
   window.location.href = '/tickets?' + params.toString();

@@ -676,7 +676,8 @@ function ticketAccessCondition({ userId, userRole, userOrgId, userIsSuperuser, u
 function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgIds = [],
                       status, priority, sort = 'updated_at', order = 'desc', search = '',
                       dateFrom = null, dateTo = null, orgFilters = [], idSearch = null,
-                      ownerFilters = [], partyUserId = null, limit = 0, offset = 0 }) {
+                      ownerFilters = [], partyUserId = null, limit = 0, offset = 0,
+                      includeComments = false }) {
   const validSorts = {
     created_at:    't.created_at',
     updated_at:    't.updated_at',
@@ -767,15 +768,31 @@ function getTickets({ userId, userRole, userOrgId, userIsSuperuser, userTechOrgI
     // e.g. "john smith" → `john* smith*`  (both tokens must appear, prefix-matched)
     const ftsQuery = search.trim().split(/\s+/).filter(Boolean)
       .map(t => `${t.replace(/['"*:]/g, '')}*`).join(' ');
-    conditions.push(`(t.id IN (
-      SELECT rowid FROM ticket_fts WHERE ticket_fts MATCH ?
-      UNION
-      SELECT c.ticket_id FROM comments c
-      WHERE c.id IN (SELECT rowid FROM comment_fts WHERE comment_fts MATCH ?)
-    ) OR EXISTS (
-      SELECT 1 FROM organizations o WHERE o.id = t.organization_id AND o.name LIKE ?
-    ))`);
-    params.push(ftsQuery, ftsQuery, `%${search}%`);
+    if (includeComments) {
+      const visLevels = userRole === 'admin'
+        ? ['user', 'technician', 'admin']
+        : userRole === 'technician'
+          ? ['user', 'technician']
+          : ['user'];
+      const visPh = visLevels.map(() => '?').join(',');
+      conditions.push(`(t.id IN (
+        SELECT rowid FROM ticket_fts WHERE ticket_fts MATCH ?
+        UNION
+        SELECT c.ticket_id FROM comments c
+        WHERE c.id IN (SELECT rowid FROM comment_fts WHERE comment_fts MATCH ?)
+        AND c.visibility IN (${visPh})
+      ) OR EXISTS (
+        SELECT 1 FROM organizations o WHERE o.id = t.organization_id AND o.name LIKE ?
+      ))`);
+      params.push(ftsQuery, ftsQuery, ...visLevels, `%${search}%`);
+    } else {
+      conditions.push(`(t.id IN (
+        SELECT rowid FROM ticket_fts WHERE ticket_fts MATCH ?
+      ) OR EXISTS (
+        SELECT 1 FROM organizations o WHERE o.id = t.organization_id AND o.name LIKE ?
+      ))`);
+      params.push(ftsQuery, `%${search}%`);
+    }
   }
 
   const whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';

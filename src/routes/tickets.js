@@ -207,7 +207,7 @@ async function notifyParties(ticket, actorEmail, messageBody, commentId, inReply
 // ============================================================
 
 const SINCE_SECONDS    = { '1d': 86400, '7d': 7 * 86400, '30d': 30 * 86400 };
-const DEFAULT_PREFS    = { status: 'new,pending,open,on_hold', priority: '', sort: 'priority', order: 'desc', since: '', org: '', q: '', owner: 'me', per_page: '50' };
+const DEFAULT_PREFS    = { status: 'new,pending,open,on_hold', priority: '', sort: 'priority', order: 'desc', since: '', org: '', q: '', owner: 'me', per_page: '50', include_comments: '' };
 const VALID_PER_PAGE   = [10, 50, 100, 0]; // 0 = All
 const VALID_STATUSES   = ['new', 'pending', 'open', 'on_hold', 'closed'];
 const VALID_PRIORITIES = ['urgent', 'high', 'medium', 'low'];
@@ -227,7 +227,7 @@ router.get('/', (req, res) => {
     return res.redirect(`/tickets?${qs}`);
   }
 
-  const { status, priority, sort, order, q, since, org, date_from, date_to, owner, view: viewParam, page: pageParam, per_page: perPageParam } = req.query;
+  const { status, priority, sort, order, q, since, org, date_from, date_to, owner, view: viewParam, page: pageParam, per_page: perPageParam, include_comments } = req.query;
 
   // Admin-only: filter by any ticket_parties membership (all roles), used from admin users page
   const partyUserId = req.user.role === 'admin' && req.query.party
@@ -257,12 +257,13 @@ router.get('/', (req, res) => {
     order:     order    || DEFAULT_PREFS.order,
     since:     'since'  in req.query ? (since ?? '') : DEFAULT_PREFS.since,
     org:       org      || '',
-    q:         q        || '',
-    date_from: date_from || '',
-    date_to:   date_to   || '',
-    owner:     owner !== undefined ? (owner || '') : 'me',
-    per_page:  String(perPage),
-    view:      viewParam || '',
+    q:               q        || '',
+    date_from:       date_from || '',
+    date_to:         date_to   || '',
+    owner:           owner !== undefined ? (owner || '') : 'me',
+    per_page:        String(perPage),
+    view:            viewParam || '',
+    include_comments: 'q' in req.query ? (include_comments === '1' ? '1' : '') : (saved.include_comments || ''),
   };
   res.cookie(FILTER_COOKIE, JSON.stringify(savedPrefs), {
     httpOnly: false,
@@ -321,6 +322,7 @@ router.get('/', (req, res) => {
     orgFilters,
     ownerFilters,
     partyUserId,
+    includeComments: savedPrefs.include_comments === '1',
     limit:           perPage > 0 ? perPage : 0,
     offset:          perPage > 0 ? (currentPage - 1) * perPage : 0,
   });
