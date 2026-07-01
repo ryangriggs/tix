@@ -219,9 +219,9 @@ function readFilterCookie(req) {
 
 // GET /tickets
 router.get('/', (req, res) => {
+  const saved = readFilterCookie(req);
   // No query params → redirect to saved prefs (or defaults)
   if (Object.keys(req.query).length === 0) {
-    const saved = readFilterCookie(req);
     const prefs = { ...DEFAULT_PREFS, ...saved };
     const qs = new URLSearchParams(prefs).toString();
     return res.redirect(`/tickets?${qs}`);
