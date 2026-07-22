@@ -183,14 +183,21 @@
       </div>
 
       <% if (passwordLoginEnabled) { %>
-      <div class="form-group">
-        <label for="dialog-new-password">Password</label>
-        <input type="password" id="dialog-new-password" name="new_password"
-               class="form-input" autocomplete="new-password" placeholder="Leave blank to keep unchanged">
-        <p class="form-hint" id="dialog-password-hint"></p>
-      </div>
+      <input type="hidden" id="dialog-new-password-value" name="new_password" value="">
       <% } %>
     </form>
+
+    <%# Password input lives OUTSIDE dialog-edit-form so browsers don't treat the org
+        field above as a username target for this password field. Value is copied into
+        the hidden field above via the submit listener below. %>
+    <% if (passwordLoginEnabled) { %>
+    <div class="form-group">
+      <label for="dialog-new-password">Password</label>
+      <input type="password" id="dialog-new-password"
+             class="form-input" autocomplete="new-password" placeholder="Leave blank to keep unchanged">
+      <p class="form-hint" id="dialog-password-hint"></p>
+    </div>
+    <% } %>
 
     <!-- Additional orgs section (technicians + superusers) -->
     <div id="dialog-tech-orgs" style="display:none">
@@ -375,6 +382,12 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 
 // Org autocomplete on dialog org input
 document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('dialog-edit-form').addEventListener('submit', function() {
+    var vis = document.getElementById('dialog-new-password');
+    var hid = document.getElementById('dialog-new-password-value');
+    if (vis && hid) hid.value = vis.value;
+  });
+
   const orgInput = document.getElementById('dialog-org');
   if (orgInput && typeof createAutocomplete === 'function') {
     createAutocomplete(orgInput, {
