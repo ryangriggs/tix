@@ -90,10 +90,11 @@ router.post('/users/:id/edit', async (req, res) => {
 
   const newPassword = (req.body.new_password || '').trim();
   if (newPassword && config.passwordLoginEnabled) {
-    if (newPassword.length >= 8) {
-      const hash = await bcrypt.hash(newPassword, 12);
-      db.setUserPassword(id, hash);
+    if (newPassword.length < 8) {
+      return res.redirect('/admin/users?message=Password+must+be+at+least+8+characters');
     }
+    const hash = await bcrypt.hash(newPassword, 12);
+    db.setUserPassword(id, hash);
   }
 
   audit.log(req, `edited user ${editTarget?.email || id}`);

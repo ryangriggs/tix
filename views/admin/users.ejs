@@ -129,7 +129,7 @@
     <p id="dialog-email" style="font-size:.9rem;color:var(--text-muted);margin-bottom:1rem"></p>
 
     <!-- Main edit form (name, role, org, superuser, active) -->
-    <form id="dialog-edit-form" method="POST" action="">
+    <form id="dialog-edit-form" method="POST" action="" autocomplete="off">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 
       <div class="form-group">
