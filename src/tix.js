@@ -78,6 +78,7 @@ app.use((req, res, next) => {
   }
   try { res.locals.siteName = getSetting('site_name') || config.siteName; } catch (_) { res.locals.siteName = config.siteName; }
   res.locals.annotationExts = new Set(config.annotationExtensions.split(',').map(e => e.trim().toLowerCase()).filter(Boolean));
+  res.locals.passwordLoginEnabled = config.passwordLoginEnabled;
 
   // Update banner — shown to admins only; dismissed per-version via cookie
   const _us = updater.getState();
@@ -165,6 +166,7 @@ app.use('/tickets', requireAuth, verifyCsrf, require('./routes/annotate'));
 app.use('/tickets',   requireAuth, verifyCsrf, require('./routes/tickets'));
 app.use('/timeline',  requireAuth, verifyCsrf, require('./routes/timeline'));
 app.use('/dashboard', requireAuth, require('./routes/dashboard'));
+app.use('/account', requireAuth, verifyCsrf, require('./routes/account'));
 app.use('/admin', requireAuth, requireAdmin, verifyCsrf, require('./routes/admin'));
 app.use('/api', requireAuth, require('./routes/api'));
 app.use('/reports',       requireAuth, require('./routes/reports'));
@@ -258,6 +260,7 @@ async function start() {
     update_check_interval_hours:    '24',
     backup_frequency_hours:         '0',
     backup_retention_days:          '30',
+    password_login_enabled:         'false',
     inactivity_hours_urgent:        '0',
     inactivity_hours_high:          '0',
     inactivity_hours_medium:        '0',

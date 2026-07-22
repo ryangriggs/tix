@@ -1,32 +1,64 @@
 <%- include('../partials/head', { title: 'Log in' }) %>
+<% const _tab = locals.tab || (passwordLoginEnabled ? 'magic' : null); %>
 <main class="auth-page">
   <div class="auth-card">
     <div class="auth-logo"><%= siteName %></div>
     <h1 class="auth-title">Log in</h1>
-    <p class="auth-subtitle">Enter your email and we'll send you a link.</p>
 
-    <% if (error) { %>
-      <div class="alert alert-error"><%= error %></div>
+    <% if (passwordLoginEnabled) { %>
+    <div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:1.25rem;gap:0">
+      <button type="button" id="tab-btn-magic" onclick="switchTab('magic')"
+        style="flex:1;padding:.5rem;background:none;border:none;border-bottom:2px solid <%- _tab !== 'password' ? 'var(--primary)' : 'transparent' %>;
+               cursor:pointer;font-size:.875rem;font-weight:500;color:<%- _tab !== 'password' ? 'var(--primary)' : 'var(--text-muted)' %>">Email link</button>
+      <button type="button" id="tab-btn-password" onclick="switchTab('password')"
+        style="flex:1;padding:.5rem;background:none;border:none;border-bottom:2px solid <%- _tab === 'password' ? 'var(--primary)' : 'transparent' %>;
+               cursor:pointer;font-size:.875rem;font-weight:500;color:<%- _tab === 'password' ? 'var(--primary)' : 'var(--text-muted)' %>">Password</button>
+    </div>
     <% } %>
 
-    <form method="POST" action="/auth/login" class="auth-form">
-      <input type="hidden" name="next" value="<%= next %>">
-      <div class="form-group">
-        <label for="email">Email address</label>
-        <input
-          type="email"
-          id="email"
-          name="email"
-          value="<%= email %>"
-          placeholder="you@example.com"
-          autocomplete="email"
-          autofocus
-          required
-          class="form-input"
-        >
-      </div>
-      <button type="submit" class="btn btn-primary btn-full" id="login-btn">Send login link</button>
-    </form>
+    <!-- Magic link tab -->
+    <div id="tab-magic" <%- _tab === 'password' ? 'style="display:none"' : '' %>>
+      <p class="auth-subtitle">Enter your email and we'll send you a link.</p>
+      <% if (_tab !== 'password' && error) { %>
+        <div class="alert alert-error"><%= error %></div>
+      <% } %>
+      <form method="POST" action="/auth/login" class="auth-form" id="magic-form">
+        <input type="hidden" name="next" value="<%= next %>">
+        <div class="form-group">
+          <label for="email">Email address</label>
+          <input type="email" id="email" name="email" value="<%= email %>"
+                 placeholder="you@example.com" autocomplete="email"
+                 <%- _tab !== 'password' ? 'autofocus' : '' %> required class="form-input">
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" id="login-btn">Send login link</button>
+      </form>
+    </div>
+
+    <% if (passwordLoginEnabled) { %>
+    <!-- Password tab -->
+    <div id="tab-password" <%- _tab === 'password' ? '' : 'style="display:none"' %>>
+      <p class="auth-subtitle">Sign in with your email and password.</p>
+      <% if (_tab === 'password' && error) { %>
+        <div class="alert alert-error"><%= error %></div>
+      <% } %>
+      <form method="POST" action="/auth/login/password" class="auth-form">
+        <input type="hidden" name="next" value="<%= next %>">
+        <div class="form-group">
+          <label for="pw-email">Email address</label>
+          <input type="email" id="pw-email" name="email" value="<%= email %>"
+                 placeholder="you@example.com" autocomplete="email"
+                 <%- _tab === 'password' ? 'autofocus' : '' %> required class="form-input">
+        </div>
+        <div class="form-group">
+          <label for="pw-password">Password</label>
+          <input type="password" id="pw-password" name="password"
+                 autocomplete="current-password" required class="form-input">
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Sign in</button>
+      </form>
+    </div>
+    <% } %>
+
   </div>
 </main>
 
@@ -35,10 +67,34 @@
   <p style="color:#fff;font-size:1rem;font-weight:500;margin:0">Please wait…</p>
 </div>
 <script>
-  document.querySelector('.auth-form').addEventListener('submit', () => {
+  document.getElementById('magic-form').addEventListener('submit', () => {
     document.getElementById('login-overlay').style.display = 'flex';
     document.getElementById('login-btn').disabled = true;
     document.getElementById('login-btn').textContent = 'Please wait…';
   });
+
+  <% if (passwordLoginEnabled) { %>
+  function switchTab(tab) {
+    var isMagic = tab === 'magic';
+    document.getElementById('tab-magic').style.display    = isMagic ? '' : 'none';
+    document.getElementById('tab-password').style.display = isMagic ? 'none' : '';
+    var btnM = document.getElementById('tab-btn-magic');
+    var btnP = document.getElementById('tab-btn-password');
+    btnM.style.borderBottomColor = isMagic ? 'var(--primary)' : 'transparent';
+    btnM.style.color             = isMagic ? 'var(--primary)' : 'var(--text-muted)';
+    btnP.style.borderBottomColor = isMagic ? 'transparent' : 'var(--primary)';
+    btnP.style.color             = isMagic ? 'var(--text-muted)' : 'var(--primary)';
+    // Sync email between forms when switching
+    if (isMagic) {
+      var pw = document.getElementById('pw-email');
+      if (pw && pw.value) document.getElementById('email').value = pw.value;
+      document.getElementById('email').focus();
+    } else {
+      var ml = document.getElementById('email');
+      if (ml && ml.value) document.getElementById('pw-email').value = ml.value;
+      document.getElementById('pw-email').focus();
+    }
+  }
+  <% } %>
 </script>
 <%- include('../partials/foot') %>

@@ -5,10 +5,12 @@ const fs     = require('fs');
 const express = require('express');
 const router  = express.Router();
 
-const jwt = require('jsonwebtoken');
+const jwt    = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const { generateSecret: totpGenerateSecret, generateSync: totpGenerateSync, verifySync: totpVerifySync } = require('otplib');
 const config = require('../config');
 const db = require('../db');
-const { sendMagicLink, sendAdminNewUserNotification } = require('../services/mail');
+const { sendMagicLink, sendMfaOtp, sendAdminNewUserNotification } = require('../services/mail');
 const { issueSessionCookie } = require('../middleware/auth');
 
 // ============================================================
@@ -283,6 +285,171 @@ router.post('/verify', (req, res) => {
   logUser(user.email, 'SUCCESS');
   issueSessionCookie(res, user);
   res.redirect(redirectTo);
+});
+
+// POST /auth/login/password — password-based login entry point
+router.post('/login/password', async (req, res) => {
+  if (!config.passwordLoginEnabled) return res.redirect('/auth/login');
+
+  const email    = (req.body.email    || '').trim().toLowerCase();
+  const password =  req.body.password || '';
+  const next     = safeRedirectUrl(req.body.next);
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !password) {
+    return loginRender(res, { error: 'Please enter your email and password.', email, next, tab: 'password' });
+  }
+
+  const limited = checkLoginRateLimit(clientIp(req), email);
+  if (limited === 'ip') {
+    logUser(email, 'FAILED - IP rate limited (password)');
+    return loginRender(res, { error: 'Too many login attempts from your network. Please try again later.', email, next, tab: 'password' });
+  }
+  if (limited === 'email') {
+    logUser(email, 'FAILED - email rate limited (password)');
+    return loginRender(res, { error: 'Too many login attempts. Please try again in a minute.', email, next, tab: 'password' });
+  }
+
+  const user = db.getUserByEmail(email);
+
+  // No account or no password set → fall back to magic link silently
+  if (!user || !user.password_hash) {
+    if (user && user.blocked_at) {
+      logUser(email, 'FAILED - account disabled');
+      return loginRender(res, { error: 'This account is disabled.', email, next, tab: 'password' });
+    }
+    if (!user) {
+      if (config.turnstileEnabled && config.turnstileSiteKey) {
+        return res.redirect(`/auth/signup?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}`);
+      }
+      const newUser = db.findOrCreateUser(email);
+      if (newUser._isNew) sendAdminNewUserNotification(newUser, 'First login (password form)').catch(console.error);
+      return sendOtp(res, newUser, email, next, () =>
+        loginRender(res, { error: 'Could not send login email. Please try again.', email, next, tab: 'password' })
+      );
+    }
+    // Has account but no password → send magic link
+    return sendOtp(res, user, email, next, () =>
+      loginRender(res, { error: 'Could not send login email. Please try again.', email, next, tab: 'password' })
+    );
+  }
+
+  if (user.blocked_at) {
+    logUser(email, 'FAILED - account disabled');
+    return loginRender(res, { error: 'This account is disabled.', email, next, tab: 'password' });
+  }
+
+  const match = await bcrypt.compare(password, user.password_hash);
+  if (!match) {
+    logUser(email, 'FAILED - wrong password');
+    return loginRender(res, { error: 'Incorrect email or password.', email, next, tab: 'password' });
+  }
+
+  // Password correct — issue short-lived MFA pending cookie
+  const pendingJwt = jwt.sign({ userId: user.id, purpose: 'mfa_pending' }, config.jwtSecret, { expiresIn: '10m' });
+  res.cookie('mfa_pending', pendingJwt, { httpOnly: true, secure: config.secureSession, maxAge: 10 * 60 * 1000, sameSite: 'lax' });
+
+  if (user.totp_enabled) {
+    return res.redirect(`/auth/mfa?mode=totp&next=${encodeURIComponent(next)}`);
+  }
+
+  // Send email OTP
+  const otp = String(crypto.randomInt(100000, 1000000));
+  const { tokenId } = db.createAuthToken(user.id, otp);
+  try {
+    await sendMfaOtp(email, otp);
+    return res.redirect(`/auth/mfa?mode=email&t=${tokenId}&next=${encodeURIComponent(next)}&sent=1`);
+  } catch (err) {
+    console.error('[Auth] Failed to send MFA email:', err);
+    res.clearCookie('mfa_pending');
+    return loginRender(res, { error: 'Could not send verification email. Please try again.', email, next, tab: 'password' });
+  }
+});
+
+// GET /auth/mfa
+router.get('/mfa', (req, res) => {
+  const pendingJwt = req.cookies.mfa_pending;
+  if (!pendingJwt) return res.redirect('/auth/login');
+
+  let payload;
+  try {
+    payload = jwt.verify(pendingJwt, config.jwtSecret);
+    if (payload.purpose !== 'mfa_pending') throw new Error('wrong purpose');
+  } catch (_) {
+    res.clearCookie('mfa_pending');
+    return res.redirect('/auth/login');
+  }
+
+  const user = db.getUserById(payload.userId);
+  if (!user || user.blocked_at) {
+    res.clearCookie('mfa_pending');
+    return res.redirect('/auth/login');
+  }
+
+  const mode    = req.query.mode || (user.totp_enabled ? 'totp' : 'email');
+  const tokenId = req.query.t   || null;
+  const next    = safeRedirectUrl(req.query.next);
+  const sent    = req.query.sent === '1';
+
+  res.render('auth/mfa', { title: 'Verify your identity', error: null, mode, tokenId, next, sent });
+});
+
+// POST /auth/mfa
+router.post('/mfa', async (req, res) => {
+  const pendingJwt = req.cookies.mfa_pending;
+  const next       = safeRedirectUrl(req.body.next);
+  const mode       = req.body.mode   || 'email';
+  const tokenId    = req.body.tokenId || null;
+
+  if (!pendingJwt) return res.redirect('/auth/login');
+
+  let payload;
+  try {
+    payload = jwt.verify(pendingJwt, config.jwtSecret);
+    if (payload.purpose !== 'mfa_pending') throw new Error('wrong purpose');
+  } catch (_) {
+    res.clearCookie('mfa_pending');
+    return res.redirect('/auth/login');
+  }
+
+  const user = db.getUserById(payload.userId);
+  if (!user || user.blocked_at) {
+    res.clearCookie('mfa_pending');
+    return res.redirect('/auth/login');
+  }
+
+  function mfaError(msg) {
+    return res.render('auth/mfa', { title: 'Verify your identity', error: msg, mode, tokenId, next, sent: false });
+  }
+
+  if (mode === 'totp') {
+    const code = (req.body.totp_code || '').trim().replace(/\s/g, '');
+    if (!user.totp_secret || !user.totp_enabled) return mfaError('Authenticator not configured. Please contact support.');
+    let valid = false;
+    try { valid = totpVerifySync({ token: code, secret: user.totp_secret }).valid; } catch (_) {}
+    if (!valid) {
+      logUser(user.email, 'FAILED - invalid TOTP');
+      return mfaError('Invalid code. Please check your authenticator app and try again.');
+    }
+  } else {
+    if (!tokenId) return mfaError('Missing verification token. Please start over.');
+    const code   = (req.body.otp || '').trim();
+    const result = db.verifyOTPByTokenId(tokenId, code);
+    if (!result) {
+      logUser(user.email, 'FAILED - invalid MFA email code');
+      return mfaError('Invalid or expired code. Please try again.');
+    }
+    if (result.locked) {
+      const waitMins = Math.ceil((result.lockedUntil - Math.floor(Date.now() / 1000)) / 60);
+      return mfaError(waitMins > 1
+        ? `Too many incorrect attempts. Please wait ${waitMins} minutes.`
+        : 'Too many incorrect attempts. Please wait a moment.');
+    }
+  }
+
+  logUser(user.email, 'SUCCESS (password + MFA)');
+  res.clearCookie('mfa_pending');
+  issueSessionCookie(res, user);
+  res.redirect(next);
 });
 
 // POST /auth/logout

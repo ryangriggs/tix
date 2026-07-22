@@ -308,6 +308,9 @@ async function initDb() {
   try { _db.exec('ALTER TABLE organizations ADD COLUMN urgent_notify_user_ids TEXT'); } catch (_) {}
   try { _db.exec('ALTER TABLE tickets ADD COLUMN pending_until       INTEGER'); } catch (_) {}
   try { _db.exec('ALTER TABLE tickets ADD COLUMN pending_reminded_at INTEGER'); } catch (_) {}
+  try { _db.exec('ALTER TABLE users ADD COLUMN password_hash TEXT'); } catch (_) {}
+  try { _db.exec('ALTER TABLE users ADD COLUMN totp_secret TEXT'); } catch (_) {}
+  try { _db.exec('ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   _db.exec('CREATE INDEX IF NOT EXISTS idx_comments_location ON comments(location_id)');
   // Back-fill close_date for tickets closed before this column existed
   _db.exec(`UPDATE tickets SET close_date = updated_at WHERE status = 'closed' AND close_date IS NULL`);
@@ -441,6 +444,22 @@ function updateUserSuperuser(userId, val) {
 
 function setUserNotificationsMuted(userId, val) {
   prepare('UPDATE users SET notifications_muted = ? WHERE id = ?').run(val ? 1 : 0, userId);
+}
+
+function setUserPassword(userId, hash) {
+  prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId);
+}
+
+function clearUserPassword(userId) {
+  prepare('UPDATE users SET password_hash = NULL WHERE id = ?').run(userId);
+}
+
+function setUserTotp(userId, secret) {
+  prepare('UPDATE users SET totp_secret = ?, totp_enabled = 1 WHERE id = ?').run(secret, userId);
+}
+
+function disableUserTotp(userId) {
+  prepare('UPDATE users SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?').run(userId);
 }
 
 function updateUserCanAddParticipants(userId, val) {
@@ -1499,6 +1518,7 @@ module.exports = {
   findOrCreateUser, getUserById, getUserByEmail, getAllUsers, getUsersSorted, getAssignableUsers,
   updateUserRole, updateUserName, blockUser, unblockUser, deleteUser,
   updateUserOrganization, updateUserSuperuser, setUserNotificationsMuted, updateUserCanAddParticipants,
+  setUserPassword, clearUserPassword, setUserTotp, disableUserTotp,
   filterNotificationRecipients, searchUsers,
   // Auth
   createAuthToken, verifyAuthToken, verifyOTPByTokenId, getAuthTokenEmail,

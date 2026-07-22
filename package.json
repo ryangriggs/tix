@@ -1,6 +1,6 @@
 {
   "name": "tix",
-  "version": "1.2.69",
+  "version": "1.2.70",
   "description": "Simple email-based ticketing system",
   "main": "src/tix.js",
   "scripts": {
@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "archiver": "^7.0.1",
+    "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.6",
     "dotenv": "^17.3.1",
     "ejs": "^3.1.10",
@@ -26,6 +27,8 @@
     "mailparser": "^3.7.1",
     "multer": "^2.0.0",
     "nodemailer": "^8.0.1",
+    "otplib": "^13.4.1",
+    "qrcode": "^1.5.4",
     "sanitize-html": "^2.12.1",
     "smtp-server": "^3.13.0",
     "sql.js": "^1.12.0",

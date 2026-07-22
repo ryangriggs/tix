@@ -261,6 +261,16 @@ function send(opts) {
 // Public helpers
 // ============================================================
 
+async function sendMfaOtp(toEmail, otp) {
+  const html = await renderEmail('mfa-otp', { otp });
+  await send({
+    to:      toEmail,
+    subject: 'Your verification code',
+    html,
+    text:    `Your verification code: ${otp}\n\nThis code expires in 15 minutes. If you did not request this, someone may have your password.`,
+  });
+}
+
 async function sendMagicLink(toEmail, magicLinkUrl, otp) {
   const html = await renderEmail('login', { magicLinkUrl, otp });
   await send({
@@ -409,4 +419,4 @@ async function sendAdminNewUserNotification(user, source) {
   send({ to: adminEmail, subject: `New user: ${user.email}`, html, text });
 }
 
-module.exports = { send, sendMagicLink, sendTicketNotification, sendDueReminder, sendInactivityReminder, sendPendingReminder, sendAdminNewUserNotification, resetMailTransport, makeUnsubToken, parseUnsubToken, logEmail };
+module.exports = { send, sendMfaOtp, sendMagicLink, sendTicketNotification, sendDueReminder, sendInactivityReminder, sendPendingReminder, sendAdminNewUserNotification, resetMailTransport, makeUnsubToken, parseUnsubToken, logEmail };

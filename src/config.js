@@ -58,6 +58,7 @@ const config = {
   notifyEmailStatusChange: true,
   enableBillableHours: true,
   enableLocation: true,
+  passwordLoginEnabled: false,
 
   appUrl: (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, ''),
 
@@ -122,6 +123,7 @@ function applySettings(map) {
   if ('notify_email_status_change' in map) config.notifyEmailStatusChange = map.notify_email_status_change !== 'false';
   if ('enable_billable_hours'    in map) config.enableBillableHours   = map.enable_billable_hours   !== 'false';
   if ('enable_location'          in map) config.enableLocation         = map.enable_location          !== 'false';
+  if ('password_login_enabled'   in map) config.passwordLoginEnabled   = map.password_login_enabled   === 'true';
 
   if ('jwt_secret'          in map) config.jwtSecret         = map.jwt_secret          || config.jwtSecret;
   if ('secure_session'      in map) config.secureSession      = map.secure_session      === 'true';

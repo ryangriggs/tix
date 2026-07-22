@@ -68,6 +68,9 @@
     <div class="app-header-right">
       <% if (user) { %>
         <span class="user-email"><%= user.email %></span>
+        <% if (passwordLoginEnabled) { %>
+          <a href="/account/security" class="btn btn-ghost btn-sm">Security</a>
+        <% } %>
         <form method="POST" action="/auth/logout" style="display:inline">
           <button type="submit" class="btn btn-ghost btn-sm">Log out</button>
         </form>

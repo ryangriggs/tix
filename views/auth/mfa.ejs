@@ -1,0 +1,79 @@
+<%- include('../partials/head', { title: 'Verify your identity' }) %>
+<main class="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo"><%= siteName %></div>
+    <h1 class="auth-title">Verify your identity</h1>
+
+    <% if (mode === 'email' && sent) { %>
+      <p class="auth-subtitle">We emailed a 6-digit verification code. Enter it below.</p>
+    <% } else if (mode === 'totp') { %>
+      <p class="auth-subtitle">Enter the code from your authenticator app.</p>
+    <% } %>
+
+    <% if (error) { %>
+      <div class="alert alert-error"><%= error %></div>
+    <% } %>
+
+    <% if (mode === 'totp') { %>
+      <form method="POST" action="/auth/mfa" class="auth-form" id="mfa-form">
+        <input type="hidden" name="mode"    value="totp">
+        <input type="hidden" name="next"    value="<%= next %>">
+        <div class="form-group">
+          <label for="totp-code">Authenticator code</label>
+          <input type="text" id="totp-code" name="totp_code"
+                 inputmode="numeric" maxlength="6" placeholder="000000"
+                 autocomplete="one-time-code" autofocus required class="form-input otp-input">
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Verify</button>
+      </form>
+    <% } else { %>
+      <form method="POST" action="/auth/mfa" class="auth-form" id="mfa-form">
+        <input type="hidden" name="mode"    value="email">
+        <input type="hidden" name="tokenId" value="<%= tokenId %>">
+        <input type="hidden" name="next"    value="<%= next %>">
+        <div class="form-group">
+          <label for="otp">6-digit code</label>
+          <input type="text" id="otp" name="otp"
+                 inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+                 placeholder="123456" autocomplete="one-time-code"
+                 autofocus required class="form-input otp-input">
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Verify code</button>
+      </form>
+    <% } %>
+
+    <div style="margin-top:1.5rem;text-align:center">
+      <a href="/auth/login" class="link-muted">← Back to login</a>
+    </div>
+  </div>
+</main>
+
+<div id="mfa-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;flex-direction:column;align-items:center;justify-content:center;gap:1rem">
+  <div style="width:40px;height:40px;border:4px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite"></div>
+  <p style="color:#fff;font-size:1rem;font-weight:500;margin:0">Please wait…</p>
+</div>
+<script>
+  const mfaForm  = document.getElementById('mfa-form');
+  const otpInput = document.getElementById('otp') || document.getElementById('totp-code');
+
+  function showOverlay() {
+    document.getElementById('mfa-overlay').style.display = 'flex';
+  }
+
+  if (otpInput) {
+    otpInput.addEventListener('input', () => {
+      const val = otpInput.value.replace(/\D/g, '');
+      if (val.length === 6) {
+        otpInput.value = val;
+        showOverlay();
+        mfaForm.submit();
+      }
+    });
+    otpInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); showOverlay(); mfaForm.submit(); }
+    });
+  }
+
+  mfaForm.addEventListener('submit', showOverlay);
+</script>
+<%- include('../partials/foot') %>

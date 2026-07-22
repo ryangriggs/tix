@@ -91,6 +91,16 @@ router.post('/users/:id/edit', (req, res) => {
   res.redirect('/admin/users?message=User+updated');
 });
 
+// POST /admin/users/:id/reset-password — clear a user's password (they must use magic link)
+router.post('/users/:id/reset-password', (req, res) => {
+  const id   = parseInt(req.params.id, 10);
+  const user = db.getUserById(id);
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+  db.clearUserPassword(id);
+  audit.log(req, `reset password for user ${user.email}`);
+  res.json({ ok: true });
+});
+
 // POST /admin/users/:id/impersonate — sign in as another user
 router.post('/users/:id/impersonate', (req, res) => {
   const target = db.getUserById(parseInt(req.params.id, 10));
@@ -527,6 +537,7 @@ router.post('/settings', (req, res) => {
     notify_email_status_change:     req.body.notify_email_status_change === '1' ? 'true' : 'false',
     enable_billable_hours:          req.body.enable_billable_hours     === '1' ? 'true' : 'false',
     enable_location:                req.body.enable_location           === '1' ? 'true' : 'false',
+    password_login_enabled:         req.body.password_login_enabled    === '1' ? 'true' : 'false',
     update_check_enabled:           req.body.update_check_enabled      === '1' ? 'true' : 'false',
     update_repo_url:                trim('update_repo_url') || 'https://github.com/ryangriggs/tix.git',
     update_check_interval_hours:    String(Math.max(1, flt('update_check_interval_hours', 24))),

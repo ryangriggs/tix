@@ -77,6 +77,7 @@
               data-user-blocked="<%= u.blocked_at ? '1' : '0' %>"
               data-user-notifications-muted="<%= u.notifications_muted ? '1' : '0' %>"
               data-user-can-add-participants="<%= u.can_add_participants ? '1' : '0' %>"
+              data-user-has-password="<%= u.password_hash ? '1' : '0' %>"
               data-is-self="<%= u.id === user.id ? '1' : '0' %>">Edit</button>
           </td>
         </tr>
@@ -99,6 +100,7 @@
         data-user-blocked="<%= u.blocked_at ? '1' : '0' %>"
         data-user-notifications-muted="<%= u.notifications_muted ? '1' : '0' %>"
         data-user-can-add-participants="<%= u.can_add_participants ? '1' : '0' %>"
+        data-user-has-password="<%= u.password_hash ? '1' : '0' %>"
         data-is-self="<%= u.id === user.id ? '1' : '0' %>">
         <div class="user-card-top">
           <span class="user-card-name"><%= u.name || u.email %></span>
@@ -201,6 +203,11 @@
   <div class="dialog-footer">
     <div style="display:flex;gap:.5rem">
       <button type="button" id="dialog-delete-btn" class="btn btn-sm btn-danger" onclick="dialogDeleteUser()">Delete</button>
+      <form id="dialog-reset-pw-form" method="POST" action="" style="display:none">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button type="submit" class="btn btn-sm btn-danger"
+                onclick="return confirm('Clear this user\'s password? They will need to use a magic link to sign in.')">Reset Password</button>
+      </form>
       <form id="dialog-impersonate-form" method="POST" action="" style="display:inline">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <button type="submit" id="dialog-impersonate-btn" class="btn btn-sm btn-secondary"
@@ -264,12 +271,14 @@ function openEditDialog(btn) {
 
   document.getElementById('dialog-edit-form').action = `/admin/users/${d.userId}/edit`;
   document.getElementById('dialog-impersonate-form').action = `/admin/users/${d.userId}/impersonate`;
+  document.getElementById('dialog-reset-pw-form').action = `/admin/users/${d.userId}/reset-password`;
 
   const isSelf = d.isSelf === '1';
   const deleteBtn = document.getElementById('dialog-delete-btn');
   deleteBtn.style.display = isSelf ? 'none' : '';
   document.getElementById('dialog-impersonate-btn').style.display = isSelf ? 'none' : '';
   document.getElementById('dialog-active-row').style.display = isSelf ? 'none' : '';
+  document.getElementById('dialog-reset-pw-form').style.display = (d.userHasPassword === '1' && !isSelf) ? 'inline' : 'none';
 
   updateDialogSections();
 
