@@ -187,6 +187,32 @@ a:hover { text-decoration: underline; }
 }
 .nav-dropdown-item:hover { background: var(--bg); color: var(--text); }
 
+/* User account avatar + dropdown */
+.user-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  font-size: .8rem; font-weight: 700;
+  border: none; cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s; user-select: none;
+}
+.user-avatar:hover { background: var(--accent-hover); }
+.user-menu-panel { right: 0; left: auto; min-width: 190px; }
+.user-menu-email {
+  padding: .5rem .85rem .45rem;
+  font-size: .78rem; color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border-bottom: 1px solid var(--border); margin-bottom: .25rem;
+}
+.user-menu-divider { border-top: 1px solid var(--border); margin: .25rem 0; }
+.user-menu-signout {
+  display: block; width: 100%; padding: .4rem .85rem;
+  font-size: .875rem; white-space: nowrap; text-align: left;
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font); color: var(--danger);
+}
+.user-menu-signout:hover { background: var(--danger-light); }
+
 /* ============================================================
    Timeline page
    ============================================================ */
@@ -317,9 +343,9 @@ a:hover { text-decoration: underline; }
   }
   .timeline-sidebar-toggle { display: block; }
   .timeline-sidebar-body.collapsed { display: none; }
-  /* Nav dropdown on mobile: inline items, no hover */
-  .nav-dropdown-menu { display: block; position: static; box-shadow: none; border: none; padding: 0; }
-  .nav-dropdown-item { padding: .6rem .75rem; font-size: .95rem; }
+  /* Nav dropdown on mobile: inline items, no hover (exclude user menu which keeps its overlay behaviour) */
+  .nav-dropdown-menu:not(.user-menu-panel) { display: block; position: static; box-shadow: none; border: none; padding: 0; }
+  .nav-dropdown:not(.user-menu) .nav-dropdown-item { padding: .6rem .75rem; font-size: .95rem; }
 }
 
 /* ============================================================
@@ -1799,7 +1825,6 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   .form-row .form-group .form-select-sm { padding: 0.5rem 0.75rem; font-size: 0.875rem; }
 
   .app-header-inner { gap: 0.5rem; }
-  .user-email { display: none; }
   .hamburger-btn { display: flex; }
   .app-nav {
     display: none;

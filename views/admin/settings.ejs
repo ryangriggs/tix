@@ -530,6 +530,18 @@
           Create a site, choose <strong>Managed</strong> challenge type, and add your domain.
         </p>
       </div>
+
+      <hr class="settings-hr">
+      <h3 class="settings-sub-title">Password Login</h3>
+
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" name="password_login_enabled" value="1"
+                 <%= s.password_login_enabled === 'true' ? 'checked' : '' %>>
+          Enable password-based login
+        </label>
+        <p class="form-hint">Allow users to sign in with a password (requires MFA — authenticator app or emailed code). When disabled, only magic link login is available.</p>
+      </div>
     </div>
 
     <!-- ── Uploads ────────────────────────────────────────────── -->
@@ -606,14 +618,6 @@
         <p class="form-hint">Show the location field on ticket replies and include the Travel Report in Reports.</p>
       </div>
 
-      <div class="form-group">
-        <label class="checkbox-label">
-          <input type="checkbox" name="password_login_enabled" value="1"
-                 <%= s.password_login_enabled === 'true' ? 'checked' : '' %>>
-          Enable password-based login
-        </label>
-        <p class="form-hint">Allow users to sign in with a password (requires MFA — authenticator app or emailed code). When disabled, only magic link login is available.</p>
-      </div>
     </div>
 
     <!-- ── System ─────────────────────────────────────────────── -->

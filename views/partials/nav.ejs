@@ -67,13 +67,21 @@
     </nav>
     <div class="app-header-right">
       <% if (user) { %>
-        <span class="user-email"><%= user.email %></span>
-        <% if (passwordLoginEnabled) { %>
-          <a href="/account/security" class="btn btn-ghost btn-sm">Security</a>
-        <% } %>
-        <form method="POST" action="/auth/logout" style="display:inline">
-          <button type="submit" class="btn btn-ghost btn-sm">Log out</button>
-        </form>
+      <div class="nav-dropdown user-menu">
+        <button type="button" class="user-avatar" aria-label="Account menu" aria-haspopup="true">
+          <%= user.email[0].toUpperCase() %>
+        </button>
+        <div class="nav-dropdown-menu user-menu-panel">
+          <div class="user-menu-email"><%= user.email %></div>
+          <% if (passwordLoginEnabled) { %>
+          <a href="/account/security" class="nav-dropdown-item">Security</a>
+          <% } %>
+          <div class="user-menu-divider"></div>
+          <form method="POST" action="/auth/logout" style="margin:0">
+            <button type="submit" class="user-menu-signout">Log out</button>
+          </form>
+        </div>
+      </div>
       <% } %>
     </div>
     <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle menu" aria-expanded="false">
