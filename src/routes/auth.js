@@ -17,6 +17,15 @@ const { issueSessionCookie } = require('../middleware/auth');
 // Login rate limiting — in-memory, resets on restart
 // ============================================================
 
+// TOTP MFA attempt tracking: key = `${userId}:${iat}` (identifies one mfa_pending JWT)
+const _mfaTotpAttempts = new Map(); // key → { tries, expiresAt }
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of _mfaTotpAttempts) {
+    if (v.expiresAt < now) _mfaTotpAttempts.delete(k);
+  }
+}, 5 * 60_000).unref();
+
 const _loginByIp    = new Map(); // ip  → [timestamp, ...]
 const _loginByEmail = new Map(); // email → [timestamp, ...]
 
@@ -95,7 +104,8 @@ async function sendOtp(res, user, email, next, onError) {
 router.get('/login', (req, res) => {
   if (req.cookies.session) return res.redirect('/');
   const next = safeRedirectUrl(req.query.next);
-  loginRender(res, { error: null, email: '', next });
+  const errorMap = { mfa_locked: 'Too many incorrect MFA attempts. Please log in again.' };
+  loginRender(res, { error: errorMap[req.query.error] || null, email: '', next });
 });
 
 // POST /auth/login
@@ -421,15 +431,35 @@ router.post('/mfa', async (req, res) => {
     return res.render('auth/mfa', { title: 'Verify your identity', error: msg, mode, tokenId, next, sent: false });
   }
 
+  // Key that uniquely identifies this mfa_pending token (userId + issued-at)
+  const totpKey = `${payload.userId}:${payload.iat}`;
+
   if (mode === 'totp') {
     const code = (req.body.totp_code || '').trim().replace(/\s/g, '');
     if (!user.totp_secret || !user.totp_enabled) return mfaError('Authenticator not configured. Please contact support.');
+
+    // Enforce TOTP attempt limit (same threshold as OTP)
+    const maxTries = config.otpMaxTries || 5;
+    const entry = _mfaTotpAttempts.get(totpKey);
+    if (entry && entry.tries >= maxTries) {
+      logUser(user.email, 'FAILED - TOTP locked out');
+      res.clearCookie('mfa_pending');
+      return res.redirect('/auth/login?error=mfa_locked');
+    }
+
     let valid = false;
     try { valid = totpVerifySync({ token: code, secret: user.totp_secret }).valid; } catch (_) {}
     if (!valid) {
+      const tries = (entry ? entry.tries : 0) + 1;
+      _mfaTotpAttempts.set(totpKey, { tries, expiresAt: Date.now() + 10 * 60_000 });
       logUser(user.email, 'FAILED - invalid TOTP');
-      return mfaError('Invalid code. Please check your authenticator app and try again.');
+      if (tries >= maxTries) {
+        res.clearCookie('mfa_pending');
+        return res.redirect('/auth/login?error=mfa_locked');
+      }
+      return mfaError(`Invalid code. ${maxTries - tries} attempt${maxTries - tries === 1 ? '' : 's'} remaining.`);
     }
+    _mfaTotpAttempts.delete(totpKey);
   } else {
     if (!tokenId) return mfaError('Missing verification token. Please start over.');
     const code   = (req.body.otp || '').trim();
@@ -444,6 +474,12 @@ router.post('/mfa', async (req, res) => {
         ? `Too many incorrect attempts. Please wait ${waitMins} minutes.`
         : 'Too many incorrect attempts. Please wait a moment.');
     }
+    // CRITICAL: ensure this OTP token was issued for the same user as mfa_pending
+    if (result.user_id !== user.id) {
+      logUser(user.email, 'BLOCKED - MFA token user mismatch');
+      res.clearCookie('mfa_pending');
+      return res.redirect('/auth/login');
+    }
   }
 
   logUser(user.email, 'SUCCESS (password + MFA)');
@@ -456,6 +492,7 @@ router.post('/mfa', async (req, res) => {
 router.post('/logout', (req, res) => {
   res.clearCookie('session');
   res.clearCookie('admin_session');
+  res.clearCookie('mfa_pending');
   res.redirect('/auth/login');
 });
 

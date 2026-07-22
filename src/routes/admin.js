@@ -5,6 +5,7 @@ const fs      = require('fs');
 const path    = require('path');
 const router  = express.Router();
 
+const bcrypt  = require('bcryptjs');
 const db = require('../db');
 const config = require('../config');
 const { issueSessionCookie } = require('../middleware/auth');
@@ -52,7 +53,7 @@ router.get('/users/:id/tech-orgs', (req, res) => {
 });
 
 // POST /admin/users/:id/edit — combined property update from dialog
-router.post('/users/:id/edit', (req, res) => {
+router.post('/users/:id/edit', async (req, res) => {
   const id         = parseInt(req.params.id, 10);
   const editTarget = db.getUserById(id);
   const name = (req.body.name || '').trim();
@@ -86,6 +87,14 @@ router.post('/users/:id/edit', (req, res) => {
 
   const canAddParticipants = req.body.can_add_participants === '1' ? 1 : 0;
   db.updateUserCanAddParticipants(id, canAddParticipants);
+
+  const newPassword = (req.body.new_password || '').trim();
+  if (newPassword && config.passwordLoginEnabled) {
+    if (newPassword.length >= 8) {
+      const hash = await bcrypt.hash(newPassword, 12);
+      db.setUserPassword(id, hash);
+    }
+  }
 
   audit.log(req, `edited user ${editTarget?.email || id}`);
   res.redirect('/admin/users?message=User+updated');

@@ -181,6 +181,15 @@
           <span>Allow adding participants to tickets <span style="font-size:.8rem;color:var(--text-muted)">(via email CC or web UI)</span></span>
         </label>
       </div>
+
+      <% if (passwordLoginEnabled) { %>
+      <div class="form-group">
+        <label for="dialog-new-password">Password</label>
+        <input type="password" id="dialog-new-password" name="new_password"
+               class="form-input" autocomplete="new-password" placeholder="Leave blank to keep unchanged">
+        <p class="form-hint" id="dialog-password-hint"></p>
+      </div>
+      <% } %>
     </form>
 
     <!-- Additional orgs section (technicians + superusers) -->
@@ -279,6 +288,13 @@ function openEditDialog(btn) {
   document.getElementById('dialog-impersonate-btn').style.display = isSelf ? 'none' : '';
   document.getElementById('dialog-active-row').style.display = isSelf ? 'none' : '';
   document.getElementById('dialog-reset-pw-form').style.display = (d.userHasPassword === '1' && !isSelf) ? 'inline' : 'none';
+
+  var pwInput = document.getElementById('dialog-new-password');
+  var pwHint  = document.getElementById('dialog-password-hint');
+  if (pwInput) {
+    pwInput.value = '';
+    if (pwHint) pwHint.textContent = d.userHasPassword === '1' ? 'Password is set.' : 'No password set.';
+  }
 
   updateDialogSections();
 
